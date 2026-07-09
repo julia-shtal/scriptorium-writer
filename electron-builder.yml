@@ -1,0 +1,31 @@
+appId: com.scriptorium.app
+productName: Scriptorium
+copyright: Copyright © 2026 Julia Shtal
+
+directories:
+  buildResources: build
+  output: release
+
+# Compiled output from electron-vite (main / preload / renderer) plus the
+# manifest. resources/ (icons, dictionaries) get bundled in later milestones.
+files:
+  - out/**/*
+  - package.json
+
+# TODO(M4/M9): bundle resources/dictionaries for offline spellcheck.
+# extraResources:
+#   - from: resources
+#     to: resources
+
+win:
+  target:
+    - nsis
+  # TODO(M9): add resources/icons/icon.ico
+
+# Per-user install; no code signing in v1 (tracked as a follow-up in M9).
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

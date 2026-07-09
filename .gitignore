@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+release/
+
+# electron-vite / vite caches
+.vite/
+*.tsbuildinfo
+.eslintcache
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.local
