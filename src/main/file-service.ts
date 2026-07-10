@@ -39,7 +39,7 @@ import {
 } from '@shared/schema'
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
-import { countWords } from './word-count'
+import { countWords } from '@shared/word-count'
 import {
   chapterFileStem,
   isoSafeTimestamp,

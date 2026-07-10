@@ -1,37 +1,34 @@
 import { useEffect, useState } from 'react'
+import { AppFrame } from '@renderer/components/AppFrame'
+import { EditorView } from '@renderer/views/EditorView'
+import { bootstrapLibrary } from '@renderer/store/bootstrap'
+import { useEditorStore } from '@renderer/store/editorStore'
 
-/**
- * M0 placeholder. Proves the full IPC + contextBridge path by calling
- * `window.api.ping()` and rendering the result. No styling, no editor, no data
- * layer — those arrive in later milestones.
- */
-function App(): JSX.Element {
-  const [pong, setPong] = useState<string>('…')
+export default function App(): JSX.Element {
+  const openChapter = useEditorStore((s) => s.openChapter)
+  const chapterId = useEditorStore((s) => s.chapterId)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    window.api
-      .ping()
-      .then((result) => {
-        if (!cancelled) setPong(result)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setPong(`error: ${String(err)}`)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    void (async () => {
+      try {
+        const { storyId, chapterId } = await bootstrapLibrary()
+        await openChapter(storyId, chapterId)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Не удалось открыть библиотеку')
+      }
+    })()
+  }, [openChapter])
 
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
-      <h1>Scriptorium Writer</h1>
-      <p>
-        IPC check — <code>window.api.ping()</code> returned:{' '}
-        <strong data-testid="ping-result">{pong}</strong>
-      </p>
-    </div>
+    <AppFrame>
+      {error ? (
+        <div style={{ padding: 34 }}>Ошибка: {error}</div>
+      ) : chapterId ? (
+        <EditorView />
+      ) : (
+        <div style={{ padding: 34 }}>Загрузка…</div>
+      )}
+    </AppFrame>
   )
 }
-
-export default App
