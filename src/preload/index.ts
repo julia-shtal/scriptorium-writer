@@ -1,14 +1,64 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Api } from '@shared/types'
+import { AppError, decodeIpcError } from '@shared/errors'
 
 /**
  * Typed `window.api` surface. Every method is a thin wrapper over
  * `ipcRenderer.invoke`, with signatures that exactly match `@shared/types` (Api).
  *
- * M0 exposes only `ping`. M1 grows this to the full FileService surface.
+ * Errors thrown in main are encoded into the rejection's message (see
+ * `src/main/ipc.ts`); we decode them back into a typed {@link AppError} so the
+ * renderer gets a real `code` to branch on instead of an opaque string.
  */
+async function invoke<T>(channel: keyof Api, ...args: unknown[]): Promise<T> {
+  try {
+    return (await ipcRenderer.invoke(channel, ...args)) as T
+  } catch (err) {
+    const decoded = err instanceof Error ? decodeIpcError(err.message) : null
+    if (decoded) throw new AppError(decoded.code, decoded.message)
+    throw err
+  }
+}
+
 const api: Api = {
-  ping: () => ipcRenderer.invoke('ping')
+  ping: () => invoke('ping'),
+
+  // library
+  listStories: () => invoke('listStories'),
+  createStory: (input) => invoke('createStory', input),
+  deleteStory: (id) => invoke('deleteStory', id),
+
+  // story
+  readStory: (id) => invoke('readStory', id),
+  updateStoryMeta: (id, meta) => invoke('updateStoryMeta', id, meta),
+  reorderChapters: (id, chapterIds) => invoke('reorderChapters', id, chapterIds),
+
+  // chapters
+  createChapter: (storyId, title) => invoke('createChapter', storyId, title),
+  readChapter: (storyId, chapterId) => invoke('readChapter', storyId, chapterId),
+  saveChapter: (storyId, chapter) => invoke('saveChapter', storyId, chapter),
+  deleteChapter: (storyId, chapterId) => invoke('deleteChapter', storyId, chapterId),
+
+  // versions
+  listVersions: (storyId, chapterId) => invoke('listVersions', storyId, chapterId),
+  readVersion: (storyId, chapterId, versionId) =>
+    invoke('readVersion', storyId, chapterId, versionId),
+  restoreVersion: (storyId, chapterId, versionId) =>
+    invoke('restoreVersion', storyId, chapterId, versionId),
+
+  // notes
+  readNotes: (storyId) => invoke('readNotes', storyId),
+  saveNotes: (storyId, notes) => invoke('saveNotes', storyId, notes),
+
+  // settings
+  readSettings: () => invoke('readSettings'),
+  saveSettings: (settings) => invoke('saveSettings', settings),
+
+  // recovery
+  scanLibrary: () => invoke('scanLibrary'),
+
+  // misc
+  revealInFolder: (path) => invoke('revealInFolder', path)
 }
 
 // With contextIsolation enabled (it always is — see main), expose through the

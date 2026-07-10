@@ -83,6 +83,21 @@ export interface VersionSummary {
   wordCount: number
 }
 
+/**
+ * Reported by the startup scan when a chapter's canon `.json` is missing or fails
+ * to parse. Never a side effect — the corrupt/missing file is left untouched and the
+ * renderer (M5) uses this to offer a one-click restore from `newestVersionId`.
+ */
+export interface ChapterRecovery {
+  storyId: string
+  chapterId: string
+  /** Best-effort title (from a readable snapshot); may be absent if unrecoverable. */
+  chapterTitle?: string
+  reason: 'missing' | 'corrupt'
+  /** Newest snapshot available to restore from, or `null` if none exists. */
+  newestVersionId: string | null
+}
+
 export interface NoteEntry {
   id: string
   name: string
@@ -114,20 +129,47 @@ export interface Settings {
 }
 
 /**
- * The typed surface exposed on `window.api` via the preload contextBridge.
- *
- * M0 wires only `ping` end-to-end to prove the IPC + contextBridge path. The full
- * surface (library / story / chapters / versions / notes / settings) lands in M1.
+ * The typed surface exposed on `window.api` via the preload contextBridge. Every
+ * method here is backed 1:1 by an `ipcMain.handle` registration delegating to the
+ * main-process `FileService`. Signatures are the single source of truth for both
+ * the preload wrappers and the IPC handlers.
  */
 export interface Api {
   /** Round-trips through `ipcMain.handle('ping')`; returns `'pong'`. */
   ping(): Promise<'pong'>
 
-  // TODO(M1): library — listStories, createStory, deleteStory
-  // TODO(M1): story — readStory, updateStoryMeta, reorderChapters
-  // TODO(M1): chapters — createChapter, readChapter, saveChapter, deleteChapter
-  // TODO(M1): versions — listVersions, readVersion, restoreVersion
-  // TODO(M1): notes — readNotes, saveNotes
-  // TODO(M1): settings — readSettings, saveSettings
-  // TODO(M1): misc — revealInFolder
+  // library
+  listStories(): Promise<StorySummary[]>
+  createStory(input: NewStoryInput): Promise<Story>
+  deleteStory(id: string): Promise<void> // soft delete → .trash
+
+  // story
+  readStory(id: string): Promise<Story>
+  updateStoryMeta(id: string, meta: Partial<StoryMeta>): Promise<Story>
+  reorderChapters(id: string, chapterIds: string[]): Promise<void>
+
+  // chapters
+  createChapter(storyId: string, title: string): Promise<Chapter>
+  readChapter(storyId: string, chapterId: string): Promise<Chapter>
+  saveChapter(storyId: string, chapter: ChapterWrite): Promise<SaveResult>
+  deleteChapter(storyId: string, chapterId: string): Promise<void> // soft delete
+
+  // versions
+  listVersions(storyId: string, chapterId: string): Promise<VersionSummary[]>
+  readVersion(storyId: string, chapterId: string, versionId: string): Promise<Chapter>
+  restoreVersion(storyId: string, chapterId: string, versionId: string): Promise<Chapter>
+
+  // notes
+  readNotes(storyId: string): Promise<Notes>
+  saveNotes(storyId: string, notes: Notes): Promise<void>
+
+  // settings
+  readSettings(): Promise<Settings>
+  saveSettings(settings: Settings): Promise<void>
+
+  // recovery — startup scan for missing/corrupt canon (consumed by M5)
+  scanLibrary(): Promise<ChapterRecovery[]>
+
+  // misc
+  revealInFolder(path: string): Promise<void> // open a folder in the OS file explorer
 }
