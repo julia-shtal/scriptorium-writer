@@ -36,7 +36,7 @@ See `SPEC.md` for the full design and `TASKS.md` for the milestone breakdown.
 
 ```bash
 npm install
-npm run dev      # opens a window; the placeholder shows the result of window.api.ping()
+npm run dev      # opens the book-themed editor on a seeded demo chapter
 ```
 
 > **npm 11 note:** npm 11 blocks package install scripts by default, so `npm install`
@@ -44,7 +44,9 @@ npm run dev      # opens a window; the placeholder shows the result of window.ap
 > uninstall`, fetch it once with `node node_modules/electron/install.js` (or allow it
 > via `npm approve-scripts electron`), then re-run `npm run dev`.
 
-`npm run dev` opens a window that displays `pong`, fetched over IPC — proving the
+`npm run dev` opens the book-framed writing surface. On first run the app seeds a demo
+story so there is something to edit (a stand-in for the Library/Chapters navigation that
+arrives in M6); edits are persisted through the M1 `window.api`, proving the
 main → preload (contextBridge) → renderer path works end to end.
 
 ## Architecture
@@ -116,6 +118,31 @@ files may be renamed safely. The Markdown backup copy (`.md`) is **not** written
 
 Run the data-layer tests with `npm run test`.
 
+## Editor (M2)
+
+The writing surface is a **TipTap 2/ProseMirror** editor styled as a parchment book
+page (`src/renderer/editor/`), themed entirely with CSS tokens in
+`src/renderer/theme/book.css` (palette + page-stack texture from SPEC §10, no hard-coded
+colours elsewhere). Its content is ProseMirror JSON — the same canon the M1 data layer
+persists.
+
+- **Toolbar** — italic/bold/strike, align left/center/right, undo/redo, a **Tab**
+  control that toggles the first-line indent (a per-chapter *view* preference applied as
+  a global `.indent-on` CSS class — it does **not** insert tab characters), a `✳✳✳`
+  scene-divider (a real custom block node, `SceneDivider.ts`), and stub buttons for
+  footnotes (M3), the cleanup wand (M8).
+- **Footer** — live word count (chapter + selection), a manual **Save** button wired to
+  `window.api.saveChapter`, and placeholders for autosave status (M5) and spellcheck
+  languages (M4).
+- **Focus mode** hides the sidebar and editor chrome; the collapsible sidebar lists the
+  SPEC §10 views (only *Editor* is live in M2 — the rest arrive in M6).
+
+State lives in two small Zustand stores (`src/renderer/store/`): `editorStore` (open
+chapter, dirty flag, word count, save) and `uiStore` (focus/sidebar/active view). Word
+counting is **single-sourced** in `src/shared/word-count.ts` so the on-screen count
+equals the count main computes on save. Autosave timers, the quit/switch flush guard,
+and version-history UI are intentionally deferred to M5.
+
 ## Project layout
 
 ```
@@ -129,17 +156,22 @@ src/
     file-service.ts       # ALL disk I/O: atomic writes, snapshots, scan/restore
     paths.ts              # library path resolution, slug/filename helpers
     atomic-write.ts       # tmp + fsync + rename atomic write helper
-    word-count.ts         # word count from a ProseMirror doc (computed in main)
   preload/index.ts        # contextBridge → window.api (typed, decodes AppError)
   preload/index.d.ts      # global Window.api typing
   renderer/
     index.html
-    main.tsx              # React entry
-    app.tsx               # placeholder (ping check)
+    main.tsx              # React entry (imports fonts + book.css)
+    app.tsx               # app shell: bootstrap demo story → editor view
+    theme/book.css        # book theme tokens + page-stack texture
+    store/                # zustand stores: editorStore, uiStore, bootstrap
+    editor/               # TipTap editor, toolbar, footer, SceneDivider node
+    views/EditorView.tsx  # title + chapter switcher + toolbar + surface + footer
+    components/           # AppFrame (leather frame + grid), Sidebar
   shared/
     types.ts              # domain + IPC contract (single source of truth)
     schema.ts             # schemaVersion constants
     errors.ts             # typed AppError + IPC encode/decode
+    word-count.ts         # word count from a ProseMirror doc (shared by main + renderer)
 out/                      # build output (gitignored)
 release/                  # packaged installers (gitignored)
 ```
@@ -148,14 +180,20 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M1 — Data layer.** The reliability backbone is in place: `FileService` with atomic
-writes, library/story/chapter read-write, version snapshots + pruning, soft delete to
-`.trash/`, corrupt/missing-canon startup scan, and the full typed `window.api` over
-IPC. Unit-tested with Vitest (`npm run test`). Next up: the editor (M2), then
-autosave/versions UI (M5) — see `TASKS.md`.
+**M2 — Editor core.** The TipTap writing surface is in place: book-themed parchment
+page, toolbar (marks, alignment, undo/redo, indent toggle, scene divider), live word
+count, focus mode, a collapsible sidebar, and a manual Save that persists through the M1
+`window.api` and reloads identically. A demo story is seeded on first run as a stand-in
+for the Library/Chapters navigation (M6). Next up: **M5 — autosave + version history**
+(debounce/interval/lifecycle saves, quit guard, restore UI) — see `TASKS.md`.
 
-Earlier: **M0 — Project scaffold** (toolchain, window, IPC `ping`, shared type
-skeleton).
+Earlier:
+
+- **M1 — Data layer.** The reliability backbone: `FileService` with atomic writes,
+  library/story/chapter read-write, version snapshots + pruning, soft delete to
+  `.trash/`, corrupt/missing-canon startup scan, and the full typed `window.api` over
+  IPC. Unit-tested with Vitest (`npm run test`).
+- **M0 — Project scaffold** (toolchain, window, IPC `ping`, shared type skeleton).
 
 ### Known residual
 

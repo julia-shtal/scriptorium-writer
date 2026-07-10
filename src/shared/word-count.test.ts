@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { countWords } from './word-count'
+import { countWords, countWordsInText } from './word-count'
 
 const doc = (...paragraphs: string[]): Record<string, unknown> => ({
   type: 'doc',
@@ -7,6 +7,16 @@ const doc = (...paragraphs: string[]): Record<string, unknown> => ({
     type: 'paragraph',
     content: text ? [{ type: 'text', text }] : []
   }))
+})
+
+describe('countWordsInText', () => {
+  it('counts whitespace-separated words', () => {
+    expect(countWordsInText('  one   two three ')).toBe(3)
+  })
+
+  it('empty string is zero', () => {
+    expect(countWordsInText('   ')).toBe(0)
+  })
 })
 
 describe('countWords', () => {

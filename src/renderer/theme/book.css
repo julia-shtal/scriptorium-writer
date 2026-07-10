@@ -1,0 +1,181 @@
+/* Book theme tokens (SPEC §10) — the single home for palette values. */
+:root {
+  --book-frame: #3a2a1d;
+  --page-bg: #f5efe0;
+  --sidebar-bg: #efe6d3;
+  --sidebar-border: #dccdb0;
+  --accent: #a8874e;
+  --ink: #4a3a2a;
+  --ink-heading: #5a3f20;
+  --ink-nav: #6b573c;
+  --rule: #e3d6bd;
+  --muted: #9c855f;
+  --page-edge: linear-gradient(
+    var(--edge-dir, to left),
+    #e9dfc8 0 1px, #d3c2a0 1px 2px, #ece2cd 2px 3px, #d3c2a0 3px 4px,
+    #ece2cd 4px 5px, #d3c2a0 5px 6px, #e4d9bf 6px 8px
+  );
+  --font-serif: 'PT Serif', 'Lora', 'Noto Serif', Georgia, serif;
+  --font-sans: 'PT Sans', system-ui, sans-serif;
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  background: var(--book-frame);
+}
+
+/* ── Frame + grid ──────────────────────────────────────────────── */
+.book-frame { background: var(--book-frame); border-radius: 12px; padding: 20px; min-height: 100%; box-sizing: border-box; }
+.book-grid {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  border-radius: 6px;
+  position: relative;
+  min-height: calc(100vh - 40px);
+  color: var(--ink);
+}
+/* Collapsed: a slim rail (holding the re-expand control) + the full-width page.
+   NOT `0 1fr` — with the sidebar display:none, grid auto-placement would drop the
+   page into the zero-width first track and collapse the content to ~0px. */
+.book-grid.sidebar-collapsed { grid-template-columns: 44px 1fr; }
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.sidebar {
+  background: var(--sidebar-bg);
+  border-radius: 6px 0 0 6px;
+  border-right: 1px solid var(--sidebar-border);
+  padding: 16px 0;
+  position: relative;
+  /* No `overflow: hidden` — it would clip the left page-stack edge
+     (`::before`, positioned at left:-8px, outside the box). */
+}
+.sidebar::before {
+  content: '';
+  position: absolute; top: 3px; left: -8px; bottom: 3px; width: 8px;
+  --edge-dir: to left; background: var(--page-edge);
+  border-radius: 4px 0 0 4px;
+}
+.sidebar-collapsed .sidebar { display: none; }
+/* Always-visible control to bring the collapsed sidebar back. Sits in the slim rail
+   (grid col 1), light-on-frame so it is never a dark-on-dark casualty. */
+.sidebar-expand {
+  align-self: start;
+  justify-self: start;
+  /* left of the page's left edge (which sits in the rightmost 8px of this rail) */
+  margin: 14px 0 0 5px;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--sidebar-bg); color: var(--accent);
+  border: 1px solid var(--sidebar-border); border-radius: 5px; cursor: pointer;
+}
+.sidebar-expand:hover { background: #e2d3b3; }
+.sidebar-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px 14px; border-bottom: 1px solid var(--sidebar-border);
+}
+.sidebar-title { font-size: 16px; font-weight: 500; color: var(--ink-heading); flex: 1; }
+.sidebar-icon { color: var(--accent); }
+.sidebar-collapse { color: var(--muted); cursor: pointer; }
+.sidebar-section {
+  padding: 14px 16px 6px; font-size: 11px; letter-spacing: .08em;
+  color: var(--muted); font-family: var(--font-sans);
+}
+.sidebar-nav { font-family: var(--font-sans); font-size: 14px; }
+.nav-item {
+  display: flex; align-items: center; gap: 9px; padding: 8px 16px;
+  color: var(--ink-nav); cursor: pointer; border-left: 3px solid transparent;
+}
+.nav-item.active { background: #e2d3b3; color: var(--ink-heading); border-left-color: var(--accent); }
+.nav-item.inert { cursor: default; opacity: .85; }
+.nav-badge {
+  margin-left: auto; background: var(--sidebar-border); color: var(--ink-heading);
+  border-radius: 10px; padding: 1px 8px; font-size: 12px;
+}
+
+/* ── Editor page ───────────────────────────────────────────────── */
+.page {
+  background: var(--page-bg); position: relative; margin-right: 8px;
+  border-radius: 0 6px 6px 0; min-width: 0; display: flex; flex-direction: column;
+}
+.page::before {
+  content: '';
+  position: absolute; top: 3px; right: -8px; bottom: 3px; width: 8px;
+  --edge-dir: to right; background: var(--page-edge);
+  border-radius: 0 4px 4px 0;
+}
+/* Left page-stack edge for when the sidebar is hidden (collapsed or focus): the
+   sidebar's own `::before` is gone, so the page grows its own left edge, glued to
+   its left and symmetric with the right one. Moves inward with the layout. */
+.sidebar-collapsed .page::after,
+.focus-mode .page::after {
+  content: '';
+  position: absolute; top: 3px; left: -8px; bottom: 3px; width: 8px;
+  --edge-dir: to left; background: var(--page-edge);
+  border-radius: 4px 0 0 4px;
+}
+
+.toolbar {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--rule);
+  font-family: var(--font-sans); color: #7a6446;
+}
+.toolbar-btn {
+  width: 28px; height: 28px; display: inline-flex; align-items: center;
+  justify-content: center; background: none; border: none; color: inherit;
+  cursor: pointer; border-radius: 4px; padding: 0;
+}
+.toolbar-btn:hover { background: #eaddc2; }
+.toolbar-btn.active { color: var(--accent); }
+.toolbar-btn.italic { font-style: italic; font-family: serif; font-size: 16px; }
+.toolbar-btn.bold { font-weight: 600; }
+.toolbar-btn.strike { text-decoration: line-through; }
+.toolbar-btn.text { width: auto; padding: 0 7px; font-size: 13px; }
+.toolbar-sep { width: 1px; height: 20px; background: var(--rule); margin: 0 3px; }
+
+.chapter-head { display: flex; align-items: center; gap: 10px; padding: 20px 34px 4px; }
+.chapter-title-input {
+  border: none; background: transparent; font-family: var(--font-serif);
+  font-size: 22px; font-weight: 500; color: var(--ink-heading); flex: 1; padding: 0;
+}
+.chapter-title-input:focus { outline: none; }
+.chapter-switcher { font-family: var(--font-sans); font-size: 13px; color: var(--ink-nav); }
+
+.editor-surface {
+  padding: 8px 34px 22px; font-size: 16.5px; line-height: 1.85; color: var(--ink);
+  flex: 1; overflow-y: auto;
+}
+.editor-surface:focus { outline: none; }
+.editor-surface p { margin: 0 0 12px; }
+.editor-surface.indent-on p { text-indent: 2em; }
+.editor-surface p[style*='text-align: center'] { text-indent: 0; }
+.scene-divider {
+  text-align: center; color: var(--accent); letter-spacing: 8px;
+  margin: 20px 0; font-weight: 500; text-indent: 0;
+}
+
+.footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 34px 9px 16px; border-top: 1px solid var(--rule);
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--muted);
+}
+.footer-left { display: flex; align-items: center; gap: 14px; }
+.footer-item { display: flex; align-items: center; gap: 5px; }
+.save-btn {
+  display: flex; align-items: center; gap: 6px; background: var(--accent);
+  color: #fbf6ea; border: none; border-radius: 5px; padding: 7px 16px;
+  font-family: var(--font-sans); font-size: 13.5px; font-weight: 500; cursor: pointer;
+}
+.save-btn:disabled { opacity: .6; cursor: default; }
+
+/* ── Focus mode ────────────────────────────────────────────────── */
+.focus-mode .sidebar,
+.focus-mode .toolbar,
+.focus-mode .footer { display: none; }
+.focus-mode .book-grid { grid-template-columns: 1fr; }
+.focus-exit {
+  position: fixed; top: 26px; right: 30px; z-index: 10;
+  background: var(--accent); color: #fbf6ea; border: none; border-radius: 5px;
+  padding: 6px 10px; font-family: var(--font-sans); font-size: 12px; cursor: pointer;
+}
