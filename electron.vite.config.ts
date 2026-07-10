@@ -20,7 +20,7 @@ function injectProdCsp(): Plugin {
   ].join('; ')
 
   return {
-    name: 'scriptorium:inject-prod-csp',
+    name: 'scriptorium-writer:inject-prod-csp',
     transformIndexHtml(html, ctx): string {
       // ctx.server is defined only during `dev`; skip injection there.
       if (ctx.server) return html

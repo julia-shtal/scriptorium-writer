@@ -25,8 +25,11 @@ See `SPEC.md` for the full design and `TASKS.md` for the milestone breakdown.
 | `npm run dev` | Launch the app in development with HMR (renderer) and DevTools. |
 | `npm run build` | Typecheck, then build main / preload / renderer into `out/`. |
 | `npm run build:win` | Full build + package a Windows **NSIS** installer into `release/`. |
+| `npm run start` | Preview the production build (`electron-vite preview`). |
 | `npm run typecheck` | Type-check the node (main/preload/shared) and web (renderer) projects. |
 | `npm run lint` | ESLint over `src` (`.ts`/`.tsx`). |
+| `npm run test` | Run the Vitest unit suite (data layer) once. |
+| `npm run test:watch` | Run Vitest in watch mode. |
 | `npm run format` | Prettier-format `src`. |
 
 ## Getting started
@@ -60,6 +63,59 @@ strict and must not be weakened:
 Shared domain types live once in `src/shared/types.ts` and are imported by all three
 processes. Schema-version constants live in `src/shared/schema.ts`.
 
+## Data layer (M1)
+
+All persistence lives in the main-process `FileService` (`src/main/file-service.ts`)
+and is exposed to the renderer as the typed `window.api` surface (contract in
+`src/shared/types.ts`, registered in `src/main/ipc.ts`, wrapped in
+`src/preload/index.ts`). The renderer never touches `fs`.
+
+**Where data lives**
+
+- **Library** (your stories) — a plain, syncable folder. Default:
+  `Documents/Scriptorium-Writer/`. It is a normal directory you can back up, sync, or open
+  in a file manager.
+- **Settings** — per-machine, in Electron's `userData/settings.json`. Settings hold
+  `libraryPath`, so each machine knows where its library is (override the library
+  location by changing `libraryPath`). This is a deliberate choice: settings stay
+  per-machine while the library travels.
+
+**On-disk layout**
+
+```
+Scriptorium-Writer/               ← library root (libraryPath)
+  stories/
+    <story-id>/
+      story.json                  ← StoryMeta + chapterOrder + schemaVersion
+      chapters/
+        01-slug.json              ← Chapter canon (ProseMirror JSON) — SOURCE OF TRUTH
+      versions/
+        <chapterId>/
+          2026-07-09T10-15-00-123Z.json   ← per-chapter snapshots (pruned to a cap)
+      notes/
+        notes.json
+  .trash/                         ← soft-deleted stories/chapters land here
+```
+
+`NN-slug` filenames are for human legibility only; the app always resolves chapters
+by the stable `id` stored **inside** each file, never by trusting a filename, so
+files may be renamed safely. The Markdown backup copy (`.md`) is **not** written yet
+— that lands in M7 (a `// TODO(M7)` marks the slot in `saveChapter`).
+
+**Reliability guarantees** (SPEC §5, enforced + unit-tested):
+
+- **Atomic writes** — every data file is written to a temp file, `fsync`ed, then
+  `rename`d over the target. A crash mid-write can never corrupt the existing file.
+- **Version snapshots** — each successful `saveChapter` writes a timestamped snapshot
+  and prunes to `maxVersionsPerChapter` (default 20).
+- **Never blank corrupt data** — a canon that is missing or fails to parse is surfaced
+  via `scanLibrary()` (with the newest restorable snapshot) and a typed
+  `CHAPTER_CORRUPT` error, never silently overwritten.
+- **Soft delete** — stories and chapters move to `.trash/`, never hard-deleted.
+- Errors cross IPC as a typed `AppError` (code + message), not raw Node errors.
+
+Run the data-layer tests with `npm run test`.
+
 ## Project layout
 
 ```
@@ -67,8 +123,14 @@ electron.vite.config.ts   # main / preload / renderer build config
 electron-builder.yml      # Windows NSIS packaging config
 tsconfig.json             # references tsconfig.node.json + tsconfig.web.json
 src/
-  main/index.ts           # app + window lifecycle, IPC (ping)
-  preload/index.ts        # contextBridge → window.api
+  main/
+    index.ts              # app + window lifecycle, constructs FileService, wires IPC
+    ipc.ts                # ipcMain.handle registrations → FileService (typed)
+    file-service.ts       # ALL disk I/O: atomic writes, snapshots, scan/restore
+    paths.ts              # library path resolution, slug/filename helpers
+    atomic-write.ts       # tmp + fsync + rename atomic write helper
+    word-count.ts         # word count from a ProseMirror doc (computed in main)
+  preload/index.ts        # contextBridge → window.api (typed, decodes AppError)
   preload/index.d.ts      # global Window.api typing
   renderer/
     index.html
@@ -77,15 +139,23 @@ src/
   shared/
     types.ts              # domain + IPC contract (single source of truth)
     schema.ts             # schemaVersion constants
+    errors.ts             # typed AppError + IPC encode/decode
 out/                      # build output (gitignored)
 release/                  # packaged installers (gitignored)
 ```
 
+Unit tests live next to their modules as `*.test.ts` (run by Vitest).
+
 ## Status
 
-**M0 — Project scaffold.** Toolchain, window, IPC `ping`, and the shared type
-skeleton are in place. Later milestones add the data layer (M1), editor (M2),
-autosave/versions (M5), and the rest — see `TASKS.md`.
+**M1 — Data layer.** The reliability backbone is in place: `FileService` with atomic
+writes, library/story/chapter read-write, version snapshots + pruning, soft delete to
+`.trash/`, corrupt/missing-canon startup scan, and the full typed `window.api` over
+IPC. Unit-tested with Vitest (`npm run test`). Next up: the editor (M2), then
+autosave/versions UI (M5) — see `TASKS.md`.
+
+Earlier: **M0 — Project scaffold** (toolchain, window, IPC `ping`, shared type
+skeleton).
 
 ### Known residual
 

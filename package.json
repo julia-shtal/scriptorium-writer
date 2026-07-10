@@ -1,5 +1,5 @@
 {
-  "name": "scriptorium",
+  "name": "scriptorium-writer",
   "version": "0.0.0",
   "description": "Local-first desktop app for writing long-form fiction, styled like the warm pages of a book.",
   "main": "./out/main/index.js",
@@ -18,6 +18,8 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "lint": "eslint . --ext .ts,.tsx --cache",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
@@ -41,6 +43,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.5.3",
-    "vite": "^5.3.3"
+    "vite": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

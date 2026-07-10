@@ -1,6 +1,8 @@
 import { join } from 'path'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { FileService } from './file-service'
+import { registerIpcHandlers } from './ipc'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -39,14 +41,30 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.scriptorium.app')
+app.whenReady().then(async () => {
+  electronApp.setAppUserModelId('com.scriptorium-writer.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerIpcHandlers()
+  // All disk I/O lives in the main-process FileService. It is Electron-free by
+  // design (unit-tested against temp dirs); the app supplies the machine paths here.
+  const fileService = new FileService({
+    userDataPath: app.getPath('userData'),
+    defaultLibraryPath: join(app.getPath('documents'), 'Scriptorium-Writer')
+  })
+  await fileService.ensureLibrary()
+
+  registerIpcHandlers(
+    { handle: ipcMain.handle.bind(ipcMain) },
+    {
+      fileService,
+      revealInFolder: async (target: string) => {
+        await shell.openPath(target)
+      }
+    }
+  )
 
   createWindow()
 
@@ -61,11 +79,5 @@ app.on('window-all-closed', () => {
   }
 })
 
-/**
- * IPC registrations. M0 wires only `ping` to prove the contextBridge + IPC path
- * end to end. The full FileService-backed surface lands in M1 (see `src/main/ipc.ts`).
- */
-function registerIpcHandlers(): void {
-  ipcMain.handle('ping', async (): Promise<'pong'> => 'pong')
-  // TODO(M1): register the full window.api surface via src/main/ipc.ts.
-}
+// TODO(M5): quit guard — intercept `before-quit`, request a final renderer flush,
+// and delay quit until any in-flight save resolves (SPEC §5.7).

@@ -25,7 +25,7 @@ function App(): JSX.Element {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
-      <h1>Scriptorium</h1>
+      <h1>Scriptorium Writer</h1>
       <p>
         IPC check — <code>window.api.ping()</code> returned:{' '}
         <strong data-testid="ping-result">{pong}</strong>
