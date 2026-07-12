@@ -129,8 +129,8 @@ persists.
 - **Toolbar** — italic/bold/strike, align left/center/right, undo/redo, a **Tab**
   control that toggles the first-line indent (a per-chapter *view* preference applied as
   a global `.indent-on` CSS class — it does **not** insert tab characters), a `✳✳✳`
-  scene-divider (a real custom block node, `SceneDivider.ts`), and stub buttons for
-  footnotes (M3), the cleanup wand (M8).
+  scene-divider (a real custom block node, `SceneDivider.ts`), a `[?]` **footnote**
+  button (live — see M3 below), and a stub button for the cleanup wand (M8).
 - **Footer** — live word count (chapter + selection), a manual **Save** button wired to
   `window.api.saveChapter`, and placeholders for autosave status (M5) and spellcheck
   languages (M4).
@@ -168,6 +168,25 @@ missing or fails to parse. The affected chapter is offered for one-click restore
 its newest snapshot; the corrupt file itself is **never** silently overwritten —
 restoring reopens the chapter once the newest good snapshot is back in place.
 
+## Footnotes (M3)
+
+Footnotes are a custom **inline atom** TipTap node (`src/renderer/editor/extensions/Footnote.ts`).
+The toolbar `[?]` button inserts one at the cursor. Each footnote stores only its text
+in the JSON canon (`{ "type": "footnote", "attrs": { "text": "…" } }`); the visible
+`[N]` marker number is **derived at render** by document order (`footnote-numbering.ts`),
+never stored — so inserting, deleting, or moving footnotes always renumbers correctly.
+
+- **Hover** a marker to read its text in a popover; **select** the marker to edit the
+  text in a compact field, closing with `×` or `Esc` (`FootnoteView.tsx`).
+- Footnote text lives in an *attribute*, not a text node, so it does **not** count
+  toward the chapter word count (by design).
+- Footnotes round-trip losslessly through save/reload and appear unchanged in version
+  snapshots (the node is registered in the shared `bookExtensions`, used by both the
+  live editor and the read-only history preview).
+- The Markdown mapping (`[^n]` markers + `[^n]:` definitions) is prepared as a pure
+  helper in `src/shared/footnote-markdown.ts` for M7 to consume — **M3 does not write
+  any `.md`** yet.
+
 ## Project layout
 
 ```
@@ -189,7 +208,7 @@ src/
     app.tsx               # app shell: bootstrap demo story → editor view
     theme/book.css        # book theme tokens + page-stack texture
     store/                # zustand stores: editorStore, uiStore, bootstrap
-    editor/               # TipTap editor, toolbar, footer, SceneDivider node
+    editor/               # TipTap editor, toolbar, footer, SceneDivider + Footnote nodes
     views/EditorView.tsx  # title + chapter switcher + toolbar + surface + footer
     components/           # AppFrame (leather frame + grid), Sidebar
   shared/
@@ -197,6 +216,7 @@ src/
     schema.ts             # schemaVersion constants
     errors.ts             # typed AppError + IPC encode/decode
     word-count.ts         # word count from a ProseMirror doc (shared by main + renderer)
+    footnote-markdown.ts  # footnote → Markdown mapping helper (prepared for M7)
 out/                      # build output (gitignored)
 release/                  # packaged installers (gitignored)
 ```
@@ -205,17 +225,23 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M5 — Autosave + version history.** Reliability is now locked into the UI: a single
-`flush()` write path shared by manual Save, a 2s debounce, a 2min dirty-interval, and
-lifecycle flushes (chapter switch, window blur, before quit); a main-process quit guard
-that delays exit until the renderer confirms a final flush (or a 5s safety timeout); a
-Version History view (preview read-only, restore-with-snapshot); and a startup
-crash-recovery prompt that restores a corrupt/missing chapter from its newest snapshot
-without ever silently overwriting the bad file. Next up: **M3 — footnotes** — see
+**M3 — Footnotes.** A custom inline-atom footnote node with an auto-numbered `[N]`
+marker (numbering derived by document order, never stored), a hover popover to read the
+text and a select-to-edit field to change it, wired to the toolbar `[?]` button. Text is
+stored losslessly in the JSON canon and survives save/reload and version snapshots; the
+Markdown mapping is prepared as a pure helper for M7 but no `.md` is written yet. See the
+*Footnotes (M3)* section above. Next up: **M4 — spellcheck (RU + EN, offline)** — see
 `TASKS.md`.
 
 Earlier:
 
+- **M5 — Autosave + version history.** A single `flush()` write path shared by manual
+  Save, a 2s debounce, a 2min dirty-interval, and lifecycle flushes (chapter switch,
+  window blur, before quit); a main-process quit guard that delays exit until the
+  renderer confirms a final flush (or a 5s safety timeout); a Version History view
+  (preview read-only, restore-with-snapshot); and a startup crash-recovery prompt that
+  restores a corrupt/missing chapter from its newest snapshot without ever silently
+  overwriting the bad file.
 - **M2 — Editor core.** The TipTap writing surface: book-themed parchment page, toolbar
   (marks, alignment, undo/redo, indent toggle, scene divider), live word count, focus
   mode, a collapsible sidebar, and a manual Save that persists through the M1

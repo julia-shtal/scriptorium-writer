@@ -317,3 +317,86 @@ body {
   justify-content: flex-end;
   margin-top: 8px;
 }
+
+/* --- Footnotes (M3) --- */
+.footnote {
+  position: relative;
+  display: inline;
+  /* Reset the inherited first-line indent (.indent-on p { text-indent: 2em }) so the
+     absolutely-positioned popover/editor below don't start their text indented. */
+  text-indent: 0;
+}
+
+.footnote-marker {
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.8em;
+  vertical-align: super;
+  line-height: 0;
+  user-select: none;
+}
+
+.footnote-popover {
+  position: absolute;
+  left: 0;
+  top: 1.4em;
+  z-index: 20;
+  /* Explicit width: the containing block is the tiny inline marker, so a `max-width`
+     alone shrink-wraps the text to ~one word per line. Matches the editor field width. */
+  width: 18rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--page-bg);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.footnote-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.footnote-editor {
+  position: absolute;
+  left: 0;
+  top: 1.4em;
+  z-index: 21;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  background: var(--page-bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.footnote-input {
+  width: 18rem;
+  min-height: 3.2rem;
+  resize: vertical;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--page-bg);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.footnote-close {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+.footnote-close:hover {
+  color: var(--ink);
+}
