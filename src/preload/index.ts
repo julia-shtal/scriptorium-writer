@@ -53,6 +53,7 @@ const api: Api = {
   // settings
   readSettings: () => invoke('readSettings'),
   saveSettings: (settings) => invoke('saveSettings', settings),
+  applySpellLanguages: (langs) => invoke('applySpellLanguages', langs),
 
   // recovery
   scanLibrary: () => invoke('scanLibrary'),

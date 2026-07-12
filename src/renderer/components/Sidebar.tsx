@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   IconFeather,
   IconLayoutSidebarLeftCollapse,
@@ -11,6 +12,7 @@ import {
   IconSettings
 } from '@tabler/icons-react'
 import { useUiStore, type ViewId } from '@renderer/store/uiStore'
+import { useEditorStore } from '@renderer/store/editorStore'
 
 interface NavDef {
   id: ViewId
@@ -31,18 +33,33 @@ const GENERAL: NavDef[] = [
   { id: 'settings', label: 'Настройки', icon: <IconSettings size={17} /> }
 ]
 
-/** Only the Editor is live in M2; other items render inert (wired in M6). */
 export function Sidebar(): JSX.Element {
   const activeView = useUiStore((s) => s.activeView)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
+  const setActiveView = useUiStore((s) => s.setActiveView)
+  const storyId = useEditorStore((s) => s.storyId)
+  const chapterId = useEditorStore((s) => s.chapterId)
+  // Re-fetch the snapshot count whenever a save completes (each save creates a
+  // version), not only on chapter switch — otherwise the badge freezes for the
+  // whole editing session.
+  const lastSavedAt = useEditorStore((s) => s.lastSavedAt)
+  const [versionCount, setVersionCount] = useState(0)
+
+  useEffect(() => {
+    if (!storyId || !chapterId) return
+    void window.api.listVersions(storyId, chapterId).then((v) => setVersionCount(v.length))
+  }, [storyId, chapterId, lastSavedAt])
 
   const item = (def: NavDef): JSX.Element => {
-    const live = def.id === 'editor'
     const active = def.id === activeView
     return (
-      <div key={def.id} className={`nav-item${active ? ' active' : ''}${live ? '' : ' inert'}`}>
+      <div key={def.id} className={`nav-item${active ? ' active' : ''}`}
+           onClick={() => setActiveView(def.id)}>
         {def.icon}
         {def.label}
+        {def.id === 'versions' && versionCount > 0 && (
+          <span className="nav-badge">{versionCount}</span>
+        )}
       </div>
     )
   }

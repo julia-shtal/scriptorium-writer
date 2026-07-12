@@ -220,6 +220,39 @@ caches the dictionary in `userData/Dictionaries` after first use.
 electron-builder's `extraResources` so offline spellcheck also works in the packaged
 app, not just `npm run dev`.
 
+## Navigation & views (M6)
+
+The sidebar drives a view router in `app.tsx` keyed on `uiStore.activeView`. Two sections:
+**РАБОТА** (Editor, Chapters, Story info, Version history, Notes, Statistics — scoped to
+the open story) and **ОБЩЕЕ** (Library, Settings). The sidebar collapses to give the
+editor full width; the Version-history item carries a badge with the open chapter's
+snapshot count.
+
+- **Library** — all stories with status, chapter/word counts and last-edited; create,
+  open, and soft-delete (inline confirm, no blocking `window.confirm`).
+- **Chapters** — the open story's chapters with **native HTML5 drag-to-reorder**
+  (persisted via `reorderChapters`; no drag-and-drop dependency), inline rename, add,
+  open, soft-delete.
+- **Story info** — title, description, tags, status → `updateStoryMeta`.
+- **Notes** — per-story codex (characters / locations / world / timeline + a scratchpad),
+  loaded via `readNotes` and saved debounced (500 ms) via `saveNotes`.
+- **Statistics** — total words, per-chapter breakdown, and a daily writing streak. Streak
+  data lives in renderer `localStorage` (`scriptorium:activeDays`) — lightweight, cleared
+  with app data; not part of the file canon.
+- **Settings** — autosave interval, spellcheck languages (bundled `ru` / `en-US`), editor
+  font family/size, max versions per chapter, and the library path (read-only + reveal).
+
+**Live settings.** Changes apply without a restart via `settingsStore`: font family/size
+set CSS custom properties (`--editor-font-family` / `--editor-font-size`) the editor
+consumes; autosave interval re-arms the timer through `editorStore.configureAutosave`;
+spellcheck languages update the footer label and re-check the live Chromium session
+through a new `applySpellLanguages` IPC (main calls `session.setSpellCheckerLanguages`),
+so the renderer never touches `session` directly.
+
+State is split across small Zustand stores: `storyStore` (open story + chapter list —
+the shared truth for Chapters / Story info / the editor switcher), `settingsStore`,
+`editorStore`, and `uiStore`.
+
 ## Project layout
 
 ```
@@ -238,11 +271,11 @@ src/
   renderer/
     index.html
     main.tsx              # React entry (imports fonts + book.css)
-    app.tsx               # app shell: bootstrap demo story → editor view
+    app.tsx               # app shell: bootstrap + sidebar-driven view router
     theme/book.css        # book theme tokens + page-stack texture
-    store/                # zustand stores: editorStore, uiStore, bootstrap
+    store/                # zustand stores: editorStore, storyStore, settingsStore, uiStore, bootstrap
     editor/               # TipTap editor, toolbar, footer, SceneDivider + Footnote nodes
-    views/EditorView.tsx  # title + chapter switcher + toolbar + surface + footer
+    views/                # EditorView, Library, Chapters, StoryInfo, Notes, Statistics, Settings, VersionHistory
     components/           # AppFrame (leather frame + grid), Sidebar
   shared/
     types.ts              # domain + IPC contract (single source of truth)
@@ -258,16 +291,24 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M3 — Footnotes.** A custom inline-atom footnote node with an auto-numbered `[N]`
-marker (numbering derived by document order, never stored), a hover popover to read the
-text and a select-to-edit field to change it, wired to the toolbar `[?]` button. Text is
-stored losslessly in the JSON canon and survives save/reload and version snapshots; the
-Markdown mapping is prepared as a pure helper for M7 but no `.md` is written yet. See the
-*Footnotes (M3)* section above. Next up: **M4 — spellcheck (RU + EN, offline)** — see
-`TASKS.md`.
+**M6 — Navigation & views.** The sidebar-driven view router and all remaining views
+(Library, Chapters with drag-to-reorder, Story info, Notes, Statistics, Settings) around
+the editor + version-history views, each persisting through the M1 `window.api`. Settings
+apply live (font, autosave interval, spellcheck languages via a new `applySpellLanguages`
+IPC). See the *Navigation & views (M6)* section above. Next up: **M7 — Markdown backup
+export** — see `TASKS.md`.
 
 Earlier:
 
+- **M4 — Spellcheck (RU + EN, offline).** Simultaneous Russian + English Chromium
+  spellcheck served from bundled `.bdic` dictionaries by a loopback prefix-matching
+  server, with a native suggestion / add-to-dictionary context menu. See the *Spellcheck
+  (offline, M4)* section above.
+- **M3 — Footnotes.** A custom inline-atom footnote node with an auto-numbered `[N]`
+  marker (numbering derived by document order, never stored), a hover popover to read the
+  text and a select-to-edit field to change it, wired to the toolbar `[?]` button. Text is
+  stored losslessly in the JSON canon and survives save/reload and version snapshots; the
+  Markdown mapping is prepared as a pure helper for M7 but no `.md` is written yet.
 - **M5 — Autosave + version history.** A single `flush()` write path shared by manual
   Save, a 2s debounce, a 2min dirty-interval, and lifecycle flushes (chapter switch,
   window blur, before quit); a main-process quit guard that delays exit until the

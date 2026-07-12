@@ -90,7 +90,9 @@ app.whenReady().then(async () => {
       fileService,
       revealInFolder: async (target: string) => {
         await shell.openPath(target)
-      }
+      },
+      setSpellLanguages: (langs: string[]) =>
+        session.defaultSession.setSpellCheckerLanguages(langs)
     }
   )
 
