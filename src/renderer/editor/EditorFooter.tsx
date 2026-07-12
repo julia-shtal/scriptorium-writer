@@ -31,10 +31,15 @@ export function EditorFooter(): JSX.Element {
           слов: {wordCount}
           {selectionWordCount > 0 ? ` · выделено: ${selectionWordCount}` : ''}
         </span>
-        {/* TODO(M5): live autosave status (saving / saved HH:MM / failed + retry). */}
+        {/* Live autosave status (saving / saved HH:MM / failed + retry). */}
         <span className="footer-item">
           <IconCloudCheck size={16} color="#7a8a4e" />
           {statusLabel(saveStatus, lastSavedAt)}
+          {saveStatus === 'error' && (
+            <button className="retry-btn" onClick={() => void save()}>
+              повторить
+            </button>
+          )}
         </span>
         {/* TODO(M4): real spellcheck languages from settings. */}
         <span className="footer-item">

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Api } from '@shared/types'
+import type { Api, LifecycleApi } from '@shared/types'
 import { AppError, decodeIpcError } from '@shared/errors'
 
 /**
@@ -61,12 +61,28 @@ const api: Api = {
   revealInFolder: (path) => invoke('revealInFolder', path)
 }
 
+const lifecycle: LifecycleApi = {
+  onQuitFlush: (handler) => {
+    ipcRenderer.on('quit:flush-request', async () => {
+      try {
+        await handler()
+      } finally {
+        // Always ack, even if the flush threw — main must not hang the quit.
+        ipcRenderer.send('quit:flush-done')
+      }
+    })
+  }
+}
+
 // With contextIsolation enabled (it always is — see main), expose through the
 // contextBridge. The `else` branch only exists as a defensive fallback and should
 // never run given our BrowserWindow config.
 if (process.contextIsolated) {
   contextBridge.exposeInMainWorld('api', api)
+  contextBridge.exposeInMainWorld('lifecycle', lifecycle)
 } else {
   // @ts-expect-error — define on window only in the (unreachable) non-isolated case
   window.api = api
+  // @ts-expect-error — same fallback for the lifecycle bridge
+  window.lifecycle = lifecycle
 }

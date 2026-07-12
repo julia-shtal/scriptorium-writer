@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IconMaximize } from '@tabler/icons-react'
+import { IconHistory, IconMaximize } from '@tabler/icons-react'
 import { useChapterEditor } from '@renderer/editor/useChapterEditor'
 import { EditorSurface } from '@renderer/editor/Editor'
 import { Toolbar } from '@renderer/editor/toolbar/Toolbar'
@@ -16,6 +16,7 @@ export function EditorView(): JSX.Element {
   const setTitle = useEditorStore((s) => s.setTitle)
   const openChapter = useEditorStore((s) => s.openChapter)
   const toggleFocus = useUiStore((s) => s.toggleFocus)
+  const setActiveView = useUiStore((s) => s.setActiveView)
 
   // Chapter switcher: list the open story's chapters (title-by-id).
   const [chapters, setChapters] = useState<{ id: string; title: string }[]>([])
@@ -52,6 +53,13 @@ export function EditorView(): JSX.Element {
             ))}
           </select>
         )}
+        <IconHistory
+          size={18}
+          title="История версий"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setActiveView('versions')}
+        />
+        {/* TODO(M6): replaced by the sidebar Version-history entry + badge. */}
         <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
       </div>
       <EditorSurface editor={editor} />
