@@ -24,6 +24,8 @@ export interface IpcServices {
   fileService: FileService
   /** Reveal a folder in the OS file explorer (wraps `shell.openPath` in main). */
   revealInFolder(path: string): Promise<void>
+  /** Re-apply spellcheck languages to the live session (wraps `session.setSpellCheckerLanguages`). M6. */
+  setSpellLanguages(langs: string[]): void
 }
 
 /** All channels, kept in lockstep with the `Api` surface (compile-checked below). */
@@ -46,6 +48,7 @@ export const IPC_CHANNELS = [
   'saveNotes',
   'readSettings',
   'saveSettings',
+  'applySpellLanguages',
   'scanLibrary',
   'revealInFolder'
 ] as const
@@ -60,7 +63,7 @@ void _channelsCoverApi
 void _apiCoversChannels
 
 export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServices): void {
-  const { fileService: fs, revealInFolder } = services
+  const { fileService: fs, revealInFolder, setSpellLanguages } = services
 
   // Each entry receives the raw IPC args and returns a promise/value. Arg types are
   // guaranteed by the preload wrappers, whose signatures come from `Api`; here we
@@ -92,6 +95,7 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
       fs.saveNotes(storyId as string, notes as Parameters<Api['saveNotes']>[1]),
     readSettings: () => fs.readSettings(),
     saveSettings: ([settings]) => fs.saveSettings(settings as Parameters<Api['saveSettings']>[0]),
+    applySpellLanguages: ([langs]) => setSpellLanguages(langs as string[]),
     scanLibrary: () => fs.scanLibrary(),
     revealInFolder: ([path]) => revealInFolder(path as string)
   }

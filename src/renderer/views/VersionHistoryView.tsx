@@ -5,17 +5,9 @@ import { bookExtensions } from '@renderer/editor/extensions/bookExtensions'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import type { VersionSummary } from '@shared/types'
+import { formatDateTime } from './format'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
-
-function formatStamp(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 
 export function VersionHistoryView(): JSX.Element {
   const storyId = useEditorStore((s) => s.storyId)
@@ -78,7 +70,7 @@ export function VersionHistoryView(): JSX.Element {
               className={v.versionId === selected ? 'active' : ''}
               onClick={() => void preview(v.versionId)}
             >
-              <span>{formatStamp(v.savedAt)}</span>
+              <span>{formatDateTime(v.savedAt)}</span>
               <span className="history-words">{v.wordCount} сл.</span>
               <button
                 className="linkish"

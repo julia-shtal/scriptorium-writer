@@ -166,6 +166,8 @@ export interface Api {
   // settings
   readSettings(): Promise<Settings>
   saveSettings(settings: Settings): Promise<void>
+  /** Re-apply spellcheck languages to the live session (no restart). M6. */
+  applySpellLanguages(langs: string[]): Promise<void>
 
   // recovery — startup scan for missing/corrupt canon (consumed by M5)
   scanLibrary(): Promise<ChapterRecovery[]>

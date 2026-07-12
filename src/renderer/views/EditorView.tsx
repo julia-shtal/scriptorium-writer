@@ -59,7 +59,6 @@ export function EditorView(): JSX.Element {
           style={{ cursor: 'pointer' }}
           onClick={() => setActiveView('versions')}
         />
-        {/* TODO(M6): replaced by the sidebar Version-history entry + badge. */}
         <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
       </div>
       <EditorSurface editor={editor} />

@@ -21,7 +21,8 @@ describe('registerIpcHandlers', () => {
     const { handle, channels } = makeRegistrar()
     registerIpcHandlers({ handle }, {
       fileService: {} as FileService,
-      revealInFolder: vi.fn()
+      revealInFolder: vi.fn(),
+      setSpellLanguages: vi.fn()
     })
     for (const channel of IPC_CHANNELS) {
       expect(channels.has(channel)).toBe(true)
@@ -33,7 +34,8 @@ describe('registerIpcHandlers', () => {
     const createStory = vi.fn().mockResolvedValue({ id: 'x' })
     registerIpcHandlers({ handle }, {
       fileService: { createStory } as unknown as FileService,
-      revealInFolder: vi.fn()
+      revealInFolder: vi.fn(),
+      setSpellLanguages: vi.fn()
     })
     const result = await channels.get('createStory')!(null, { title: 'X' })
     expect(createStory).toHaveBeenCalledWith({ title: 'X' })
@@ -46,7 +48,8 @@ describe('registerIpcHandlers', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     registerIpcHandlers({ handle }, {
       fileService: { readStory } as unknown as FileService,
-      revealInFolder: vi.fn()
+      revealInFolder: vi.fn(),
+      setSpellLanguages: vi.fn()
     })
     let thrown: unknown
     try {
@@ -65,8 +68,21 @@ describe('registerIpcHandlers', () => {
     const { handle, channels } = makeRegistrar()
     registerIpcHandlers({ handle }, {
       fileService: {} as FileService,
-      revealInFolder: vi.fn()
+      revealInFolder: vi.fn(),
+      setSpellLanguages: vi.fn()
     })
     expect(await channels.get('ping')!(null)).toBe('pong')
+  })
+
+  it('applySpellLanguages delegates to the session hook', async () => {
+    const { handle, channels } = makeRegistrar()
+    const setSpellLanguages = vi.fn()
+    registerIpcHandlers({ handle }, {
+      fileService: {} as FileService,
+      revealInFolder: vi.fn(),
+      setSpellLanguages
+    })
+    await channels.get('applySpellLanguages')!(null, ['ru'])
+    expect(setSpellLanguages).toHaveBeenCalledWith(['ru'])
   })
 })
