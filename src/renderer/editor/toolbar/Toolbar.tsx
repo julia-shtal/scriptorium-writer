@@ -46,8 +46,8 @@ export function Toolbar({ editor }: { editor: Editor | null }): JSX.Element | nu
       <span className="toolbar-sep" />
       <button className={`toolbar-btn text ${indentOn ? 'active' : ''}`}
         title="Красная строка" onClick={toggleIndent}>Tab</button>
-      {/* TODO(M3): footnote insert + hover popover. Visible no-op for now. */}
-      <button className="toolbar-btn text" title="Сноска (скоро)" onClick={() => {}}>[?]</button>
+      <button className="toolbar-btn text" title="Сноска"
+        onClick={() => editor.chain().focus().insertFootnote().run()}>[?]</button>
       <button className="toolbar-btn text" title="Разделитель сцен"
         onClick={() => editor.chain().focus().insertSceneDivider().run()}>✳✳✳</button>
 

@@ -2,12 +2,13 @@ import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
 import type { Extensions } from '@tiptap/react'
 import { SceneDivider } from './SceneDivider'
+import { Footnote } from './Footnote'
 
 /**
  * The single source of truth for the editor's node/mark set. Used by the live
  * editor (useChapterEditor) and the read-only Version History preview so both
  * render identical content. StarterKit is trimmed to the supported nodes;
- * horizontalRule is replaced by SceneDivider.
+ * horizontalRule is replaced by SceneDivider; Footnote is the M3 inline node.
  */
 export const bookExtensions: Extensions = [
   StarterKit.configure({
@@ -21,5 +22,6 @@ export const bookExtensions: Extensions = [
     horizontalRule: false
   }),
   TextAlign.configure({ types: ['paragraph'], alignments: ['left', 'center', 'right'] }),
-  SceneDivider
+  SceneDivider,
+  Footnote
 ]
