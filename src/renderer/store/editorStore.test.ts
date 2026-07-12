@@ -46,6 +46,12 @@ describe('editorStore', () => {
 
   afterEach(() => vi.unstubAllGlobals())
 
+  // add alongside the existing afterEach
+  afterEach(() => {
+    useEditorStore.getState().stopAutosave()
+    vi.useRealTimers()
+  })
+
   test('openChapter loads via window.api.readChapter and is not dirty', async () => {
     await useEditorStore.getState().openChapter('s1', 'c1')
     expect(readChapter).toHaveBeenCalledWith('s1', 'c1')
@@ -88,5 +94,75 @@ describe('editorStore', () => {
     useEditorStore.getState().applyDocUpdate(para('edited'), '')
     await useEditorStore.getState().openChapter('s1', 'c2')
     expect(saveChapter).toHaveBeenCalledTimes(1)
+  })
+
+  test('typing then pausing debounceMs triggers exactly one flush', async () => {
+    vi.useFakeTimers()
+    useEditorStore.getState().configureAutosave({ debounceMs: 2000, intervalMs: 120000 })
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockClear()
+    useEditorStore.getState().applyDocUpdate(para('edited once'), '')
+    await vi.advanceTimersByTimeAsync(1999)
+    expect(saveChapter).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(saveChapter).toHaveBeenCalledTimes(1)
+    expect(useEditorStore.getState().dirty).toBe(false)
+    expect(useEditorStore.getState().saveStatus).toBe('saved')
+  })
+
+  test('interval flushes only while dirty', async () => {
+    vi.useFakeTimers()
+    useEditorStore.getState().configureAutosave({ debounceMs: 999999, intervalMs: 5000 })
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockClear()
+    // clean → interval tick saves nothing
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(saveChapter).not.toHaveBeenCalled()
+    // dirty (debounce is effectively disabled) → next tick saves
+    useEditorStore.getState().applyDocUpdate(para('dirty now'), '')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(saveChapter).toHaveBeenCalledTimes(1)
+  })
+
+  test('concurrent flush calls dedupe to a single save', async () => {
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockClear()
+    useEditorStore.getState().applyDocUpdate(para('once only'), '')
+    await Promise.all([
+      useEditorStore.getState().flush(),
+      useEditorStore.getState().flush()
+    ])
+    expect(saveChapter).toHaveBeenCalledTimes(1)
+  })
+
+  test('edit during an in-flight save keeps the chapter dirty', async () => {
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    let release: () => void = () => {}
+    saveChapter.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ savedAt: '2026-07-10T00:00:00.000Z', wordCount: 2, versionId: 'v2' })
+        })
+    )
+    useEditorStore.getState().applyDocUpdate(para('first edit'), '')
+    const flushing = useEditorStore.getState().flush()
+    // a new edit lands while the save is still in flight
+    useEditorStore.getState().applyDocUpdate(para('second edit while saving'), '')
+    release()
+    await flushing
+    const s = useEditorStore.getState()
+    expect(s.dirty).toBe(true)
+    expect(s.saveStatus).not.toBe('saved')
+  })
+
+  test('a failed save keeps dirty and reports error', async () => {
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockRejectedValueOnce(new Error('disk full'))
+    useEditorStore.getState().applyDocUpdate(para('unsaved edit'), '')
+    await useEditorStore.getState().flush()
+    const s = useEditorStore.getState()
+    expect(s.saveStatus).toBe('error')
+    expect(s.dirty).toBe(true)
   })
 })

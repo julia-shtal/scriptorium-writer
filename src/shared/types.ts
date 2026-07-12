@@ -173,3 +173,16 @@ export interface Api {
   // misc
   revealInFolder(path: string): Promise<void> // open a folder in the OS file explorer
 }
+
+/**
+ * A separate main→renderer push bridge, exposed on `window.lifecycle`. Kept off the
+ * invoke-only `Api` surface (which is compile-locked 1:1 to the IPC channels) because
+ * this is an event subscription, not a request/response call.
+ */
+export interface LifecycleApi {
+  /**
+   * Register the renderer's final-flush handler. Main invokes it on `before-quit`;
+   * when it resolves, the renderer acks so main can finish quitting.
+   */
+  onQuitFlush(handler: () => Promise<void> | void): void
+}

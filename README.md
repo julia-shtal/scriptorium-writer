@@ -143,6 +143,31 @@ counting is **single-sourced** in `src/shared/word-count.ts` so the on-screen co
 equals the count main computes on save. Autosave timers, the quit/switch flush guard,
 and version-history UI are intentionally deferred to M5.
 
+## Autosave & version history (M5)
+
+Manual **Save** and autosave share a single write path — there is only one way a
+chapter reaches disk. Autosave itself layers three triggers on top of that path:
+
+- **Debounce** — 2 seconds after typing stops.
+- **Interval** — every 2 minutes while the chapter is dirty, even mid-typing.
+- **Lifecycle flush** — on chapter switch, window blur, and before the app quits.
+
+**Quit guard** — closing the app does not exit immediately. Main asks the renderer to
+flush any unsaved changes and delays quitting until it confirms the write is done, or
+until a 5-second safety timeout elapses (so a stuck renderer can never wedge the app
+open). This guarantees no keystrokes are lost to a closed window.
+
+**Version History** — the history icon in the editor header (a temporary home; it
+moves into the sidebar in M6) opens the snapshot list for the current chapter. Pick a
+snapshot to preview it read-only, or restore it. Restoring first snapshots the
+*current* state (so the version you're leaving is never lost), then writes the
+restored content as the new canon.
+
+**Crash recovery** — on startup, `scanLibrary()` flags any chapter whose canon is
+missing or fails to parse. The affected chapter is offered for one-click restore from
+its newest snapshot; the corrupt file itself is **never** silently overwritten —
+restoring reopens the chapter once the newest good snapshot is back in place.
+
 ## Project layout
 
 ```
@@ -180,15 +205,22 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M2 — Editor core.** The TipTap writing surface is in place: book-themed parchment
-page, toolbar (marks, alignment, undo/redo, indent toggle, scene divider), live word
-count, focus mode, a collapsible sidebar, and a manual Save that persists through the M1
-`window.api` and reloads identically. A demo story is seeded on first run as a stand-in
-for the Library/Chapters navigation (M6). Next up: **M5 — autosave + version history**
-(debounce/interval/lifecycle saves, quit guard, restore UI) — see `TASKS.md`.
+**M5 — Autosave + version history.** Reliability is now locked into the UI: a single
+`flush()` write path shared by manual Save, a 2s debounce, a 2min dirty-interval, and
+lifecycle flushes (chapter switch, window blur, before quit); a main-process quit guard
+that delays exit until the renderer confirms a final flush (or a 5s safety timeout); a
+Version History view (preview read-only, restore-with-snapshot); and a startup
+crash-recovery prompt that restores a corrupt/missing chapter from its newest snapshot
+without ever silently overwriting the bad file. Next up: **M3 — footnotes** — see
+`TASKS.md`.
 
 Earlier:
 
+- **M2 — Editor core.** The TipTap writing surface: book-themed parchment page, toolbar
+  (marks, alignment, undo/redo, indent toggle, scene divider), live word count, focus
+  mode, a collapsible sidebar, and a manual Save that persists through the M1
+  `window.api` and reloads identically. A demo story is seeded on first run as a
+  stand-in for the Library/Chapters navigation (M6).
 - **M1 — Data layer.** The reliability backbone: `FileService` with atomic writes,
   library/story/chapter read-write, version snapshots + pruning, soft delete to
   `.trash/`, corrupt/missing-canon startup scan, and the full typed `window.api` over

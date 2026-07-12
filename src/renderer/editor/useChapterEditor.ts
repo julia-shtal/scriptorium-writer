@@ -1,8 +1,6 @@
 import { useEffect } from 'react'
 import { useEditor, type Editor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import TextAlign from '@tiptap/extension-text-align'
-import { SceneDivider } from './extensions/SceneDivider'
+import { bookExtensions } from './extensions/bookExtensions'
 import { useEditorStore } from '@renderer/store/editorStore'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
@@ -24,20 +22,7 @@ export function useChapterEditor(): Editor | null {
   const chapterId = useEditorStore((s) => s.chapterId)
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
-        blockquote: false,
-        codeBlock: false,
-        code: false,
-        horizontalRule: false
-      }),
-      TextAlign.configure({ types: ['paragraph'], alignments: ['left', 'center', 'right'] }),
-      SceneDivider
-    ],
+    extensions: bookExtensions,
     content: useEditorStore.getState().doc ?? EMPTY_DOC,
     editorProps: {
       attributes: { class: 'editor-surface', spellcheck: 'true' }
