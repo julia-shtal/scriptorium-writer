@@ -1,9 +1,19 @@
 import { join } from 'path'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { FileService } from './file-service'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
+import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
+
+// Offline spellcheck dictionaries (SPEC §7, M4): dev serves them straight from the repo
+// `resources/` dir; packaged builds get them from electron-builder's copy under
+// `<resourcesPath>/resources/`.
+function dictionariesDir(): string {
+  return is.dev
+    ? join(app.getAppPath(), 'resources', 'dictionaries')
+    : join(process.resourcesPath, 'resources', 'dictionaries')
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -20,6 +30,10 @@ function createWindow(): void {
       sandbox: false
     }
   })
+
+  // Native right-click menu for offline spellcheck (SPEC §7, M4): dictionary
+  // suggestions plus "Add to dictionary", wired on this window's webContents.
+  registerSpellcheckContextMenu(mainWindow.webContents, session.defaultSession)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -79,6 +93,11 @@ app.whenReady().then(async () => {
       }
     }
   )
+
+  // Offline spellcheck (SPEC §7, M4). Must fully complete — server listening + URL set —
+  // before the first spellcheck-enabled window is created (startup-ordering refinement).
+  const settings = await fileService.readSettings()
+  await configureSpellcheck(session.defaultSession, settings.spellLanguages, dictionariesDir())
 
   createWindow()
 
