@@ -12,10 +12,11 @@ files:
   - out/**/*
   - package.json
 
-# TODO(M4/M9): bundle resources/dictionaries for offline spellcheck.
-# extraResources:
-#   - from: resources
-#     to: resources
+# Offline spellcheck dictionaries (M4). Copied to <resourcesPath>/resources/ so the
+# packaged app resolves them the same way dev does (see dictionariesDir in main/index.ts).
+extraResources:
+  - from: resources
+    to: resources
 
 win:
   target:

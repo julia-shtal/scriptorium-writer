@@ -1,5 +1,14 @@
 import { IconCloudCheck, IconAbc, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEditorStore, type SaveStatus } from '@renderer/store/editorStore'
+import { useUiStore } from '@renderer/store/uiStore'
+
+const LANG_LABELS: Record<string, string> = { ru: 'RU', 'en-US': 'EN', en: 'EN' }
+
+/** Short uppercase labels for the footer spellcheck indicator, e.g. `RU · EN`. */
+export function formatSpellLanguages(langs: readonly string[]): string {
+  if (langs.length === 0) return '—'
+  return langs.map((l) => LANG_LABELS[l] ?? l.split('-')[0].toUpperCase()).join(' · ')
+}
 
 function statusLabel(status: SaveStatus, lastSavedAt: string | null): string {
   switch (status) {
@@ -23,6 +32,7 @@ export function EditorFooter(): JSX.Element {
   const saveStatus = useEditorStore((s) => s.saveStatus)
   const lastSavedAt = useEditorStore((s) => s.lastSavedAt)
   const save = useEditorStore((s) => s.save)
+  const spellLanguages = useUiStore((s) => s.spellLanguages)
 
   return (
     <div className="footer">
@@ -41,10 +51,9 @@ export function EditorFooter(): JSX.Element {
             </button>
           )}
         </span>
-        {/* TODO(M4): real spellcheck languages from settings. */}
         <span className="footer-item">
           <IconAbc size={16} />
-          RU · EN
+          {formatSpellLanguages(spellLanguages)}
         </span>
       </span>
       <button className="save-btn" onClick={() => void save()} disabled={saveStatus === 'saving'}>

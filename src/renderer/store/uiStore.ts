@@ -17,16 +17,21 @@ interface UiState {
   focusMode: boolean
   /** Sidebar collapse toggle (editor goes full width). */
   sidebarCollapsed: boolean
+  /** Active spellcheck languages (from settings) for the footer label. */
+  spellLanguages: string[]
   setActiveView: (view: ViewId) => void
   toggleFocus: () => void
   toggleSidebar: () => void
+  setSpellLanguages: (langs: string[]) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
   activeView: 'editor',
   focusMode: false,
   sidebarCollapsed: false,
+  spellLanguages: ['ru', 'en-US'],
   setActiveView: (activeView) => set({ activeView }),
   toggleFocus: () => set((s) => ({ focusMode: !s.focusMode })),
-  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed }))
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setSpellLanguages: (spellLanguages) => set({ spellLanguages })
 }))

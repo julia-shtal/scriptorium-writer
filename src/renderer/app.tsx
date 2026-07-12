@@ -23,6 +23,7 @@ export default function App(): JSX.Element {
     void (async () => {
       try {
         const settings = await window.api.readSettings()
+        useUiStore.getState().setSpellLanguages(settings.spellLanguages)
         configureAutosave({
           debounceMs: settings.autosaveDebounceMs,
           intervalMs: settings.autosaveIntervalMs

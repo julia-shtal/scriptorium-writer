@@ -187,6 +187,39 @@ never stored — so inserting, deleting, or moving footnotes always renumbers co
   helper in `src/shared/footnote-markdown.ts` for M7 to consume — **M3 does not write
   any `.md`** yet.
 
+## Spellcheck (offline, M4)
+
+Spellcheck is **editor-only** — it affects Chromium's underlines and the context menu
+in the editable surface. It never touches persistence; the `.json` canon (and the M7
+`.md` backup) are unaffected.
+
+**Provenance** — `resources/dictionaries/ru.bdic` and `resources/dictionaries/en-US.bdic`
+were extracted from the `hunspell_dictionaries.zip` release asset for `electron@43.1.0`
+(source filenames `ru-RU-3-0.bdic` and `en-US-10-1.bdic`; the version suffix is stripped
+when bundling). Note the naming quirk: that release names the Russian dictionary
+`ru-RU`, not `ru` — the prefix-matching described below handles this transparently, so
+the stripped `ru.bdic` still serves any `ru-...`-prefixed request.
+
+**How it works offline** — main starts a loopback HTTP server bound to `127.0.0.1` and
+points `session.setSpellCheckerDictionaryDownloadURL` at it. The server matches
+Chromium's version-suffixed request filename (e.g. `ru-RU-3-0.bdic`) by **language
+prefix**, so it serves the bundled `.bdic` regardless of the suffix Chromium asks for —
+this survives Chromium version bumps without touching the bundled files. Chromium
+caches the dictionary in `userData/Dictionaries` after first use.
+
+**Manual verification (network disabled):**
+
+1. Disable the network. Launch the app. Type a misspelled Russian word and a misspelled
+   English word in one paragraph → both underline red.
+2. Right-click a misspelled word → correct suggestions appear; click one → it replaces
+   the word.
+3. Click "Добавить в словарь" (Add to dictionary) → the underline disappears; restart
+   the app → the word stays un-underlined (persisted in `userData`).
+
+**Packaging note:** `resources/` (including `resources/dictionaries/`) is bundled via
+electron-builder's `extraResources` so offline spellcheck also works in the packaged
+app, not just `npm run dev`.
+
 ## Project layout
 
 ```
