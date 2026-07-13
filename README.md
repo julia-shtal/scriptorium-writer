@@ -325,6 +325,7 @@ src/
     theme/book.css        # book theme tokens + page-stack texture
     store/                # zustand stores: editorStore, storyStore, settingsStore, uiStore, bootstrap
     editor/               # TipTap editor, toolbar, footer, SceneDivider + Footnote nodes
+    editor/cleanup/       # M8 cleanup wand: rules, span diff, preview plugin, action bar
     views/                # EditorView, Library, Chapters, StoryInfo, Notes, Statistics, Settings, VersionHistory
     components/           # AppFrame (leather frame + grid), Sidebar
   shared/
@@ -341,16 +342,22 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M7 — Markdown backup export.** Every successful chapter save now also writes a
-human-readable `.md` backup beside the `.json` canon (bold/italic/strike, scene dividers
-as `---`, footnotes as `[^n]` + definitions; paragraph alignment intentionally dropped).
-The write is best-effort: a failure never fails the save or touches the canon, and
-surfaces as a soft "копия .md не сохранена" warning in the editor footer. Soft-delete and
-chapter reordering keep the `.md` sibling in sync with its `.json`. See the *Chapter
-files: `.json` canon + `.md` backup (M7)* section above.
+**M8 — Cleanup wand (minimal rules).** The toolbar wand runs a pluggable, ordered set of
+pure text-cleanup rules (collapse spaces, punctuation spacing, stray hyphen spaces,
+` - ` → em dash, trailing-whitespace trim) over the selection — or the whole chapter when
+nothing is selected — behind an inline diff preview, applied as a single undoable
+transaction that preserves marks and never alters node structure. See the *Cleanup wand
+(M8)* section above.
 
 Earlier:
 
+- **M7 — Markdown backup export.** Every successful chapter save also writes a
+  human-readable `.md` backup beside the `.json` canon (bold/italic/strike, scene dividers
+  as `---`, footnotes as `[^n]` + definitions; paragraph alignment intentionally dropped).
+  The write is best-effort: a failure never fails the save or touches the canon, and
+  surfaces as a soft "копия .md не сохранена" warning in the editor footer. Soft-delete and
+  chapter reordering keep the `.md` sibling in sync with its `.json`. See the *Chapter
+  files: `.json` canon + `.md` backup (M7)* section above.
 - **M6 — Navigation & views.** The sidebar-driven view router and all remaining views
   (Library, Chapters with drag-to-reorder, Story info, Notes, Statistics, Settings) around
   the editor + version-history views, each persisting through the M1 `window.api`.
