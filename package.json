@@ -1,6 +1,6 @@
 {
   "name": "scriptorium-writer",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Local-first desktop app for writing long-form fiction, styled like the warm pages of a book.",
   "main": "./out/main/index.js",
   "author": "Julia Shtal",
