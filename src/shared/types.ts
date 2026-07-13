@@ -75,6 +75,11 @@ export interface SaveResult {
   savedAt: ISODate
   wordCount: number
   versionId: string
+  /**
+   * Set when the sibling `.md` backup could not be written (M7). The `.json` canon
+   * still saved successfully — this is a soft, non-fatal warning.
+   */
+  mdWarning?: string
 }
 
 export interface VersionSummary {

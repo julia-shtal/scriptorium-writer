@@ -18,7 +18,8 @@ const reset = (): void =>
     selectionWordCount: 0,
     indentOn: true,
     saveStatus: 'idle',
-    lastSavedAt: null
+    lastSavedAt: null,
+    mdWarning: null
   })
 
 describe('editorStore', () => {
@@ -164,5 +165,29 @@ describe('editorStore', () => {
     const s = useEditorStore.getState()
     expect(s.saveStatus).toBe('error')
     expect(s.dirty).toBe(true)
+  })
+
+  test('surfaces mdWarning from a save and clears it on the next clean save', async () => {
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter
+      .mockResolvedValueOnce({
+        savedAt: '2026-07-12T00:00:00.000Z',
+        wordCount: 3,
+        versionId: 'v1',
+        mdWarning: 'Markdown backup failed: EPERM'
+      })
+      .mockResolvedValueOnce({
+        savedAt: '2026-07-12T00:00:01.000Z',
+        wordCount: 3,
+        versionId: 'v2'
+      })
+
+    useEditorStore.getState().applyDocUpdate(para('first edit'), '')
+    await useEditorStore.getState().save()
+    expect(useEditorStore.getState().mdWarning).toContain('Markdown backup failed')
+
+    useEditorStore.getState().applyDocUpdate(para('second edit'), '')
+    await useEditorStore.getState().save()
+    expect(useEditorStore.getState().mdWarning).toBeNull()
   })
 })

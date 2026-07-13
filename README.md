@@ -91,6 +91,7 @@ Scriptorium-Writer/               ← library root (libraryPath)
       story.json                  ← StoryMeta + chapterOrder + schemaVersion
       chapters/
         01-slug.json              ← Chapter canon (ProseMirror JSON) — SOURCE OF TRUTH
+        01-slug.md                ← Human-readable Markdown backup (lossy, write-only)
       versions/
         <chapterId>/
           2026-07-09T10-15-00-123Z.json   ← per-chapter snapshots (pruned to a cap)
@@ -101,8 +102,29 @@ Scriptorium-Writer/               ← library root (libraryPath)
 
 `NN-slug` filenames are for human legibility only; the app always resolves chapters
 by the stable `id` stored **inside** each file, never by trusting a filename, so
-files may be renamed safely. The Markdown backup copy (`.md`) is **not** written yet
-— that lands in M7 (a `// TODO(M7)` marks the slot in `saveChapter`).
+files may be renamed safely.
+
+### Chapter files: `.json` canon + `.md` backup (M7)
+
+Every successful chapter save writes two files with the same `NN-slug` stem:
+
+- **`NN-slug.json`** — the ProseMirror JSON **canon**. Canonical, lossless, and the
+  only file the app ever reads back. It carries everything, including paragraph
+  alignment.
+- **`NN-slug.md`** — a **human-readable Markdown backup**. Written best-effort right
+  after the canon: bold/italic/strike map to standard Markdown, scene dividers to a
+  `---` thematic break, and footnotes to `[^n]` markers plus a definitions block.
+  **Paragraph alignment is dropped** (Markdown can't represent it) — this is expected
+  and acceptable because the `.json` retains it.
+
+The `.md` is **write-only in v1**: it's a backup you (or a Markdown editor) can read,
+but the app never re-imports or repairs from it. If the `.md` write ever fails, the
+save still succeeds — the `.json` canon is untouched and the editor shows a soft
+"копия .md не сохранена" warning.
+
+The `.md` sibling stays in sync with its canon across the chapter lifecycle: soft-delete
+moves both files into `.trash/`, and reordering chapters renames both files' `NN` ordinal
+prefixes in lockstep so a `.json`/`.md` pair never mismatches or orphans.
 
 **Reliability guarantees** (SPEC §5, enforced + unit-tested):
 
@@ -183,9 +205,9 @@ never stored — so inserting, deleting, or moving footnotes always renumbers co
 - Footnotes round-trip losslessly through save/reload and appear unchanged in version
   snapshots (the node is registered in the shared `bookExtensions`, used by both the
   live editor and the read-only history preview).
-- The Markdown mapping (`[^n]` markers + `[^n]:` definitions) is prepared as a pure
-  helper in `src/shared/footnote-markdown.ts` for M7 to consume — **M3 does not write
-  any `.md`** yet.
+- The Markdown mapping (`[^n]` markers + `[^n]:` definitions) lives in the shared
+  helper `src/shared/footnote-markdown.ts`, reused by the M7 `.md` backup serializer
+  (`src/main/markdown.ts`) so marker numbers always match the definitions block.
 
 ## Spellcheck (offline, M4)
 
@@ -282,7 +304,7 @@ src/
     schema.ts             # schemaVersion constants
     errors.ts             # typed AppError + IPC encode/decode
     word-count.ts         # word count from a ProseMirror doc (shared by main + renderer)
-    footnote-markdown.ts  # footnote → Markdown mapping helper (prepared for M7)
+    footnote-markdown.ts  # footnote → Markdown mapping helper (used by main/markdown.ts, M7)
 out/                      # build output (gitignored)
 release/                  # packaged installers (gitignored)
 ```
@@ -291,15 +313,21 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M6 — Navigation & views.** The sidebar-driven view router and all remaining views
-(Library, Chapters with drag-to-reorder, Story info, Notes, Statistics, Settings) around
-the editor + version-history views, each persisting through the M1 `window.api`. Settings
-apply live (font, autosave interval, spellcheck languages via a new `applySpellLanguages`
-IPC). See the *Navigation & views (M6)* section above. Next up: **M7 — Markdown backup
-export** — see `TASKS.md`.
+**M7 — Markdown backup export.** Every successful chapter save now also writes a
+human-readable `.md` backup beside the `.json` canon (bold/italic/strike, scene dividers
+as `---`, footnotes as `[^n]` + definitions; paragraph alignment intentionally dropped).
+The write is best-effort: a failure never fails the save or touches the canon, and
+surfaces as a soft "копия .md не сохранена" warning in the editor footer. Soft-delete and
+chapter reordering keep the `.md` sibling in sync with its `.json`. See the *Chapter
+files: `.json` canon + `.md` backup (M7)* section above.
 
 Earlier:
 
+- **M6 — Navigation & views.** The sidebar-driven view router and all remaining views
+  (Library, Chapters with drag-to-reorder, Story info, Notes, Statistics, Settings) around
+  the editor + version-history views, each persisting through the M1 `window.api`.
+  Settings apply live (font, autosave interval, spellcheck languages via a new
+  `applySpellLanguages` IPC). See the *Navigation & views (M6)* section above.
 - **M4 — Spellcheck (RU + EN, offline).** Simultaneous Russian + English Chromium
   spellcheck served from bundled `.bdic` dictionaries by a loopback prefix-matching
   server, with a native suggestion / add-to-dictionary context menu. See the *Spellcheck
@@ -308,7 +336,7 @@ Earlier:
   marker (numbering derived by document order, never stored), a hover popover to read the
   text and a select-to-edit field to change it, wired to the toolbar `[?]` button. Text is
   stored losslessly in the JSON canon and survives save/reload and version snapshots; the
-  Markdown mapping is prepared as a pure helper for M7 but no `.md` is written yet.
+  Markdown mapping (`[^n]` + definitions) is reused by the M7 `.md` backup serializer.
 - **M5 — Autosave + version history.** A single `flush()` write path shared by manual
   Save, a 2s debounce, a 2min dirty-interval, and lifecycle flushes (chapter switch,
   window blur, before quit); a main-process quit guard that delays exit until the

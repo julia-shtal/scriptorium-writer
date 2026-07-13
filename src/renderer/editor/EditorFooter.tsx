@@ -31,6 +31,7 @@ export function EditorFooter(): JSX.Element {
   const selectionWordCount = useEditorStore((s) => s.selectionWordCount)
   const saveStatus = useEditorStore((s) => s.saveStatus)
   const lastSavedAt = useEditorStore((s) => s.lastSavedAt)
+  const mdWarning = useEditorStore((s) => s.mdWarning)
   const save = useEditorStore((s) => s.save)
   const spellLanguages = useUiStore((s) => s.spellLanguages)
 
@@ -49,6 +50,11 @@ export function EditorFooter(): JSX.Element {
             <button className="retry-btn" onClick={() => void save()}>
               повторить
             </button>
+          )}
+          {mdWarning && (
+            <span className="save-warning" title={mdWarning}>
+              ⚠ копия .md не сохранена
+            </span>
           )}
         </span>
         <span className="footer-item">
