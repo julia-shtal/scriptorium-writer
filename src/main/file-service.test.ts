@@ -6,6 +6,7 @@ import { FileService } from './file-service'
 import { layout } from './paths'
 import { isAppError } from '@shared/errors'
 import type { ProseMirrorJSON } from '@shared/types'
+import { serializeChapterToMarkdown } from './markdown'
 
 const dirsToClean: string[] = []
 
@@ -264,6 +265,161 @@ describe('notes', () => {
     const reread = await svc.readNotes(story.id)
     expect(reread.scratch).toBe('idea')
     expect(reread.characters[0].name).toBe('Franz')
+  })
+})
+
+describe('markdown backup (M7)', () => {
+  it('writes a sibling .md next to the .json canon on save', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'MD Story' })
+    const ch = await svc.createChapter(story.id, 'Chapter One')
+    await svc.saveChapter(story.id, {
+      id: ch.id,
+      title: 'Chapter One',
+      doc: docWith('hello world')
+    })
+
+    const dir = layout.chaptersDir(lib, story.id)
+    const names = await fsp.readdir(dir)
+    const json = names.find((n) => n.endsWith('.json'))
+    const md = names.find((n) => n.endsWith('.md'))
+    expect(json).toBeDefined()
+    expect(md).toBeDefined()
+    // Same stem, different extension.
+    expect(md).toBe(json!.replace(/\.json$/, '.md'))
+
+    const body = await fsp.readFile(join(dir, md!), 'utf8')
+    expect(body).toContain('hello world')
+    expect(body).toBe(serializeChapterToMarkdown('Chapter One', docWith('hello world')))
+  })
+
+  it('returns mdWarning and preserves the .json canon when the .md write fails', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'MD Fail Story' })
+    const ch = await svc.createChapter(story.id, 'Chapter One')
+
+    // First save succeeds and creates the .md.
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Chapter One', doc: docWith('v1') })
+    const dir = layout.chaptersDir(lib, story.id)
+    const jsonName = (await chapterFiles(lib, story.id))[0]
+    const mdPath = join(dir, jsonName.replace(/\.json$/, '.md'))
+
+    // Sabotage the .md target: replace the file with a DIRECTORY so the atomic
+    // rename-over-target fails deterministically on every platform.
+    await fsp.rm(mdPath)
+    await fsp.mkdir(mdPath)
+
+    const result = await svc.saveChapter(story.id, {
+      id: ch.id,
+      title: 'Chapter One',
+      doc: docWith('v2')
+    })
+
+    // Save reported as succeeded-with-warning.
+    expect(result.mdWarning).toBeTruthy()
+    expect(result.savedAt).toBeTruthy()
+
+    // Canon is intact and holds the new content.
+    const reread = await svc.readChapter(story.id, ch.id)
+    expect(JSON.stringify(reread.doc)).toContain('v2')
+  })
+
+  it('soft-deletes the sibling .md alongside the .json', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'Del Story' })
+    const ch = await svc.createChapter(story.id, 'Chapter One')
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Chapter One', doc: docWith('body') })
+
+    const dir = layout.chaptersDir(lib, story.id)
+    expect((await fsp.readdir(dir)).some((n) => n.endsWith('.md'))).toBe(true)
+
+    await svc.deleteChapter(story.id, ch.id)
+
+    // No orphan .md left behind in the live chapters directory.
+    expect((await fsp.readdir(dir)).some((n) => n.endsWith('.md'))).toBe(false)
+  })
+
+  it('renames the sibling .md when chapters are reordered', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'Reorder Story' })
+    const a = await svc.createChapter(story.id, 'Alpha')
+    const b = await svc.createChapter(story.id, 'Beta')
+    await svc.saveChapter(story.id, { id: a.id, title: 'Alpha', doc: docWith('alpha body') })
+    await svc.saveChapter(story.id, { id: b.id, title: 'Beta', doc: docWith('beta body') })
+
+    await svc.reorderChapters(story.id, [b.id, a.id])
+
+    const dir = layout.chaptersDir(lib, story.id)
+    const names = (await fsp.readdir(dir)).sort()
+    const mds = names.filter((n) => n.endsWith('.md'))
+    // Exactly one .md per chapter — no orphans, no duplicates.
+    expect(mds.length).toBe(2)
+    // Every .md has a matching .json of the same stem (they stayed in sync).
+    for (const md of mds) {
+      expect(names).toContain(md.replace(/\.md$/, '.json'))
+    }
+    // Beta is now first (ordinal 01), Alpha second (ordinal 02).
+    expect(mds[0]).toMatch(/^01-.*\.md$/)
+    expect(mds[1]).toMatch(/^02-.*\.md$/)
+    const first = await fsp.readFile(join(dir, mds[0]), 'utf8')
+    expect(first).toContain('beta body')
+  })
+})
+
+describe('chapter file renumbering (delete)', () => {
+  it('renumbers remaining chapter files to contiguous ordinals after a delete', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'Renum' })
+    const a = await svc.createChapter(story.id, 'Alpha')
+    const b = await svc.createChapter(story.id, 'Beta')
+    const c = await svc.createChapter(story.id, 'Gamma')
+    await svc.saveChapter(story.id, { id: a.id, title: 'Alpha', doc: docWith('alpha') })
+    await svc.saveChapter(story.id, { id: c.id, title: 'Gamma', doc: docWith('gamma') })
+
+    await svc.deleteChapter(story.id, b.id)
+
+    // Files (both .json and .md) renumber to 01/02 — no leftover 03- gap.
+    const dir = layout.chaptersDir(lib, story.id)
+    const names = (await fsp.readdir(dir)).sort()
+    expect(names.filter((n) => n.endsWith('.json'))).toEqual(['01-alpha.json', '02-gamma.json'])
+    expect(names.filter((n) => n.endsWith('.md'))).toEqual(['01-alpha.md', '02-gamma.md'])
+    // Chapters still resolve by id with their own content.
+    expect(JSON.stringify((await svc.readChapter(story.id, c.id)).doc)).toContain('gamma')
+  })
+
+  it('does not overwrite a chapter when a later same-title chapter is created', async () => {
+    // The reported data-loss scenario: identical (default) titles → identical slugs.
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'Dup' })
+    const a = await svc.createChapter(story.id, 'Глава')
+    const b = await svc.createChapter(story.id, 'Глава')
+    const c = await svc.createChapter(story.id, 'Глава')
+    await svc.saveChapter(story.id, { id: a.id, title: 'Глава', doc: docWith('alpha') })
+    await svc.saveChapter(story.id, { id: c.id, title: 'Глава', doc: docWith('gamma') })
+
+    await svc.deleteChapter(story.id, b.id)
+    const d = await svc.createChapter(story.id, 'Глава')
+    await svc.saveChapter(story.id, { id: d.id, title: 'Глава', doc: docWith('delta') })
+
+    // Exactly three canon files, all distinct, none clobbered.
+    expect((await chapterFiles(lib, story.id)).length).toBe(3)
+    expect(JSON.stringify((await svc.readChapter(story.id, a.id)).doc)).toContain('alpha')
+    expect(JSON.stringify((await svc.readChapter(story.id, c.id)).doc)).toContain('gamma')
+    expect(JSON.stringify((await svc.readChapter(story.id, d.id)).doc)).toContain('delta')
+  })
+
+  it('createChapter picks a free filename instead of overwriting a colliding one', async () => {
+    // Backstop for a library already in the broken state: a stray file sits exactly
+    // where the next create would write. It must not be clobbered.
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'Guard' })
+    const dir = layout.chaptersDir(lib, story.id)
+    await fsp.writeFile(join(dir, '01-глава.json'), '{"stray":"keep me"}')
+
+    const ch = await svc.createChapter(story.id, 'Глава')
+
+    expect(await fsp.readFile(join(dir, '01-глава.json'), 'utf8')).toContain('keep me')
+    expect((await svc.readChapter(story.id, ch.id)).id).toBe(ch.id)
   })
 })
 

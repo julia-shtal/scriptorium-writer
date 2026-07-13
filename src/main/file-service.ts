@@ -39,6 +39,7 @@ import {
 } from '@shared/schema'
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
+import { serializeChapterToMarkdown } from './markdown'
 import { countWords } from '@shared/word-count'
 import {
   chapterFileStem,
@@ -229,26 +230,72 @@ export class FileService {
       throw new AppError('INVALID_INPUT', 'reorder list must be a permutation of chapterOrder')
     }
 
-    const chaptersDir = layout.chaptersDir(root, id)
+    await this.renumberChapterFiles(layout.chaptersDir(root, id), chapterIds)
+    await this.writeStory(root, { ...story, chapterOrder: [...chapterIds], updatedAt: nowIso() })
+  }
+
+  /**
+   * Rename chapter files (and their `.md` siblings) to contiguous `NN-slug` names
+   * matching `orderedIds`. Two-phase (unique temp name, then final name) so a reorder
+   * that swaps ordinals — or a delete that shifts everything down — never transiently
+   * collides. Files whose canon is missing/corrupt are left in place; chapters resolve
+   * by stable id regardless of filename. Called after both reorder and delete so the
+   * `NN-` prefixes always mirror the live chapter order and never leave a gap a later
+   * create could reuse (which, with a matching slug, would overwrite good data).
+   */
+  private async renumberChapterFiles(chaptersDir: string, orderedIds: string[]): Promise<void> {
     const located = await this.listChapterFiles(chaptersDir)
     const byId = new Map(located.map((c) => [c.chapter.id, c]))
-
-    // Two-phase rename to avoid transient collisions (e.g. swapping 01 <-> 02):
-    // first move every file to a unique temp name, then to its final NN-slug name.
-    const staged: { tempPath: string; finalName: string }[] = []
-    for (let i = 0; i < chapterIds.length; i++) {
-      const entry = byId.get(chapterIds[i])
+    const staged: {
+      tempPath: string
+      finalName: string
+      mdTempPath?: string
+      mdFinalName?: string
+    }[] = []
+    for (let i = 0; i < orderedIds.length; i++) {
+      const entry = byId.get(orderedIds[i])
       if (!entry) continue // corrupt/missing file; leave it, resolve-by-id still holds
-      const finalName = `${chapterFileStem(i + 1, entry.chapter.title)}.json`
+      const stem = chapterFileStem(i + 1, entry.chapter.title)
       const tempPath = join(chaptersDir, `.reorder-${i}-${Date.now()}.tmp`)
       await fsp.rename(entry.path, tempPath)
-      staged.push({ tempPath, finalName })
-    }
-    for (const { tempPath, finalName } of staged) {
-      await fsp.rename(tempPath, join(chaptersDir, finalName))
-    }
 
-    await this.writeStory(root, { ...story, chapterOrder: [...chapterIds], updatedAt: nowIso() })
+      const item: {
+        tempPath: string
+        finalName: string
+        mdTempPath?: string
+        mdFinalName?: string
+      } = { tempPath, finalName: `${stem}.json` }
+
+      const mdSource = entry.path.replace(/\.json$/, '.md')
+      if (await exists(mdSource)) {
+        const mdTempPath = join(chaptersDir, `.reorder-md-${i}-${Date.now()}.tmp`)
+        await fsp.rename(mdSource, mdTempPath)
+        item.mdTempPath = mdTempPath
+        item.mdFinalName = `${stem}.md`
+      }
+      staged.push(item)
+    }
+    for (const s of staged) {
+      await fsp.rename(s.tempPath, join(chaptersDir, s.finalName))
+      if (s.mdTempPath && s.mdFinalName) {
+        await fsp.rename(s.mdTempPath, join(chaptersDir, s.mdFinalName))
+      }
+    }
+  }
+
+  /**
+   * A chapter file path guaranteed not to collide with an existing file. Normally
+   * returns `NN-slug.json`; if that already exists (a library left in the pre-fix
+   * duplicate-ordinal state), it appends `-2`, `-3`, … so a create can never clobber
+   * another chapter's canon.
+   */
+  private async freeChapterPath(dir: string, ordinal: number, title: string): Promise<string> {
+    const stem = chapterFileStem(ordinal, title)
+    let candidate = join(dir, `${stem}.json`)
+    for (let n = 2; await exists(candidate); n++) {
+      candidate = join(dir, `${stem}-${n}.json`)
+    }
+    return candidate
   }
 
   // ── Chapters ────────────────────────────────────────────────────────────────
@@ -268,7 +315,10 @@ export class FileService {
       schemaVersion: CHAPTER_SCHEMA_VERSION
     }
     const ordinal = story.chapterOrder.length + 1
-    const target = join(layout.chaptersDir(root, storyId), `${chapterFileStem(ordinal, title)}.json`)
+    // Never overwrite an existing file: renumbering keeps ordinals contiguous, but a
+    // library already carrying duplicate `NN-slug` names (from before that fix) could
+    // still collide — pick a free name rather than clobber good data.
+    const target = await this.freeChapterPath(layout.chaptersDir(root, storyId), ordinal, title)
     await atomicWriteFile(target, pretty(chapter))
     await this.writeStory(root, {
       ...story,
@@ -321,14 +371,26 @@ export class FileService {
       join(layout.chaptersDir(root, storyId), `${chapterFileStem(ordinal, incoming.title)}.json`)
     await atomicWriteFile(target, pretty(chapter))
 
-    // TODO(M7): after the .json canon write succeeds, atomically write the sibling
-    // human-readable `.md` backup here. A failure to write `.md` must not fail the
-    // save or corrupt the canon.
+    // M7: write the human-readable Markdown backup alongside the canon. Best-effort —
+    // a failure here must never fail the save or corrupt the .json canon (SPEC §5, §8).
+    let mdWarning: string | undefined
+    try {
+      const mdTarget = target.replace(/\.json$/, '.md')
+      await atomicWriteFile(mdTarget, serializeChapterToMarkdown(chapter.title, chapter.doc))
+    } catch (err) {
+      mdWarning = `Markdown backup failed: ${err instanceof Error ? err.message : String(err)}`
+      console.error(`[saveChapter] ${mdWarning}`, err)
+    }
 
     const versionId = await this.writeSnapshot(root, storyId, chapter, stamp)
     await this.pruneVersions(root, storyId, incoming.id)
 
-    return { savedAt, wordCount: chapter.wordCount, versionId }
+    return {
+      savedAt,
+      wordCount: chapter.wordCount,
+      versionId,
+      ...(mdWarning ? { mdWarning } : {})
+    }
   }
 
   async deleteChapter(storyId: string, chapterId: string): Promise<void> {
@@ -346,17 +408,23 @@ export class FileService {
     if (path) {
       await fsp.mkdir(join(trashRoot, 'chapters'), { recursive: true })
       await fsp.rename(path, join(trashRoot, 'chapters', basename(path)))
+      // M7: the Markdown backup follows its canon into the trash so no orphan lingers.
+      const mdPath = path.replace(/\.json$/, '.md')
+      if (await exists(mdPath)) {
+        await fsp.rename(mdPath, join(trashRoot, 'chapters', basename(mdPath)))
+      }
     }
     const versionsDir = layout.chapterVersionsDir(root, storyId, chapterId)
     if (await exists(versionsDir)) {
       await fsp.mkdir(trashRoot, { recursive: true })
       await fsp.rename(versionsDir, join(trashRoot, 'versions'))
     }
-    await this.writeStory(root, {
-      ...story,
-      chapterOrder: story.chapterOrder.filter((c) => c !== chapterId),
-      updatedAt: nowIso()
-    })
+    // Renumber the survivors so their `NN-` prefixes stay contiguous — otherwise the
+    // deleted ordinal becomes a gap the next create would reuse, colliding with (and
+    // overwriting) a same-slug chapter that kept its old, higher number.
+    const remaining = story.chapterOrder.filter((c) => c !== chapterId)
+    await this.renumberChapterFiles(layout.chaptersDir(root, storyId), remaining)
+    await this.writeStory(root, { ...story, chapterOrder: remaining, updatedAt: nowIso() })
   }
 
   // ── Versions ──────────────────────────────────────────────────────────────

@@ -183,6 +183,11 @@ body {
 .retry-btn:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+.save-warning {
+  margin-left: 6px;
+  color: var(--muted);
+  cursor: help;
+}
 
 /* ── Focus mode ────────────────────────────────────────────────── */
 .focus-mode .sidebar,

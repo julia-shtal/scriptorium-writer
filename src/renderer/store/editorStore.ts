@@ -26,6 +26,8 @@ interface EditorState {
   indentOn: boolean
   saveStatus: SaveStatus
   lastSavedAt: string | null
+  /** Soft warning when the sibling `.md` backup failed to write (M7); canon still saved. */
+  mdWarning: string | null
 
   openChapter: (storyId: string, chapterId: string) => Promise<void>
   applyDocUpdate: (doc: ProseMirrorJSON, selectionText: string) => void
@@ -55,6 +57,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   indentOn: true,
   saveStatus: 'idle',
   lastSavedAt: null,
+  mdWarning: null,
 
   openChapter: async (storyId, chapterId) => {
     // Chapter-switch guard: cancel any pending debounce and force a final flush so
@@ -104,7 +107,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (inFlight) await inFlight
     const { storyId, chapterId, title, doc, dirty } = get()
     if (!dirty || !storyId || !chapterId || !doc) return
-    set({ saveStatus: 'saving' })
+    set({ saveStatus: 'saving', mdWarning: null })
     const run = (async () => {
       try {
         const result: SaveResult = await window.api.saveChapter(storyId, {
@@ -122,7 +125,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             saveStatus: 'saved',
             dirty: false,
             wordCount: result.wordCount,
-            lastSavedAt: result.savedAt
+            lastSavedAt: result.savedAt,
+            mdWarning: result.mdWarning ?? null
           })
         }
       } catch {
