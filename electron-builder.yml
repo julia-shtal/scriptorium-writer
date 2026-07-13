@@ -7,7 +7,7 @@ directories:
   output: release
 
 # Compiled output from electron-vite (main / preload / renderer) plus the
-# manifest. resources/ (icons, dictionaries) get bundled in later milestones.
+# manifest. resources/ (icons, dictionaries) are bundled via extraResources below.
 files:
   - out/**/*
   - package.json
@@ -21,7 +21,7 @@ extraResources:
 win:
   target:
     - nsis
-  # TODO(M9): add resources/icons/icon.ico
+  icon: resources/icons/icon.ico
 
 # Per-user install; no code signing in v1 (tracked as a follow-up in M9).
 nsis:
@@ -30,3 +30,5 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
