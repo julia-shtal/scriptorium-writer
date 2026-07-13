@@ -15,8 +15,17 @@ function dictionariesDir(): string {
     : join(process.resourcesPath, 'resources', 'dictionaries')
 }
 
+// App icon (M9): dev resolves from the repo `resources/` dir; packaged builds get it
+// from electron-builder's copy under `<resourcesPath>/resources/`. Mirrors dictionariesDir().
+function iconPath(): string {
+  return is.dev
+    ? join(app.getAppPath(), 'resources', 'icons', 'icon.ico')
+    : join(process.resourcesPath, 'resources', 'icons', 'icon.ico')
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
+    icon: iconPath(),
     width: 1200,
     height: 820,
     show: false,

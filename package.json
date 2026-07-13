@@ -20,7 +20,8 @@
     "lint": "eslint . --ext .ts,.tsx --cache",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "gen:icon": "node scripts/gen-icon.mjs"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",

@@ -303,6 +303,28 @@ preview.
   leaves the document byte-identical. Zero proposed edits show a brief "Нечего чистить" note
   instead of entering preview.
 
+## Packaging & release (M9)
+
+`npm run build:win` type-checks, builds `out/`, and packages a **Windows NSIS
+installer** into `release/` (e.g. `Scriptorium Writer Setup <version>.exe`). The
+installer is **per-user** (no administrator rights), lets you pick the install
+directory, and creates desktop + Start-menu shortcuts. The app icon lives at
+`resources/icons/icon.ico` — a generated placeholder (regenerate with
+`npm run gen:icon`); drop a designed `.ico` at that path to rebrand.
+
+- **Offline in the packaged app** — `resources/` (including the `ru`/`en-US`
+  dictionaries) is bundled via electron-builder `extraResources`, so spellcheck works
+  with the network disabled in the installed build, exactly as in `npm run dev`.
+- **Your library is a normal folder** — the packaged app creates the library on first
+  run (default `Documents/Scriptorium-Writer/`) and it is a plain directory you can
+  **back up, sync (Dropbox/OneDrive/git), or open in Explorer** at any time. See
+  *Where data lives* and *On-disk layout* above for the `.json` canon / `.md` backup /
+  snapshot structure. Settings are per-machine in Electron's `userData`.
+- **Reveal library in Explorer** — Settings shows the library path with a link that
+  opens it in the OS file manager (`window.api.revealInFolder`).
+- **Code signing** — v1 ships **unsigned**; Windows SmartScreen may warn on first launch
+  ("More info → Run anyway"). Signing (and an auto-update server) are post-v1 follow-ups.
+
 ## Project layout
 
 ```
@@ -342,14 +364,21 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ## Status
 
-**M8 — Cleanup wand (minimal rules).** The toolbar wand runs a pluggable, ordered set of
-pure text-cleanup rules (collapse spaces, punctuation spacing, stray hyphen spaces,
-` - ` → em dash, trailing-whitespace trim) over the selection — or the whole chapter when
-nothing is selected — behind an inline diff preview, applied as a single undoable
-transaction that preserves marks and never alters node structure. See the *Cleanup wand
-(M8)* section above.
+**M9 — Packaging & release.** A Windows **NSIS installer** (`npm run build:win` →
+`release/`): per-user install with an app icon (`resources/icons/icon.ico`, a generated
+placeholder — `npm run gen:icon`), bundled offline dictionaries, desktop + Start-menu
+shortcuts, and a "Reveal library in Explorer" action in Settings. The library stays a
+normal, syncable folder. Unsigned in v1 (SmartScreen may warn); code signing and
+auto-update are noted follow-ups. See the *Packaging & release (M9)* section above.
 
 Earlier:
+
+- **M8 — Cleanup wand (minimal rules).** The toolbar wand runs a pluggable, ordered set
+  of pure text-cleanup rules (collapse spaces, punctuation spacing, stray hyphen spaces,
+  ` - ` → em dash, trailing-whitespace trim) over the selection — or the whole chapter
+  when nothing is selected — behind an inline diff preview, applied as a single undoable
+  transaction that preserves marks and never alters node structure. See the *Cleanup
+  wand (M8)* section above.
 
 - **M7 — Markdown backup export.** Every successful chapter save also writes a
   human-readable `.md` backup beside the `.json` canon (bold/italic/strike, scene dividers
