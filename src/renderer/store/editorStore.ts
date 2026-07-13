@@ -24,6 +24,12 @@ interface EditorState {
   selectionWordCount: number
   /** Per-chapter view preference (first-line indent). Not stored in the doc. */
   indentOn: boolean
+  /**
+   * True while the cleanup wand is showing its inline diff preview. The doc is only
+   * decorated (not yet edited), the editor is read-only, and autosave must be
+   * suppressed so no snapshot of the uncommitted, decoration-only state is taken.
+   */
+  wandPreviewActive: boolean
   saveStatus: SaveStatus
   lastSavedAt: string | null
   /** Soft warning when the sibling `.md` backup failed to write (M7); canon still saved. */
@@ -34,6 +40,8 @@ interface EditorState {
   setSelection: (selectionText: string) => void
   setTitle: (title: string) => void
   toggleIndent: () => void
+  /** Enter/leave the wand preview (see `wandPreviewActive`). */
+  setWandPreviewActive: (active: boolean) => void
   /** The single write path — used by manual Save, debounce, interval, blur, quit. */
   flush: () => Promise<void>
   /** Manual Save button alias (cancels any pending debounce, then flushes). */
@@ -55,6 +63,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   wordCount: 0,
   selectionWordCount: 0,
   indentOn: true,
+  wandPreviewActive: false,
   saveStatus: 'idle',
   lastSavedAt: null,
   mdWarning: null,
@@ -100,6 +109,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   toggleIndent: () => set((s) => ({ indentOn: !s.indentOn })),
+
+  setWandPreviewActive: (active) => set({ wandPreviewActive: active }),
 
   flush: async () => {
     // Serialize with any save already running, then re-check dirty so edits made
@@ -151,6 +162,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   scheduleAutosave: () => {
+    // Suppressed during the wand preview: the doc is only decorated, not yet edited.
+    if (get().wandPreviewActive) return
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
@@ -163,7 +176,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     intervalMs = i
     if (intervalTimer) clearInterval(intervalTimer)
     intervalTimer = setInterval(() => {
-      if (get().dirty) void get().flush()
+      // Skip the periodic flush while the wand preview is up (uncommitted state).
+      if (get().dirty && !get().wandPreviewActive) void get().flush()
     }, intervalMs)
   },
 
