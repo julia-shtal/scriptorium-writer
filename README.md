@@ -171,26 +171,6 @@ demo story so there is something to edit (a stand-in for the Library/Chapters
 navigation that arrives in M6); edits are persisted through the M1 `window.api`,
 proving the main → preload (contextBridge) → renderer path works end to end.
 
-### Publishing a release
-
-The "just download it" path in the writers' section above depends on a GitHub
-Release existing with a built installer attached. There's no CI for this yet, so
-it's a manual step:
-
-1. Bump the version in `package.json` (currently `0.0.0` — bump to e.g. `1.0.0` for
-   the first public build; electron-builder uses this string to name the
-   installer).
-2. `npm run build:win` — produces `release/Scriptorium Writer Setup <version>.exe`.
-3. Open [**Releases → Draft a new
-   release**](https://github.com/julia-shtal/scriptorium-writer/releases/new), tag
-   it `v<version>`, and attach the `.exe` from `release/` as an asset, then publish.
-4. The writers' section links to `releases/latest`, which always resolves to
-   whatever you publish — no README edits needed for future versions.
-
-Note: the installer isn't code-signed (tracked as a follow-up for M9), so Windows
-SmartScreen will warn on first run — expected, and already covered in the writers'
-instructions above.
-
 ### Architecture
 
 Standard Electron three-process split (see `SPEC.md` §3). The security boundary is
