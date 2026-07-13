@@ -8,12 +8,20 @@ import {
   IconWand
 } from '@tabler/icons-react'
 import { useEditorStore } from '@renderer/store/editorStore'
+import type { WandController } from '@renderer/editor/cleanup/useWand'
 
 const ICON = 18
 
-export function Toolbar({ editor }: { editor: Editor | null }): JSX.Element | null {
+export function Toolbar({
+  editor,
+  wand
+}: {
+  editor: Editor | null
+  wand: WandController
+}): JSX.Element | null {
   const indentOn = useEditorStore((s) => s.indentOn)
   const toggleIndent = useEditorStore((s) => s.toggleIndent)
+  const wandActive = useEditorStore((s) => s.wandPreviewActive)
   if (!editor) return null
 
   const mark = (name: string): string => (editor.isActive(name) ? 'toolbar-btn active' : 'toolbar-btn')
@@ -52,10 +60,11 @@ export function Toolbar({ editor }: { editor: Editor | null }): JSX.Element | nu
         onClick={() => editor.chain().focus().insertSceneDivider().run()}>✳✳✳</button>
 
       <span className="toolbar-sep" />
-      {/* TODO(M8): text-cleanup wand. Visible no-op with tooltip for now. */}
-      <button className="toolbar-btn"
-        title="Чистка текста: слипшиеся запятые, лишние пробелы, короткое тире → длинное (скоро)"
-        onClick={() => {}}><IconWand size={ICON} color="var(--muted)" /></button>
+      <button className={`toolbar-btn${wandActive ? ' active' : ''}`}
+        title="Чистка текста: слипшиеся запятые, лишние пробелы, короткое тире → длинное"
+        disabled={wandActive}
+        onClick={wand.trigger}><IconWand size={ICON} /></button>
+      {wand.emptyNote && <span className="wand-empty-note">Нечего чистить</span>}
     </div>
   )
 }

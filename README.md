@@ -152,7 +152,7 @@ persists.
   control that toggles the first-line indent (a per-chapter *view* preference applied as
   a global `.indent-on` CSS class — it does **not** insert tab characters), a `✳✳✳`
   scene-divider (a real custom block node, `SceneDivider.ts`), a `[?]` **footnote**
-  button (live — see M3 below), and a stub button for the cleanup wand (M8).
+  button (live — see M3 below), and the cleanup **wand** (live — see M8 below).
 - **Footer** — live word count (chapter + selection), a manual **Save** button wired to
   `window.api.saveChapter`, and placeholders for autosave status (M5) and spellcheck
   languages (M4).
@@ -274,6 +274,34 @@ so the renderer never touches `session` directly.
 State is split across small Zustand stores: `storyStore` (open story + chapter list —
 the shared truth for Chapters / Story info / the editor switcher), `settingsStore`,
 `editorStore`, and `uiStore`.
+
+## Cleanup wand (M8)
+
+The toolbar **wand** (`src/renderer/editor/cleanup/`) runs a minimal, pluggable set of
+text-cleanup rules over the current selection — or the whole chapter when nothing is
+selected — and applies them as **one undoable transaction** behind an inline diff
+preview.
+
+- **Rules** (`rules.ts`) are an ordered list of pure `(text) => string` transforms, each
+  a discrete entry so a later milestone can expose per-rule Settings toggles
+  (`// TODO(post-v1)`): collapse multiple spaces, normalize spacing around
+  `, . ; : ! ?`, fix stray spaces in hyphenated words, ` - ` → em dash ` — `, and trim
+  trailing whitespace per line. No quote typography yet (deferred).
+- **Span computation** (`computeSpans.ts`) walks the text nodes overlapping the range and
+  turns each node's rule output into tight edit spans via a **hand-rolled char-level diff**
+  (no new dependency). Footnote markers and `hard_break` are natural run boundaries; a
+  partial selection **rounds up to the full boundary text node** (the rules are
+  context-sensitive), documented in the function's JSDoc. Text content only — marks and
+  node structure are never altered.
+- **Preview** is decoration-only: `wandPreviewPlugin.ts` shows the old text struck through
+  (`--muted`) with the proposed new text inline (`--accent`); the editor goes read-only and
+  autosave is suppressed via the `editorStore.wandPreviewActive` flag so no snapshot of the
+  uncommitted state is taken.
+- A fixed **action bar** (`WandActionBar.tsx`, not a modal) confirms (Enter) or cancels
+  (Esc). Confirm builds a single `tr` — spans applied rightmost-first, each preserving the
+  marks at its position, tagged `wandCleanup` — so the whole cleanup is one Ctrl+Z. Cancel
+  leaves the document byte-identical. Zero proposed edits show a brief "Нечего чистить" note
+  instead of entering preview.
 
 ## Project layout
 

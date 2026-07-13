@@ -156,6 +156,40 @@ body {
   margin: 20px 0; font-weight: 500; text-indent: 0;
 }
 
+/* ── Cleanup wand preview ──────────────────────────────────────── */
+/* Old text struck through in muted; proposed new text inline in accent. */
+.wand-old {
+  color: var(--muted); text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+.wand-new {
+  color: var(--accent); font-weight: 500;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 3px; padding: 0 1px;
+}
+.wand-empty-note {
+  margin-left: 6px; font-family: var(--font-sans); font-size: 12.5px;
+  color: var(--muted); align-self: center;
+}
+.wand-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 34px; border-top: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--accent) 8%, var(--page-bg));
+  font-family: var(--font-sans); font-size: 13px; color: var(--ink-nav);
+}
+.wand-bar-count { color: var(--ink-heading); font-weight: 500; }
+.wand-bar-spacer { flex: 1; }
+.wand-bar-btn {
+  font-family: var(--font-sans); font-size: 13px; padding: 6px 14px;
+  border-radius: 5px; cursor: pointer;
+}
+.wand-bar-btn.primary { background: var(--accent); color: #fbf6ea; border: none; }
+.wand-bar-btn.ghost {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.wand-bar-btn.ghost:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
 .footer {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 9px 34px 9px 16px; border-top: 1px solid var(--rule);

@@ -3,6 +3,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import type { Extensions } from '@tiptap/react'
 import { SceneDivider } from './SceneDivider'
 import { Footnote } from './Footnote'
+import { WandPreview } from '../cleanup/wandPreviewPlugin'
 
 /**
  * The single source of truth for the editor's node/mark set. Used by the live
@@ -23,5 +24,6 @@ export const bookExtensions: Extensions = [
   }),
   TextAlign.configure({ types: ['paragraph'], alignments: ['left', 'center', 'right'] }),
   SceneDivider,
-  Footnote
+  Footnote,
+  WandPreview
 ]

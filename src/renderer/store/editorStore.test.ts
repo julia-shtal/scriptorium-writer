@@ -17,6 +17,7 @@ const reset = (): void =>
     wordCount: 0,
     selectionWordCount: 0,
     indentOn: true,
+    wandPreviewActive: false,
     saveStatus: 'idle',
     lastSavedAt: null,
     mdWarning: null
@@ -109,6 +110,33 @@ describe('editorStore', () => {
     expect(saveChapter).toHaveBeenCalledTimes(1)
     expect(useEditorStore.getState().dirty).toBe(false)
     expect(useEditorStore.getState().saveStatus).toBe('saved')
+  })
+
+  test('debounce autosave is suppressed while the wand preview is active', async () => {
+    vi.useFakeTimers()
+    useEditorStore.getState().configureAutosave({ debounceMs: 2000, intervalMs: 120000 })
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockClear()
+    useEditorStore.getState().setWandPreviewActive(true)
+    useEditorStore.getState().applyDocUpdate(para('edited during preview'), '')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(saveChapter).not.toHaveBeenCalled()
+    // Leaving preview and editing again schedules a normal save.
+    useEditorStore.getState().setWandPreviewActive(false)
+    useEditorStore.getState().applyDocUpdate(para('edited after preview'), '')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(saveChapter).toHaveBeenCalledTimes(1)
+  })
+
+  test('interval flush is skipped while the wand preview is active', async () => {
+    vi.useFakeTimers()
+    useEditorStore.getState().configureAutosave({ debounceMs: 999999, intervalMs: 5000 })
+    await useEditorStore.getState().openChapter('s1', 'c1')
+    saveChapter.mockClear()
+    useEditorStore.setState({ dirty: true })
+    useEditorStore.getState().setWandPreviewActive(true)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(saveChapter).not.toHaveBeenCalled()
   })
 
   test('interval flushes only while dirty', async () => {

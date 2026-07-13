@@ -4,12 +4,15 @@ import { useChapterEditor } from '@renderer/editor/useChapterEditor'
 import { EditorSurface } from '@renderer/editor/Editor'
 import { Toolbar } from '@renderer/editor/toolbar/Toolbar'
 import { EditorFooter } from '@renderer/editor/EditorFooter'
+import { WandActionBar } from '@renderer/editor/cleanup/WandActionBar'
+import { useWand } from '@renderer/editor/cleanup/useWand'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import type { Story } from '@shared/types'
 
 export function EditorView(): JSX.Element {
   const editor = useChapterEditor()
+  const wand = useWand(editor)
   const storyId = useEditorStore((s) => s.storyId)
   const chapterId = useEditorStore((s) => s.chapterId)
   const title = useEditorStore((s) => s.title)
@@ -35,7 +38,7 @@ export function EditorView(): JSX.Element {
 
   return (
     <>
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} wand={wand} />
       <div className="chapter-head">
         <input
           className="chapter-title-input"
@@ -62,6 +65,7 @@ export function EditorView(): JSX.Element {
         <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
       </div>
       <EditorSurface editor={editor} />
+      <WandActionBar wand={wand} />
       <EditorFooter />
     </>
   )

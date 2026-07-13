@@ -13,6 +13,8 @@ export function useAutosaveLifecycle(): void {
     const flush = (): Promise<void> => useEditorStore.getState().flush()
 
     const onBlur = (): void => {
+      // Don't flush a decoration-only wand preview to disk on window blur.
+      if (useEditorStore.getState().wandPreviewActive) return
       void flush()
     }
     window.addEventListener('blur', onBlur)
