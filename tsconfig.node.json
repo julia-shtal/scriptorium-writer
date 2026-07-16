@@ -9,6 +9,10 @@
   "compilerOptions": {
     "composite": true,
     "strict": true,
+    // @vitejs/plugin-react@5 is ESM-only and exposes its types via an `exports`
+    // map; the base config's legacy `moduleResolution: "node"` can't resolve that.
+    // "bundler" is the correct mode for this Vite-driven project and reads exports maps.
+    "moduleResolution": "bundler",
     "types": ["electron-vite/node", "node"],
     "baseUrl": ".",
     "paths": {

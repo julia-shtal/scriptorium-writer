@@ -473,12 +473,10 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 ### Known residual
 
-- `vite@5.4.21` carries a low-severity, **dev-server-only** advisory
-  (CVE-2026-39365, path traversal in optimized-deps `.map` handling). Vite 5 is
-  pinned transitively by `electron-vite@2.3` (electron-vite 4/5, which use Vite
-  6/7, also require Node 22.12+). The dev server only binds locally for this
-  offline app, so practical risk is negligible; revisit when moving to
-  electron-vite 5.
+- None. The build toolchain runs on `electron-vite@5` / `vite@7` / `vitest@3`,
+  and `npm audit` reports **0 vulnerabilities**. This clears the earlier
+  dev-server-only `vite@5` advisory (CVE-2026-39365), which is gone now that no
+  part of the dependency tree pins Vite 5.
 
 ### Version History (M0–M8)
 
