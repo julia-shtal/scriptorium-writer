@@ -1,9 +1,12 @@
 import { join } from 'path'
 import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
+import type { UpdateDownloadedInfo } from '@shared/types'
 import { FileService } from './file-service'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
+import { initAutoUpdate } from './auto-update'
 import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
 
 // Offline spellcheck dictionaries (SPEC §7, M4): dev serves them straight from the repo
@@ -23,7 +26,7 @@ function iconPath(): string {
     : join(process.resourcesPath, 'resources', 'icons', 'icon.ico')
 }
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     icon: iconPath(),
     width: 1200,
@@ -76,6 +79,55 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
+}
+
+/**
+ * Background auto-update (M12). Graceful degradation is mandatory (same rule as M4
+ * spellcheck): this must NEVER delay or block launch. Two guards:
+ *  - skip entirely unless `app.isPackaged` — `electron-updater` does not work under
+ *    `npm run dev` and would throw;
+ *  - the whole thing is wrapped in try/catch, and the update-check promise's rejection
+ *    is swallowed inside `initAutoUpdate`.
+ *
+ * The "restart to update" path is the reliability-critical bit: it must reuse the
+ * quit-guard flush and set `hasFlushed = true` before `quitAndInstall()`, so the
+ * install's own quit isn't preventDefault'd by `before-quit`, and no double-flush runs.
+ */
+function setupAutoUpdate(win: BrowserWindow): void {
+  if (!app.isPackaged) {
+    console.log('[auto-update] skipped: not packaged (dev build)')
+    return
+  }
+  try {
+    initAutoUpdate({
+      checkForUpdates: () => autoUpdater.checkForUpdates(),
+      onUpdateDownloaded: (cb) => {
+        autoUpdater.on('update-downloaded', (info) => {
+          const payload: UpdateDownloadedInfo = { version: info.version }
+          cb(payload)
+        })
+      },
+      sendToRenderer: (info) => {
+        if (!win.isDestroyed()) win.webContents.send('update:downloaded', info)
+      },
+      onRestartRequest: (cb) => {
+        ipcMain.on('update:restart', () => cb())
+      },
+      flush: async () => {
+        if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+          await flushRendererOnce(win)
+        }
+        // Disarm the quit guard: quitAndInstall triggers its own app quit, and we
+        // must not let `before-quit`/`close` preventDefault it or re-run the flush.
+        hasFlushed = true
+      },
+      quitAndInstall: () => autoUpdater.quitAndInstall()
+    })
+  } catch (err) {
+    console.warn('[auto-update] setup failed (continuing normally)', err)
+  }
 }
 
 app.whenReady().then(async () => {
@@ -110,7 +162,11 @@ app.whenReady().then(async () => {
   const settings = await fileService.readSettings()
   await configureSpellcheck(session.defaultSession, settings.spellLanguages, dictionariesDir())
 
-  createWindow()
+  const mainWindow = createWindow()
+
+  // Background update check (M12) — AFTER the window exists, non-blocking. Wrapped so
+  // an offline/unreachable check never delays launch (see setupAutoUpdate).
+  setupAutoUpdate(mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -9,6 +9,7 @@ import { NotesView } from '@renderer/views/NotesView'
 import { StatisticsView } from '@renderer/views/StatisticsView'
 import { SettingsView } from '@renderer/views/SettingsView'
 import { RecoveryDialog } from '@renderer/components/RecoveryDialog'
+import { UpdateNotice } from '@renderer/components/UpdateNotice'
 import { bootstrapLibrary } from '@renderer/store/bootstrap'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
@@ -81,6 +82,7 @@ export default function App(): JSX.Element {
           onClose={() => setRecoveries([])}
         />
       )}
+      <UpdateNotice />
     </AppFrame>
   )
 }

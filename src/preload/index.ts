@@ -72,6 +72,14 @@ const lifecycle: LifecycleApi = {
         ipcRenderer.send('quit:flush-done')
       }
     })
+  },
+  // M12: main pushes when a downloaded update is ready to install.
+  onUpdateDownloaded: (handler) => {
+    ipcRenderer.on('update:downloaded', (_e, info) => handler(info))
+  },
+  // M12: ask main to flush + quitAndInstall (routed through the quit-guard).
+  restartToUpdate: () => {
+    ipcRenderer.send('update:restart')
   }
 }
 
