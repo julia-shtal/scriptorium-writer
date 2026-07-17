@@ -198,7 +198,8 @@ and is exposed to the renderer as the typed `window.api` surface (contract in
 
 - **Library** (your stories) — a plain, syncable folder. Default:
   `Documents/Scriptorium-Writer/`. It is a normal directory you can back up, sync,
-  or open in a file manager.
+  or open in a file manager. Settings → «Экспортировать библиотеку» also bundles the
+  whole folder into a single `.zip` in one click — see *Library export (M13)* below.
 - **Settings** — per-machine, in Electron's `userData/settings.json`. Settings hold
   `libraryPath`, so each machine knows where its library is (override the library
   location by changing `libraryPath`). This is a deliberate choice: settings stay
@@ -470,6 +471,26 @@ newest version. Releases are matched by the `version` in `package.json`.
   M11; signing simply makes the update flow quiet. Once M11 lands, no auto-update
   change is needed.
 
+### Library export (M13)
+
+Settings → **«Экспортировать библиотеку»** opens a native save dialog and streams
+the *entire* library folder into one `.zip` at the chosen path — a full-fidelity
+backup, not a partial one:
+
+- **Everything, byte-for-byte.** Every story, chapter canon + `.md` shadow, version
+  snapshot, and notes file, laid out exactly as on disk — including `.trash/`
+  (soft-deleted stories/chapters). Extracting the archive reproduces the original
+  `stories/<story-id>/…` structure with nothing renamed or dropped.
+- **Read-only, always.** Export only reads from the library; it never modifies it.
+  A failure (disk full, permissions) surfaces as a friendly in-app notice and never
+  touches the source data.
+- **Streamed, not blocking.** Built on [`archiver`](https://www.npmjs.com/package/archiver)
+  (deflate) in the main process (`src/main/library-archive.ts`), writing to a
+  `.part` file and renaming over the destination only once the archive is fully
+  written — the same temp-then-rename pattern as every other write in this app — so
+  a large library never freezes the UI and a crash mid-export never leaves a
+  truncated `.zip` at the destination path.
+
 ### Project layout
 
 ```
@@ -484,6 +505,7 @@ src/
     paths.ts              # library path resolution, slug/filename helpers
     atomic-write.ts       # tmp + fsync + rename atomic write helper
     auto-update.ts        # M12 background auto-update coordinator (Electron-free, DI)
+    library-archive.ts    # M13 zips the whole library folder to a user-chosen path
   preload/index.ts        # contextBridge → window.api (typed, decodes AppError)
   preload/index.d.ts      # global Window.api typing
   renderer/
@@ -519,6 +541,13 @@ Unit tests live next to their modules as `*.test.ts` (run by Vitest).
 
 <details>
 <summary>Expand — what was done at each milestone</summary>
+
+**M13 — Library export.** A one-click "Экспортировать библиотеку" action in
+Settings streams the whole library folder into a single `.zip` via `archiver`,
+including `.trash/`, reproducing the on-disk `stories/<story-id>/…` layout exactly
+on extraction. Read-only against the library; writes to a `.part` file and renames
+over the destination only once complete, so failures never touch the source or
+leave a truncated archive. See the *Library export (M13)* section above.
 
 **M8 — Cleanup wand (minimal rules).** The toolbar wand runs a pluggable, ordered
 set of pure text-cleanup rules (collapse spaces, punctuation spacing, stray hyphen

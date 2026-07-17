@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
+import { isAppError } from '@shared/errors'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
 const LANGS: { code: string; label: string }[] = [
@@ -8,7 +10,23 @@ const LANGS: { code: string; label: string }[] = [
 export function SettingsView(): JSX.Element {
   const settings = useSettingsStore((s) => s.settings)
   const update = useSettingsStore((s) => s.update)
+  const [exportState, setExportState] = useState<
+    { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; path: string } | { kind: 'error'; msg: string }
+  >({ kind: 'idle' })
   if (!settings) return <div style={{ padding: 34 }}>Загрузка настроек…</div>
+
+  const exportLibrary = async (): Promise<void> => {
+    setExportState({ kind: 'busy' })
+    try {
+      const result = await window.api.exportLibrary()
+      setExportState(result.canceled ? { kind: 'idle' } : { kind: 'done', path: result.path })
+    } catch (err) {
+      const msg = isAppError(err)
+        ? 'Не удалось сохранить архив библиотеки. Проверьте место на диске и права доступа.'
+        : 'Не удалось экспортировать библиотеку.'
+      setExportState({ kind: 'error', msg })
+    }
+  }
 
   const toggleLang = (code: string): void => {
     const has = settings.spellLanguages.includes(code)
@@ -57,7 +75,20 @@ export function SettingsView(): JSX.Element {
           <button className="linkish" onClick={() => void window.api.revealInFolder(settings.libraryPath)}>
             показать
           </button>
+          <button
+            className="linkish"
+            disabled={exportState.kind === 'busy'}
+            onClick={() => void exportLibrary()}
+          >
+            {exportState.kind === 'busy' ? 'Экспорт…' : 'Экспортировать библиотеку'}
+          </button>
         </div>
+        {exportState.kind === 'done' && (
+          <div className="settings-note">Библиотека сохранена: <code>{exportState.path}</code></div>
+        )}
+        {exportState.kind === 'error' && (
+          <div className="settings-note settings-note--error">{exportState.msg}</div>
+        )}
       </div>
     </div>
   )

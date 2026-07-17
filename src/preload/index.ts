@@ -59,7 +59,8 @@ const api: Api = {
   scanLibrary: () => invoke('scanLibrary'),
 
   // misc
-  revealInFolder: (path) => invoke('revealInFolder', path)
+  revealInFolder: (path) => invoke('revealInFolder', path),
+  exportLibrary: () => invoke('exportLibrary')
 }
 
 const lifecycle: LifecycleApi = {

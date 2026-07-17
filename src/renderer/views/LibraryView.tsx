@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { IconBooks, IconTrash, IconPlus } from '@tabler/icons-react'
 import { useStoryStore } from '@renderer/store/storyStore'
+import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import type { StorySummary } from '@shared/types'
 import { STATUS_RU, formatDate } from './format'
@@ -29,6 +30,12 @@ export function LibraryView(): JSX.Element {
   const remove = async (id: string): Promise<void> => {
     await window.api.deleteStory(id)
     setConfirmId(null)
+    // If we just deleted the story currently open in the editor, close it so the UI
+    // doesn't keep showing a deleted story's chapters/history/editor.
+    if (useStoryStore.getState().story?.id === id) {
+      useEditorStore.getState().closeChapter()
+      useStoryStore.getState().close()
+    }
     await refresh()
   }
 

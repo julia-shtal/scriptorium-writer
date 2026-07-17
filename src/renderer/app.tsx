@@ -20,10 +20,10 @@ import type { ChapterRecovery } from '@shared/types'
 
 export default function App(): JSX.Element {
   const openChapter = useEditorStore((s) => s.openChapter)
-  const chapterId = useEditorStore((s) => s.chapterId)
   const activeView = useUiStore((s) => s.activeView)
   const [error, setError] = useState<string | null>(null)
   const [recoveries, setRecoveries] = useState<ChapterRecovery[]>([])
+  const [booting, setBooting] = useState(true)
 
   useAutosaveLifecycle()
 
@@ -33,11 +33,18 @@ export default function App(): JSX.Element {
         const found = await window.api.scanLibrary()
         if (found.length > 0) setRecoveries(found)
         const { storyId, chapterId } = await bootstrapLibrary()
-        await openChapter(storyId, chapterId)
-        await useStoryStore.getState().load(storyId)
+        if (storyId && chapterId) {
+          await openChapter(storyId, chapterId)
+          await useStoryStore.getState().load(storyId)
+        } else {
+          // Empty library (nothing seeded): land on the Library view.
+          useUiStore.getState().setActiveView('library')
+        }
         await useSettingsStore.getState().load()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Не удалось открыть библиотеку')
+      } finally {
+        setBooting(false)
       }
     })()
   }, [openChapter])
@@ -70,10 +77,10 @@ export default function App(): JSX.Element {
     <AppFrame>
       {error ? (
         <div style={{ padding: 34 }}>Ошибка: {error}</div>
-      ) : chapterId ? (
-        renderView()
-      ) : (
+      ) : booting ? (
         <div style={{ padding: 34 }}>Загрузка…</div>
+      ) : (
+        renderView()
       )}
       {recoveries.length > 0 && (
         <RecoveryDialog

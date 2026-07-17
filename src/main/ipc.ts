@@ -26,6 +26,8 @@ export interface IpcServices {
   revealInFolder(path: string): Promise<void>
   /** Re-apply spellcheck languages to the live session (wraps `session.setSpellCheckerLanguages`). M6. */
   setSpellLanguages(langs: string[]): void
+  /** Show a save dialog and export the library to the chosen `.zip` (M13). */
+  exportLibrary(): Promise<import('@shared/types').ExportLibraryResult>
 }
 
 /** All channels, kept in lockstep with the `Api` surface (compile-checked below). */
@@ -50,7 +52,8 @@ export const IPC_CHANNELS = [
   'saveSettings',
   'applySpellLanguages',
   'scanLibrary',
-  'revealInFolder'
+  'revealInFolder',
+  'exportLibrary'
 ] as const
 
 // Compile-time guarantee that IPC_CHANNELS covers exactly the Api surface.
@@ -63,7 +66,7 @@ void _channelsCoverApi
 void _apiCoversChannels
 
 export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServices): void {
-  const { fileService: fs, revealInFolder, setSpellLanguages } = services
+  const { fileService: fs, revealInFolder, setSpellLanguages, exportLibrary } = services
 
   // Each entry receives the raw IPC args and returns a promise/value. Arg types are
   // guaranteed by the preload wrappers, whose signatures come from `Api`; here we
@@ -97,7 +100,8 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     saveSettings: ([settings]) => fs.saveSettings(settings as Parameters<Api['saveSettings']>[0]),
     applySpellLanguages: ([langs]) => setSpellLanguages(langs as string[]),
     scanLibrary: () => fs.scanLibrary(),
-    revealInFolder: ([path]) => revealInFolder(path as string)
+    revealInFolder: ([path]) => revealInFolder(path as string),
+    exportLibrary: () => exportLibrary()
   }
 
   for (const channel of IPC_CHANNELS) {

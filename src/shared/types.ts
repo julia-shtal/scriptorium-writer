@@ -130,8 +130,13 @@ export interface Settings {
   maxVersionsPerChapter: number
   /** Where the library folder lives. */
   libraryPath: string
+  /** True once the first-run demo story has been seeded; prevents re-seeding a deliberately-emptied library. */
+  demoSeeded?: boolean
   schemaVersion: number
 }
+
+/** Result of a library export (M13). `canceled` when the user dismissed the save dialog. */
+export type ExportLibraryResult = { canceled: true } | { canceled: false; path: string }
 
 /**
  * The typed surface exposed on `window.api` via the preload contextBridge. Every
@@ -179,6 +184,8 @@ export interface Api {
 
   // misc
   revealInFolder(path: string): Promise<void> // open a folder in the OS file explorer
+  /** Export the whole library to a user-chosen .zip (M13). Main shows the save dialog. */
+  exportLibrary(): Promise<ExportLibraryResult>
 }
 
 /**

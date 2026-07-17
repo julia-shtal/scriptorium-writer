@@ -50,4 +50,54 @@ describe('atomicWriteFile', () => {
     expect(await fsp.readFile(target, 'utf8')).toBe('b')
     expect(await listTemps()).toEqual([])
   })
+
+  // Windows-lock resilience (Defender real-time scan / Search indexer / OneDrive
+  // transiently lock a just-written file, making `rename` fail with EPERM/EACCES/EBUSY).
+  const codeError = (code: string): NodeJS.ErrnoException => {
+    const err = new Error(`simulated ${code}`) as NodeJS.ErrnoException
+    err.code = code
+    return err
+  }
+
+  it('retries a transient EPERM rename and then succeeds', async () => {
+    const target = join(dir, 'data.json')
+    let attempts = 0
+    const flaky = async (from: string, to: string): Promise<void> => {
+      attempts += 1
+      if (attempts < 3) throw codeError('EPERM')
+      await fsp.rename(from, to)
+    }
+    await atomicWriteFile(target, 'RESILIENT', { rename: flaky, sleep: () => Promise.resolve() })
+    expect(attempts).toBe(3)
+    expect(await fsp.readFile(target, 'utf8')).toBe('RESILIENT')
+    expect(await listTemps()).toEqual([])
+  })
+
+  it('gives up after exhausting retries on a persistent transient error, cleaning the temp', async () => {
+    const target = join(dir, 'data.json')
+    let attempts = 0
+    const alwaysBusy = async (): Promise<void> => {
+      attempts += 1
+      throw codeError('EBUSY')
+    }
+    await expect(
+      atomicWriteFile(target, 'x', { rename: alwaysBusy, sleep: () => Promise.resolve() })
+    ).rejects.toMatchObject({ code: 'EBUSY' })
+    expect(attempts).toBeGreaterThan(1) // it retried, not one-and-done
+    expect(await listTemps()).toEqual([])
+  })
+
+  it('does not retry a non-transient error (e.g. ENOSPC) — fails fast', async () => {
+    const target = join(dir, 'data.json')
+    let attempts = 0
+    const noSpace = async (): Promise<void> => {
+      attempts += 1
+      throw codeError('ENOSPC')
+    }
+    await expect(
+      atomicWriteFile(target, 'x', { rename: noSpace, sleep: () => Promise.resolve() })
+    ).rejects.toMatchObject({ code: 'ENOSPC' })
+    expect(attempts).toBe(1)
+    expect(await listTemps()).toEqual([])
+  })
 })
