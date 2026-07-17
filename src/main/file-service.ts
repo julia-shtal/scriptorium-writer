@@ -40,6 +40,7 @@ import {
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
 import { serializeChapterToMarkdown } from './markdown'
+import { zipDirectory } from './library-archive'
 import { countWords } from '@shared/word-count'
 import {
   chapterFileStem,
@@ -87,6 +88,7 @@ export class FileService {
       editorFontSizePx: 17,
       maxVersionsPerChapter: 20,
       libraryPath: this.defaultLibraryPath,
+      demoSeeded: false,
       schemaVersion: SETTINGS_SCHEMA_VERSION
     }
   }
@@ -551,6 +553,24 @@ export class FileService {
       }
     }
     return out
+  }
+
+  // ── Export (M13) ────────────────────────────────────────────────────────────
+
+  /**
+   * Export the entire library directory to a single `.zip` at `destPath`
+   * (full-fidelity backup — includes `.trash/`). Reads only from the library;
+   * the source is never modified. Any failure surfaces as a typed AppError.
+   */
+  async exportLibraryArchive(destPath: string): Promise<void> {
+    const root = await this.getLibraryRoot()
+    try {
+      await zipDirectory(root, destPath)
+    } catch (err) {
+      throw new AppError('EXPORT_FAILED', `failed to export library to ${destPath}`, {
+        cause: err
+      })
+    }
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────────

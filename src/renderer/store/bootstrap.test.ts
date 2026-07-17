@@ -19,23 +19,38 @@ describe('bootstrapLibrary', () => {
     expect(createStory).not.toHaveBeenCalled()
   })
 
-  test('seeds a demo story + two chapters when the library is empty', async () => {
+  test('seeds a demo story + one chapter when the library is empty', async () => {
     const listStories = vi.fn(async () => [])
     const createStory = vi.fn(async () => ({ id: 's1', chapterOrder: [] }))
-    const createChapter = vi
-      .fn()
-      .mockResolvedValueOnce({ id: 'c1', title: 'Глава 1' })
-      .mockResolvedValueOnce({ id: 'c2', title: 'Глава 2' })
+    const createChapter = vi.fn().mockResolvedValueOnce({ id: 'c1', title: 'Глава 1' })
     const saveChapter = vi.fn(async () => ({ savedAt: '', wordCount: 0, versionId: 'v' }))
+    const readSettings = vi.fn(async () => ({ demoSeeded: false }))
+    const saveSettings = vi.fn(async () => {})
     vi.stubGlobal('window', {
-      api: { listStories, createStory, createChapter, saveChapter }
+      api: { listStories, createStory, createChapter, saveChapter, readSettings, saveSettings }
     })
 
     const result = await bootstrapLibrary()
 
     expect(createStory).toHaveBeenCalledWith({ title: 'Демо' })
-    expect(createChapter).toHaveBeenCalledTimes(2)
+    expect(createChapter).toHaveBeenCalledOnce()
     expect(saveChapter).toHaveBeenCalledOnce()
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ demoSeeded: true }))
     expect(result).toEqual({ storyId: 's1', chapterId: 'c1' })
+  })
+
+  test('does not re-seed an already-seeded empty library', async () => {
+    const listStories = vi.fn(async () => [])
+    const createStory = vi.fn()
+    const saveSettings = vi.fn()
+    const readSettings = vi.fn(async () => ({ demoSeeded: true }))
+    vi.stubGlobal('window', {
+      api: { listStories, createStory, saveSettings, readSettings }
+    })
+
+    const result = await bootstrapLibrary()
+
+    expect(createStory).not.toHaveBeenCalled()
+    expect(result).toEqual({ storyId: null, chapterId: null })
   })
 })

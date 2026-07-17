@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
+import { existsSync } from 'node:fs'
 import * as fsp from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import AdmZip from 'adm-zip'
 import { FileService } from './file-service'
 import { layout } from './paths'
 import { isAppError } from '@shared/errors'
@@ -433,5 +435,38 @@ describe('settings', () => {
 
     await svc.saveSettings({ ...settings, editorFontSizePx: 20 })
     expect((await svc.readSettings()).editorFontSizePx).toBe(20)
+  })
+})
+
+describe('exportLibraryArchive (M13)', () => {
+  it('writes a valid zip of the library with no .part remnant', async () => {
+    const { svc } = await makeService()
+    await svc.createStory({ title: 'One' })
+    const outDir = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-out-'))
+    dirsToClean.push(outDir)
+    const dest = join(outDir, 'lib.zip')
+
+    await svc.exportLibraryArchive(dest)
+
+    expect(existsSync(dest)).toBe(true)
+    expect(existsSync(dest + '.part')).toBe(false)
+    const names = new AdmZip(dest).getEntries().map((e) => e.entryName.replace(/\\/g, '/'))
+    expect(names.some((n) => n.startsWith('stories/'))).toBe(true)
+  })
+
+  it('throws AppError(EXPORT_FAILED) for an unwritable destination and leaves the source intact', async () => {
+    const { svc } = await makeService()
+    await svc.createStory({ title: 'Two' })
+    const outDir = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-out-'))
+    dirsToClean.push(outDir)
+    // Parent directory does not exist -> unwritable destination.
+    const dest = join(outDir, 'no-such-dir', 'lib.zip')
+
+    await expect(svc.exportLibraryArchive(dest)).rejects.toMatchObject({
+      name: 'AppError',
+      code: 'EXPORT_FAILED'
+    })
+    const stories = await svc.listStories()
+    expect(stories.some((s) => s.title === 'Two')).toBe(true)
   })
 })

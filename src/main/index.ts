@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateDownloadedInfo } from '@shared/types'
@@ -153,7 +153,22 @@ app.whenReady().then(async () => {
         await shell.openPath(target)
       },
       setSpellLanguages: (langs: string[]) =>
-        session.defaultSession.setSpellCheckerLanguages(langs)
+        session.defaultSession.setSpellCheckerLanguages(langs),
+      exportLibrary: async () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+        const options = {
+          title: 'Экспортировать библиотеку',
+          defaultPath: `scriptorium-library-${today}.zip`,
+          filters: [{ name: 'Zip archive', extensions: ['zip'] }]
+        }
+        const result = win
+          ? await dialog.showSaveDialog(win, options)
+          : await dialog.showSaveDialog(options)
+        if (result.canceled || !result.filePath) return { canceled: true }
+        await fileService.exportLibraryArchive(result.filePath)
+        return { canceled: false, path: result.filePath }
+      }
     }
   )
 

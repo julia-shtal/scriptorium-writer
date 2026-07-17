@@ -52,6 +52,8 @@ interface EditorState {
   configureAutosave: (cfg: { debounceMs: number; intervalMs: number }) => void
   /** Clear both timers (unmount / test teardown). */
   stopAutosave: () => void
+  /** Close the open chapter (e.g. its story was deleted): cancel pending autosave and reset editor state. */
+  closeChapter: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -190,5 +192,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       clearInterval(intervalTimer)
       intervalTimer = null
     }
+  },
+
+  closeChapter: () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    set({
+      storyId: null,
+      chapterId: null,
+      title: '',
+      doc: null,
+      dirty: false,
+      wordCount: 0,
+      selectionWordCount: 0,
+      saveStatus: 'idle',
+      lastSavedAt: null,
+      mdWarning: null
+    })
   }
 }))

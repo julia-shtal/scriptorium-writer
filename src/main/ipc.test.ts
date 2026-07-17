@@ -22,7 +22,8 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ handle }, {
       fileService: {} as FileService,
       revealInFolder: vi.fn(),
-      setSpellLanguages: vi.fn()
+      setSpellLanguages: vi.fn(),
+      exportLibrary: vi.fn()
     })
     for (const channel of IPC_CHANNELS) {
       expect(channels.has(channel)).toBe(true)
@@ -35,7 +36,8 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ handle }, {
       fileService: { createStory } as unknown as FileService,
       revealInFolder: vi.fn(),
-      setSpellLanguages: vi.fn()
+      setSpellLanguages: vi.fn(),
+      exportLibrary: vi.fn()
     })
     const result = await channels.get('createStory')!(null, { title: 'X' })
     expect(createStory).toHaveBeenCalledWith({ title: 'X' })
@@ -49,7 +51,8 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ handle }, {
       fileService: { readStory } as unknown as FileService,
       revealInFolder: vi.fn(),
-      setSpellLanguages: vi.fn()
+      setSpellLanguages: vi.fn(),
+      exportLibrary: vi.fn()
     })
     let thrown: unknown
     try {
@@ -69,7 +72,8 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ handle }, {
       fileService: {} as FileService,
       revealInFolder: vi.fn(),
-      setSpellLanguages: vi.fn()
+      setSpellLanguages: vi.fn(),
+      exportLibrary: vi.fn()
     })
     expect(await channels.get('ping')!(null)).toBe('pong')
   })
@@ -80,7 +84,8 @@ describe('registerIpcHandlers', () => {
     registerIpcHandlers({ handle }, {
       fileService: {} as FileService,
       revealInFolder: vi.fn(),
-      setSpellLanguages
+      setSpellLanguages,
+      exportLibrary: vi.fn()
     })
     await channels.get('applySpellLanguages')!(null, ['ru'])
     expect(setSpellLanguages).toHaveBeenCalledWith(['ru'])

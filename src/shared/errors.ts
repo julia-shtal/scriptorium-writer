@@ -16,6 +16,7 @@ export type AppErrorCode =
   | 'CHAPTER_CORRUPT' // on-disk canon exists but cannot be parsed
   | 'READ_FAILED' // unexpected read failure
   | 'WRITE_FAILED' // unexpected write failure
+  | 'EXPORT_FAILED' // library archive export failed (disk full / permission / unwritable path)
   | 'UNKNOWN' // anything not otherwise classified
 
 export interface SerializedAppError {

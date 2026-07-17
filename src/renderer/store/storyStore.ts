@@ -22,6 +22,7 @@ interface StoryState {
   renameChapter: (chapterId: string, title: string) => Promise<void>
   removeChapter: (chapterId: string) => Promise<void>
   updateMeta: (patch: Partial<StoryMeta>) => Promise<void>
+  close: () => void
 }
 
 async function loadRows(story: Story): Promise<ChapterRow[]> {
@@ -113,5 +114,7 @@ export const useStoryStore = create<StoryState>((set, get) => ({
     if (!story) return
     const updated = await window.api.updateStoryMeta(story.id, patch)
     set({ story: updated })
-  }
+  },
+
+  close: () => set({ story: null, chapters: [] })
 }))

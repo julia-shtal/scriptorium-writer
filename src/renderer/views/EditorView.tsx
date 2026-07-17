@@ -36,6 +36,23 @@ export function EditorView(): JSX.Element {
     })
   }, [storyId, chapterId])
 
+  // No open work (e.g. the library is empty after deleting everything). Don't offer an
+  // editable surface that can never save — point the writer to create a work first.
+  if (!chapterId) {
+    return (
+      <div className="editor-empty">
+        <p>Нет открытой работы.</p>
+        <p>
+          Создайте новую работу в{' '}
+          <button className="linkish" onClick={() => setActiveView('library')}>
+            Библиотеке
+          </button>
+          , затем начните писать.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       <Toolbar editor={editor} wand={wand} />

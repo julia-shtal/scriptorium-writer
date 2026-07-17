@@ -10,6 +10,7 @@
   --ink-nav: #6b573c;
   --rule: #e3d6bd;
   --muted: #9c855f;
+  --danger: #9e3b2e;
   --page-edge: linear-gradient(
     var(--edge-dir, to left),
     #e9dfc8 0 1px, #d3c2a0 1px 2px, #ece2cd 2px 3px, #d3c2a0 3px 4px,
@@ -148,6 +149,11 @@ body {
   font-size: var(--editor-font-size, 16.5px);
 }
 .editor-surface:focus { outline: none; }
+.editor-empty {
+  padding: 34px; line-height: 1.7;
+  font-family: var(--font-sans); color: var(--muted);
+}
+.editor-empty p { margin: 0 0 8px; }
 .editor-surface p { margin: 0 0 12px; }
 .editor-surface.indent-on p { text-indent: 2em; }
 .editor-surface p[style*='text-align: center'] { text-indent: 0; }
@@ -941,4 +947,18 @@ fieldset.settings-field {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-sans);
+}
+.settings-note {
+  margin-top: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+  word-break: break-all;
+}
+.settings-note code {
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.settings-note--error {
+  color: var(--danger);
 }
