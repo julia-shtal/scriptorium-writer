@@ -182,6 +182,15 @@ export interface Api {
 }
 
 /**
+ * Payload pushed to the renderer when `electron-updater` has finished downloading an
+ * update and it is ready to install on next restart (M12). Kept minimal — the UI only
+ * needs the version string for the "update ready" notice.
+ */
+export interface UpdateDownloadedInfo {
+  version: string
+}
+
+/**
  * A separate main→renderer push bridge, exposed on `window.lifecycle`. Kept off the
  * invoke-only `Api` surface (which is compile-locked 1:1 to the IPC channels) because
  * this is an event subscription, not a request/response call.
@@ -192,4 +201,17 @@ export interface LifecycleApi {
    * when it resolves, the renderer acks so main can finish quitting.
    */
   onQuitFlush(handler: () => Promise<void> | void): void
+
+  /**
+   * Subscribe to "an update has been downloaded and is ready to install" pushes from
+   * main (M12). The renderer shows a small dismissible notice offering restart-now.
+   */
+  onUpdateDownloaded(handler: (info: UpdateDownloadedInfo) => void): void
+
+  /**
+   * Ask main to flush the renderer and then install the downloaded update + restart.
+   * Routed through the same quit-guard flush as a normal quit so unsaved edits are
+   * never lost — main never calls `quitAndInstall()` without flushing first.
+   */
+  restartToUpdate(): void
 }

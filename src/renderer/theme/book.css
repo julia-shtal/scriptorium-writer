@@ -358,6 +358,58 @@ body {
   margin-top: 8px;
 }
 
+/* --- Auto-update notice (M12) --- */
+/* A small, dismissible footer strip (not a blocking modal) shown when an update has
+   been downloaded and is ready to install. Fixed to the bottom-right of the window. */
+.update-notice {
+  position: fixed;
+  right: 26px;
+  bottom: 22px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 52px));
+  padding: 10px 14px;
+  background: var(--page-bg);
+  color: var(--ink);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.update-notice-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.update-notice-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink-nav);
+}
+.update-notice-btn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-notice-btn.primary {
+  background: var(--accent);
+  color: #fbf6ea;
+  border: none;
+}
+.update-notice-btn.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.update-notice-btn.ghost:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 /* --- Footnotes (M3) --- */
 .footnote {
   position: relative;

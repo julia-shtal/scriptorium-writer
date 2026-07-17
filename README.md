@@ -434,11 +434,47 @@ inline diff preview.
   is one Ctrl+Z. Cancel leaves the document byte-identical. Zero proposed edits show
   a brief "Нечего чистить" note instead of entering preview.
 
+### Auto-update (M12)
+
+Packaged builds check for updates in the background on launch via
+[`electron-updater`](https://www.electron.build/auto-update) and its **GitHub
+provider** — no separate update server. `electron-builder.yml` carries the
+`publish` block that points the updater at the releases of this repo:
+
+```yaml
+publish:
+  provider: github
+  owner: julia-shtal
+  repo: scriptorium-writer
+```
+
+`npm run build:win` also emits a `latest.yml` manifest into `release/`; upload it
+alongside the installer when you cut a GitHub Release so the updater can see the
+newest version. Releases are matched by the `version` in `package.json`.
+
+- **Graceful degradation (mandatory).** The update check can never delay or block
+  launch. It is skipped entirely in dev (`app.isPackaged` guard — `electron-updater`
+  throws under `npm run dev`), and in packaged builds the check is fire-and-forget
+  with any failure (offline / GitHub unreachable / rate-limited) caught and logged.
+  This mirrors the M4 spellcheck rule. See `src/main/auto-update.ts` (Electron-free,
+  dependency-injected, unit-tested) and its thin adapter in `src/main/index.ts`.
+- **Never restarts over unsaved work.** When an update finishes downloading, a small
+  **dismissible** notice (`src/renderer/components/UpdateNotice.tsx`, a footer strip —
+  not a blocking modal) offers *Перезапустить* / *Позже*. "Restart now" does **not**
+  call `quitAndInstall()` directly; it routes through the same **quit-guard flush**
+  as a normal quit (`window.lifecycle.restartToUpdate()` → main runs the renderer
+  flush handshake, disarms the guard, then installs), so no unsaved chapter is lost.
+- **Best paired with code signing (M11).** Auto-update works while the app is
+  unsigned, but each downloaded, unsigned installer still trips Windows SmartScreen —
+  which undercuts the "just click update" experience. This task is **not blocked** on
+  M11; signing simply makes the update flow quiet. Once M11 lands, no auto-update
+  change is needed.
+
 ### Project layout
 
 ```
 electron.vite.config.ts   # main / preload / renderer build config
-electron-builder.yml      # Windows NSIS packaging config
+electron-builder.yml      # Windows NSIS packaging + GitHub publish (auto-update) config
 tsconfig.json             # references tsconfig.node.json + tsconfig.web.json
 src/
   main/
@@ -447,6 +483,7 @@ src/
     file-service.ts       # ALL disk I/O: atomic writes, snapshots, scan/restore
     paths.ts              # library path resolution, slug/filename helpers
     atomic-write.ts       # tmp + fsync + rename atomic write helper
+    auto-update.ts        # M12 background auto-update coordinator (Electron-free, DI)
   preload/index.ts        # contextBridge → window.api (typed, decodes AppError)
   preload/index.d.ts      # global Window.api typing
   renderer/

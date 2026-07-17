@@ -18,6 +18,14 @@ extraResources:
   - from: resources
     to: resources
 
+# Auto-update (M12): electron-updater's GitHub provider reads releases straight from
+# this repo — no separate update server. Also emits latest.yml into the release output
+# so packaged builds know the newest published version.
+publish:
+  provider: github
+  owner: julia-shtal
+  repo: scriptorium-writer
+
 win:
   target:
     - nsis
