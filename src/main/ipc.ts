@@ -11,7 +11,7 @@
  * without spinning up an Electron runtime.
  */
 
-import type { Api } from '@shared/types'
+import type { Api, ExportFormat } from '@shared/types'
 import { encodeErrorForIpc, toAppError } from '@shared/errors'
 import type { FileService } from './file-service'
 
@@ -28,6 +28,19 @@ export interface IpcServices {
   setSpellLanguages(langs: string[]): void
   /** Show a save dialog and export the library to the chosen `.zip` (M13). */
   exportLibrary(): Promise<import('@shared/types').ExportLibraryResult>
+  /** Show an open dialog and return normalized import content (M14). */
+  readImportFile(): Promise<import('@shared/types').ImportFileResult>
+  /** Export one chapter to a user-chosen .docx or .md (M14). */
+  exportChapter(
+    storyId: string,
+    chapterId: string,
+    format: import('@shared/types').ExportFormat
+  ): Promise<import('@shared/types').ExportFileResult>
+  /** Export the whole story to one .docx or .md (M14). */
+  exportStory(
+    storyId: string,
+    format: import('@shared/types').ExportFormat
+  ): Promise<import('@shared/types').ExportFileResult>
 }
 
 /** All channels, kept in lockstep with the `Api` surface (compile-checked below). */
@@ -53,7 +66,10 @@ export const IPC_CHANNELS = [
   'applySpellLanguages',
   'scanLibrary',
   'revealInFolder',
-  'exportLibrary'
+  'exportLibrary',
+  'readImportFile',
+  'exportChapter',
+  'exportStory'
 ] as const
 
 // Compile-time guarantee that IPC_CHANNELS covers exactly the Api surface.
@@ -66,7 +82,15 @@ void _channelsCoverApi
 void _apiCoversChannels
 
 export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServices): void {
-  const { fileService: fs, revealInFolder, setSpellLanguages, exportLibrary } = services
+  const {
+    fileService: fs,
+    revealInFolder,
+    setSpellLanguages,
+    exportLibrary,
+    readImportFile,
+    exportChapter,
+    exportStory
+  } = services
 
   // Each entry receives the raw IPC args and returns a promise/value. Arg types are
   // guaranteed by the preload wrappers, whose signatures come from `Api`; here we
@@ -101,7 +125,11 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     applySpellLanguages: ([langs]) => setSpellLanguages(langs as string[]),
     scanLibrary: () => fs.scanLibrary(),
     revealInFolder: ([path]) => revealInFolder(path as string),
-    exportLibrary: () => exportLibrary()
+    exportLibrary: () => exportLibrary(),
+    readImportFile: () => readImportFile(),
+    exportChapter: ([storyId, chapterId, format]) =>
+      exportChapter(storyId as string, chapterId as string, format as ExportFormat),
+    exportStory: ([storyId, format]) => exportStory(storyId as string, format as ExportFormat)
   }
 
   for (const channel of IPC_CHANNELS) {

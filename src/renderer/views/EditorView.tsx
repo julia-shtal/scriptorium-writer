@@ -4,6 +4,7 @@ import { useChapterEditor } from '@renderer/editor/useChapterEditor'
 import { EditorSurface } from '@renderer/editor/Editor'
 import { Toolbar } from '@renderer/editor/toolbar/Toolbar'
 import { EditorFooter } from '@renderer/editor/EditorFooter'
+import { ExportMenu } from '@renderer/editor/ExportMenu'
 import { WandActionBar } from '@renderer/editor/cleanup/WandActionBar'
 import { useWand } from '@renderer/editor/cleanup/useWand'
 import { useEditorStore } from '@renderer/store/editorStore'
@@ -80,6 +81,7 @@ export function EditorView(): JSX.Element {
           onClick={() => setActiveView('versions')}
         />
         <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
+        <ExportMenu chapterId={chapterId} triggerLabel="Экспорт" />
       </div>
       <EditorSurface editor={editor} />
       <WandActionBar wand={wand} />

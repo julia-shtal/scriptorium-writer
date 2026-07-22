@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
-import { IconGripVertical, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconDownload, IconGripVertical, IconPlus, IconTrash } from '@tabler/icons-react'
+import type { ImportFileResult } from '@shared/types'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { ExportMenu } from '@renderer/editor/ExportMenu'
+import { ImportDialog } from './ImportDialog'
+
+type ImportPayload = Extract<ImportFileResult, { canceled: false }>
 
 export function ChaptersView(): JSX.Element {
   const story = useStoryStore((s) => s.story)
@@ -10,6 +15,7 @@ export function ChaptersView(): JSX.Element {
   const setActiveView = useUiStore((s) => s.setActiveView)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [importFile, setImportFile] = useState<ImportPayload | null>(null)
 
   // Refresh chapter titles/word counts on entry so edits made in the editor since
   // the story was loaded are reflected here.
@@ -33,14 +39,24 @@ export function ChaptersView(): JSX.Element {
     await useStoryStore.getState().addChapter('Новая глава')
     setActiveView('editor')
   }
+  const startImport = async (): Promise<void> => {
+    const result = await window.api.readImportFile()
+    if (result.canceled) return
+    setImportFile(result)
+  }
 
   return (
     <div className="chapters-view">
       <div className="chapters-head">
         <span className="chapters-title">Главы · {chapters.length}</span>
-        <button className="linkish" onClick={() => void addChapter()}>
-          <IconPlus size={15} /> глава
-        </button>
+        <div className="chapters-actions">
+          <button className="linkish" onClick={() => void addChapter()}>
+            <IconPlus size={15} /> глава
+          </button>
+          <button className="linkish" onClick={() => void startImport()}>
+            Импортировать…
+          </button>
+        </div>
       </div>
       <ul className="chapters-list">
         {chapters.map((c, i) => (
@@ -63,6 +79,13 @@ export function ChaptersView(): JSX.Element {
             <span className="chapters-open linkish" onClick={() => void openCh(c.id)}>
               открыть
             </span>
+            <ExportMenu
+              chapterId={c.id}
+              variant="chapter"
+              trigger={<IconDownload size={15} />}
+              triggerLabel="Экспортировать главу"
+              triggerClassName="chapters-export"
+            />
             <span className="chapters-words">{c.wordCount} сл</span>
             {confirmId === c.id ? (
               <span className="chapters-confirm">
@@ -88,6 +111,13 @@ export function ChaptersView(): JSX.Element {
           </li>
         ))}
       </ul>
+      {importFile && (
+        <ImportDialog
+          storyId={story.id}
+          file={importFile}
+          onClose={() => setImportFile(null)}
+        />
+      )}
     </div>
   )
 }

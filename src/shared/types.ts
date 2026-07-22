@@ -138,6 +138,18 @@ export interface Settings {
 /** Result of a library export (M13). `canceled` when the user dismissed the save dialog. */
 export type ExportLibraryResult = { canceled: true } | { canceled: false; path: string }
 
+/** Normalized payload returned by the import file-picker (M14). */
+export type ImportFileResult =
+  | { canceled: true }
+  | { canceled: false; kind: 'md'; text: string }
+  | { canceled: false; kind: 'docx'; html: string; warnings: string[] }
+
+/** Which file format a chapter/story export produces (M14). */
+export type ExportFormat = 'docx' | 'md'
+
+/** Result of a chapter/story export (M14). `canceled` = user dismissed the save dialog. */
+export type ExportFileResult = { canceled: true } | { canceled: false; path: string }
+
 /**
  * The typed surface exposed on `window.api` via the preload contextBridge. Every
  * method here is backed 1:1 by an `ipcMain.handle` registration delegating to the
@@ -186,6 +198,17 @@ export interface Api {
   revealInFolder(path: string): Promise<void> // open a folder in the OS file explorer
   /** Export the whole library to a user-chosen .zip (M13). Main shows the save dialog. */
   exportLibrary(): Promise<ExportLibraryResult>
+
+  // import / export (M14)
+  /** Show an open dialog (.md/.docx), read the file, return normalized content. */
+  readImportFile(): Promise<ImportFileResult>
+  /** Export one chapter to a user-chosen .docx or .md (save dialog in main). */
+  exportChapter(storyId: string, chapterId: string, format: ExportFormat): Promise<ExportFileResult>
+  /**
+   * Export the whole story to one .docx or .md. For .docx, one Heading-1 per chapter
+   * in chapterOrder; for .md, each chapter's backup joined in chapterOrder.
+   */
+  exportStory(storyId: string, format: ExportFormat): Promise<ExportFileResult>
 }
 
 /**

@@ -364,6 +364,126 @@ body {
   margin-top: 8px;
 }
 
+/* --- Import dialog (M14.1) --- */
+.import-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.import-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.import-mode input {
+  width: auto;
+}
+.import-preview {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+}
+.import-preview-count {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.import-preview-list {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+  color: var(--muted);
+}
+.import-warn {
+  margin-top: 10px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.import-warn--error {
+  color: var(--danger);
+}
+
+/* --- Export popover (M14) --- */
+/* A small menu anchored to its trigger (⋯ in the editor head, or a caller-supplied
+   icon in the chapters list). Warm surface, same shadow/radius feel as .modal. */
+.export-menu {
+  position: relative;
+  display: inline-flex;
+}
+.export-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.export-menu-trigger:hover,
+.export-menu-trigger:focus-visible {
+  color: var(--accent);
+}
+.export-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  min-width: 180px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  background: var(--page-bg);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.export-menu-popover--compact {
+  min-width: 120px;
+}
+.export-menu-caption {
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.export-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.export-menu-item:hover:not(:disabled),
+.export-menu-item:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+.export-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.export-menu-error {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
 /* --- Auto-update notice (M12) --- */
 /* A small, dismissible footer strip (not a blocking modal) shown when an update has
    been downloaded and is ready to install. Fixed to the bottom-right of the window. */
@@ -615,12 +735,20 @@ body {
 }
 .chapters-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 8px 12px;
   margin-bottom: 14px;
 }
 .chapters-title {
   font-weight: 600;
+}
+.chapters-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .chapters-list {
   list-style: none;
@@ -660,6 +788,24 @@ body {
 }
 .chapters-open {
   white-space: nowrap;
+}
+.chapters-export {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.chapters-row:hover .chapters-export,
+.chapters-export:focus-visible {
+  opacity: 1;
+}
+.chapters-export:hover {
+  color: var(--accent);
 }
 .chapters-words {
   color: var(--muted);

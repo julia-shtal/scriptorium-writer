@@ -60,7 +60,13 @@ const api: Api = {
 
   // misc
   revealInFolder: (path) => invoke('revealInFolder', path),
-  exportLibrary: () => invoke('exportLibrary')
+  exportLibrary: () => invoke('exportLibrary'),
+
+  // import / export (M14)
+  readImportFile: () => invoke('readImportFile'),
+  exportChapter: (storyId, chapterId, format) =>
+    invoke('exportChapter', storyId, chapterId, format),
+  exportStory: (storyId, format) => invoke('exportStory', storyId, format)
 }
 
 const lifecycle: LifecycleApi = {

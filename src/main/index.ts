@@ -1,13 +1,17 @@
 import { join } from 'path'
+import { readFile } from 'node:fs/promises'
 import { app, shell, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import type { UpdateDownloadedInfo } from '@shared/types'
+import type { UpdateDownloadedInfo, ExportFileResult, ExportFormat } from '@shared/types'
 import { FileService } from './file-service'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
 import { initAutoUpdate } from './auto-update'
 import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
+import { convertDocxToHtml } from './docx-import'
+import { buildChapterExportBuffer, buildStoryExportBuffer } from './export-format'
+import { atomicWriteFile } from './atomic-write'
 
 // Offline spellcheck dictionaries (SPEC §7, M4): dev serves them straight from the repo
 // `resources/` dir; packaged builds get them from electron-builder's copy under
@@ -24,6 +28,36 @@ function iconPath(): string {
   return is.dev
     ? join(app.getAppPath(), 'resources', 'icons', 'icon.ico')
     : join(process.resourcesPath, 'resources', 'icons', 'icon.ico')
+}
+
+/** Show a save dialog for a generated export and write the bytes atomically (M14/M14.1). */
+async function saveExport(
+  buffer: Buffer,
+  suggestedName: string,
+  format: ExportFormat
+): Promise<ExportFileResult> {
+  const win = BrowserWindow.getAllWindows()[0]
+  const safe = suggestedName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'export'
+  const options =
+    format === 'docx'
+      ? {
+          title: 'Экспортировать в .docx',
+          defaultPath: `${safe}.docx`,
+          filters: [{ name: 'Word', extensions: ['docx'] }]
+        }
+      : {
+          title: 'Экспортировать в .md',
+          defaultPath: `${safe}.md`,
+          filters: [{ name: 'Markdown', extensions: ['md'] }]
+        }
+  const result = win
+    ? await dialog.showSaveDialog(win, options)
+    : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return { canceled: true }
+  // Atomic write: tmp + rename in the destination dir, so a failed write never leaves a
+  // half-written file and never touches the library (export is read-only against canon).
+  await atomicWriteFile(result.filePath, buffer)
+  return { canceled: false, path: result.filePath }
 }
 
 function createWindow(): BrowserWindow {
@@ -168,6 +202,39 @@ app.whenReady().then(async () => {
         if (result.canceled || !result.filePath) return { canceled: true }
         await fileService.exportLibraryArchive(result.filePath)
         return { canceled: false, path: result.filePath }
+      },
+      readImportFile: async () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        const options = {
+          title: 'Импортировать файл',
+          properties: ['openFile' as const],
+          filters: [{ name: 'Документы', extensions: ['docx', 'md'] }]
+        }
+        const result = win
+          ? await dialog.showOpenDialog(win, options)
+          : await dialog.showOpenDialog(options)
+        if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+        const path = result.filePaths[0]
+        if (path.toLowerCase().endsWith('.md')) {
+          const text = await readFile(path, 'utf8')
+          return { canceled: false, kind: 'md', text }
+        }
+        const buffer = await readFile(path)
+        const { html, warnings } = await convertDocxToHtml(buffer)
+        return { canceled: false, kind: 'docx', html, warnings }
+      },
+      exportChapter: async (storyId, chapterId, format) => {
+        const chapter = await fileService.readChapter(storyId, chapterId)
+        const buffer = await buildChapterExportBuffer(chapter, format)
+        return saveExport(buffer, chapter.title || 'chapter', format)
+      },
+      exportStory: async (storyId, format) => {
+        const story = await fileService.readStory(storyId)
+        const chapters = await Promise.all(
+          story.chapterOrder.map((id) => fileService.readChapter(storyId, id))
+        )
+        const buffer = await buildStoryExportBuffer(chapters, story.chapterOrder, format)
+        return saveExport(buffer, story.title || 'story', format)
       }
     }
   )

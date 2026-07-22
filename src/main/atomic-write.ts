@@ -37,7 +37,7 @@ const defaultSleep = (ms: number): Promise<void> =>
  * transiently-locked rename before giving up (see {@link TRANSIENT_RENAME_CODES}). */
 export async function atomicWriteFile(
   target: string,
-  data: string,
+  data: string | Uint8Array,
   deps: AtomicWriteDeps = {}
 ): Promise<void> {
   const rename = deps.rename ?? fsp.rename
@@ -49,7 +49,9 @@ export async function atomicWriteFile(
   let handle: fsp.FileHandle | undefined
   try {
     handle = await fsp.open(tmp, 'w')
-    await handle.writeFile(data, 'utf8')
+    // Strings are UTF-8 text (JSON/Markdown canon); binary bytes (e.g. a generated
+    // .docx) are written verbatim — no encoding, or Node would re-encode them as UTF-8.
+    await handle.writeFile(data, typeof data === 'string' ? { encoding: 'utf8' } : undefined)
     await handle.sync() // fsync: flush to disk before the rename
   } finally {
     await handle?.close()
