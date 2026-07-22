@@ -22,19 +22,6 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
   const [title, setTitle] = useState(story.title)
   const [description, setDescription] = useState(story.description)
   const [tags, setTags] = useState(formatTags(story.tags))
-  const [exporting, setExporting] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
-  const exportStory = async (): Promise<void> => {
-    setExporting(true)
-    setExportError(null)
-    try {
-      await window.api.exportStoryDocx(story.id)
-    } catch {
-      setExportError('Не удалось экспортировать историю в .docx.')
-    } finally {
-      setExporting(false)
-    }
-  }
 
   useEffect(() => setTitle(story.title), [story.title])
   useEffect(() => setDescription(story.description), [story.description])
@@ -81,10 +68,6 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
           ))}
         </select>
       </label>
-      <button className="linkish" disabled={exporting} onClick={() => void exportStory()}>
-        {exporting ? 'Экспорт…' : 'Экспортировать историю в .docx'}
-      </button>
-      {exportError && <div className="storyinfo-note storyinfo-note--error">{exportError}</div>}
     </div>
   )
 }

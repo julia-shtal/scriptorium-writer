@@ -11,7 +11,7 @@
  * without spinning up an Electron runtime.
  */
 
-import type { Api } from '@shared/types'
+import type { Api, ExportFormat } from '@shared/types'
 import { encodeErrorForIpc, toAppError } from '@shared/errors'
 import type { FileService } from './file-service'
 
@@ -30,13 +30,17 @@ export interface IpcServices {
   exportLibrary(): Promise<import('@shared/types').ExportLibraryResult>
   /** Show an open dialog and return normalized import content (M14). */
   readImportFile(): Promise<import('@shared/types').ImportFileResult>
-  /** Export one chapter to a user-chosen .docx (M14). */
-  exportChapterDocx(
+  /** Export one chapter to a user-chosen .docx or .md (M14). */
+  exportChapter(
     storyId: string,
-    chapterId: string
-  ): Promise<import('@shared/types').ExportDocxResult>
-  /** Export the whole story to one .docx (M14). */
-  exportStoryDocx(storyId: string): Promise<import('@shared/types').ExportDocxResult>
+    chapterId: string,
+    format: import('@shared/types').ExportFormat
+  ): Promise<import('@shared/types').ExportFileResult>
+  /** Export the whole story to one .docx or .md (M14). */
+  exportStory(
+    storyId: string,
+    format: import('@shared/types').ExportFormat
+  ): Promise<import('@shared/types').ExportFileResult>
 }
 
 /** All channels, kept in lockstep with the `Api` surface (compile-checked below). */
@@ -64,8 +68,8 @@ export const IPC_CHANNELS = [
   'revealInFolder',
   'exportLibrary',
   'readImportFile',
-  'exportChapterDocx',
-  'exportStoryDocx'
+  'exportChapter',
+  'exportStory'
 ] as const
 
 // Compile-time guarantee that IPC_CHANNELS covers exactly the Api surface.
@@ -84,8 +88,8 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     setSpellLanguages,
     exportLibrary,
     readImportFile,
-    exportChapterDocx,
-    exportStoryDocx
+    exportChapter,
+    exportStory
   } = services
 
   // Each entry receives the raw IPC args and returns a promise/value. Arg types are
@@ -123,9 +127,9 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     revealInFolder: ([path]) => revealInFolder(path as string),
     exportLibrary: () => exportLibrary(),
     readImportFile: () => readImportFile(),
-    exportChapterDocx: ([storyId, chapterId]) =>
-      exportChapterDocx(storyId as string, chapterId as string),
-    exportStoryDocx: ([storyId]) => exportStoryDocx(storyId as string)
+    exportChapter: ([storyId, chapterId, format]) =>
+      exportChapter(storyId as string, chapterId as string, format as ExportFormat),
+    exportStory: ([storyId, format]) => exportStory(storyId as string, format as ExportFormat)
   }
 
   for (const channel of IPC_CHANNELS) {

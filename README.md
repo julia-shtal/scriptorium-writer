@@ -496,16 +496,18 @@ backup, not a partial one:
 Chapter I/O now works in both directions, at two granularities, alongside the
 existing `.md` safety shadow (which stays a write-only backup):
 
-- **Import.** Chapters view → **«Импортировать главу»** brings a single `.md`/`.docx`
-  file in as one appended chapter. **«Импортировать историю»** imports a whole file;
-  tick **«Разбить по заголовкам на отдельные главы»** to split it into one chapter per
-  top-level heading (Markdown `#` / Word *Heading 1*), titled from each heading, in
-  document order. Content before the first heading becomes an empty-title chapter — it
-  is never dropped.
-- **Export.** Per-chapter **«в .docx»** in the Chapters list exports one chapter;
-  Story info → **«Экспортировать историю в .docx»** compiles every chapter (in
-  `chapterOrder`) into one file, each title a *Heading 1*. This is a plain, editable
-  Word file — not manuscript formatting.
+- **Import.** Chapters view → **«Импортировать…»** picks a single `.md`/`.docx` file and
+  opens a preview dialog. Choose **«Одним файлом → одна глава»** to append it as one
+  chapter, or **«Разбить по заголовкам на отдельные главы»** to split it into one chapter
+  per top-level heading (Markdown `#` / Word *Heading 1*), titled from each heading, in
+  document order. The dialog previews exactly which chapters will be created before you
+  confirm; content before the first heading becomes an empty-title chapter — never
+  dropped. Cancelling creates nothing.
+- **Export.** Both live behind a download control. Per-chapter: the download icon on each
+  Chapters row (revealed on hover / keyboard focus) offers **.docx** / **.md** for that
+  chapter. Whole-story and per-chapter export also live in the editor's **⋯** export menu,
+  which compiles every chapter (in `chapterOrder`) into one file, each title a *Heading 1*.
+  These are plain, editable files — not manuscript formatting.
 
 How it stays reliable and keeps the process boundary clean:
 

@@ -25,8 +25,8 @@ describe('registerIpcHandlers', () => {
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
       readImportFile: vi.fn(),
-      exportChapterDocx: vi.fn(),
-      exportStoryDocx: vi.fn()
+      exportChapter: vi.fn(),
+      exportStory: vi.fn()
     })
     for (const channel of IPC_CHANNELS) {
       expect(channels.has(channel)).toBe(true)
@@ -42,8 +42,8 @@ describe('registerIpcHandlers', () => {
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
       readImportFile: vi.fn(),
-      exportChapterDocx: vi.fn(),
-      exportStoryDocx: vi.fn()
+      exportChapter: vi.fn(),
+      exportStory: vi.fn()
     })
     const result = await channels.get('createStory')!(null, { title: 'X' })
     expect(createStory).toHaveBeenCalledWith({ title: 'X' })
@@ -60,8 +60,8 @@ describe('registerIpcHandlers', () => {
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
       readImportFile: vi.fn(),
-      exportChapterDocx: vi.fn(),
-      exportStoryDocx: vi.fn()
+      exportChapter: vi.fn(),
+      exportStory: vi.fn()
     })
     let thrown: unknown
     try {
@@ -84,8 +84,8 @@ describe('registerIpcHandlers', () => {
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
       readImportFile: vi.fn(),
-      exportChapterDocx: vi.fn(),
-      exportStoryDocx: vi.fn()
+      exportChapter: vi.fn(),
+      exportStory: vi.fn()
     })
     expect(await channels.get('ping')!(null)).toBe('pong')
   })
@@ -99,8 +99,8 @@ describe('registerIpcHandlers', () => {
       setSpellLanguages,
       exportLibrary: vi.fn(),
       readImportFile: vi.fn(),
-      exportChapterDocx: vi.fn(),
-      exportStoryDocx: vi.fn()
+      exportChapter: vi.fn(),
+      exportStory: vi.fn()
     })
     await channels.get('applySpellLanguages')!(null, ['ru'])
     expect(setSpellLanguages).toHaveBeenCalledWith(['ru'])

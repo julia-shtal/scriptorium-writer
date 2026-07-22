@@ -64,8 +64,9 @@ const api: Api = {
 
   // import / export (M14)
   readImportFile: () => invoke('readImportFile'),
-  exportChapterDocx: (storyId, chapterId) => invoke('exportChapterDocx', storyId, chapterId),
-  exportStoryDocx: (storyId) => invoke('exportStoryDocx', storyId)
+  exportChapter: (storyId, chapterId, format) =>
+    invoke('exportChapter', storyId, chapterId, format),
+  exportStory: (storyId, format) => invoke('exportStory', storyId, format)
 }
 
 const lifecycle: LifecycleApi = {

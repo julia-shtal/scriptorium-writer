@@ -144,8 +144,11 @@ export type ImportFileResult =
   | { canceled: false; kind: 'md'; text: string }
   | { canceled: false; kind: 'docx'; html: string; warnings: string[] }
 
-/** Result of a chapter/story .docx export (M14). `canceled` = user dismissed the save dialog. */
-export type ExportDocxResult = { canceled: true } | { canceled: false; path: string }
+/** Which file format a chapter/story export produces (M14). */
+export type ExportFormat = 'docx' | 'md'
+
+/** Result of a chapter/story export (M14). `canceled` = user dismissed the save dialog. */
+export type ExportFileResult = { canceled: true } | { canceled: false; path: string }
 
 /**
  * The typed surface exposed on `window.api` via the preload contextBridge. Every
@@ -199,10 +202,13 @@ export interface Api {
   // import / export (M14)
   /** Show an open dialog (.md/.docx), read the file, return normalized content. */
   readImportFile(): Promise<ImportFileResult>
-  /** Export one chapter to a user-chosen .docx (save dialog in main). */
-  exportChapterDocx(storyId: string, chapterId: string): Promise<ExportDocxResult>
-  /** Export the whole story to one .docx, one Heading-1 per chapter in chapterOrder. */
-  exportStoryDocx(storyId: string): Promise<ExportDocxResult>
+  /** Export one chapter to a user-chosen .docx or .md (save dialog in main). */
+  exportChapter(storyId: string, chapterId: string, format: ExportFormat): Promise<ExportFileResult>
+  /**
+   * Export the whole story to one .docx or .md. For .docx, one Heading-1 per chapter
+   * in chapterOrder; for .md, each chapter's backup joined in chapterOrder.
+   */
+  exportStory(storyId: string, format: ExportFormat): Promise<ExportFileResult>
 }
 
 /**
