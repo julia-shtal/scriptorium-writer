@@ -1,13 +1,17 @@
 import { join } from 'path'
+import { readFile } from 'node:fs/promises'
 import { app, shell, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
-import type { UpdateDownloadedInfo } from '@shared/types'
+import type { UpdateDownloadedInfo, ExportDocxResult } from '@shared/types'
 import { FileService } from './file-service'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
 import { initAutoUpdate } from './auto-update'
 import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
+import { convertDocxToHtml } from './docx-import'
+import { chapterToDocxBlocks, blocksToDocxBuffer, type DocxBlock } from './docx-export'
+import { atomicWriteFile } from './atomic-write'
 
 // Offline spellcheck dictionaries (SPEC §7, M4): dev serves them straight from the repo
 // `resources/` dir; packaged builds get them from electron-builder's copy under
@@ -24,6 +28,25 @@ function iconPath(): string {
   return is.dev
     ? join(app.getAppPath(), 'resources', 'icons', 'icon.ico')
     : join(process.resourcesPath, 'resources', 'icons', 'icon.ico')
+}
+
+/** Show a save dialog for a generated .docx and write the bytes atomically (M14). */
+async function saveDocx(buffer: Buffer, suggestedName: string): Promise<ExportDocxResult> {
+  const win = BrowserWindow.getAllWindows()[0]
+  const safe = suggestedName.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80) || 'export'
+  const options = {
+    title: 'Экспортировать в .docx',
+    defaultPath: `${safe}.docx`,
+    filters: [{ name: 'Word', extensions: ['docx'] }]
+  }
+  const result = win
+    ? await dialog.showSaveDialog(win, options)
+    : await dialog.showSaveDialog(options)
+  if (result.canceled || !result.filePath) return { canceled: true }
+  // Atomic write: tmp + rename in the destination dir, so a failed write never leaves a
+  // half-written .docx and never touches the library (export is read-only against canon).
+  await atomicWriteFile(result.filePath, buffer)
+  return { canceled: false, path: result.filePath }
 }
 
 function createWindow(): BrowserWindow {
@@ -168,6 +191,42 @@ app.whenReady().then(async () => {
         if (result.canceled || !result.filePath) return { canceled: true }
         await fileService.exportLibraryArchive(result.filePath)
         return { canceled: false, path: result.filePath }
+      },
+      readImportFile: async () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        const options = {
+          title: 'Импортировать файл',
+          properties: ['openFile' as const],
+          filters: [{ name: 'Документы', extensions: ['docx', 'md'] }]
+        }
+        const result = win
+          ? await dialog.showOpenDialog(win, options)
+          : await dialog.showOpenDialog(options)
+        if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+        const path = result.filePaths[0]
+        if (path.toLowerCase().endsWith('.md')) {
+          const text = await readFile(path, 'utf8')
+          return { canceled: false, kind: 'md', text }
+        }
+        const buffer = await readFile(path)
+        const { html, warnings } = await convertDocxToHtml(buffer)
+        return { canceled: false, kind: 'docx', html, warnings }
+      },
+      exportChapterDocx: async (storyId, chapterId) => {
+        const chapter = await fileService.readChapter(storyId, chapterId)
+        const blocks = chapterToDocxBlocks(chapter.title, chapter.doc, { withHeading: false })
+        const buffer = await blocksToDocxBuffer([blocks])
+        return saveDocx(buffer, chapter.title || 'chapter')
+      },
+      exportStoryDocx: async (storyId) => {
+        const story = await fileService.readStory(storyId)
+        const blockLists: DocxBlock[][] = []
+        for (const id of story.chapterOrder) {
+          const chapter = await fileService.readChapter(storyId, id)
+          blockLists.push(chapterToDocxBlocks(chapter.title, chapter.doc, { withHeading: true }))
+        }
+        const buffer = await blocksToDocxBuffer(blockLists)
+        return saveDocx(buffer, story.title || 'story')
       }
     }
   )

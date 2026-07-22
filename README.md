@@ -491,6 +491,44 @@ backup, not a partial one:
   a large library never freezes the UI and a crash mid-export never leaves a
   truncated `.zip` at the destination path.
 
+### Import & export chapters as .docx/.md (M14)
+
+Chapter I/O now works in both directions, at two granularities, alongside the
+existing `.md` safety shadow (which stays a write-only backup):
+
+- **Import.** Chapters view → **«Импортировать главу»** brings a single `.md`/`.docx`
+  file in as one appended chapter. **«Импортировать историю»** imports a whole file;
+  tick **«Разбить по заголовкам на отдельные главы»** to split it into one chapter per
+  top-level heading (Markdown `#` / Word *Heading 1*), titled from each heading, in
+  document order. Content before the first heading becomes an empty-title chapter — it
+  is never dropped.
+- **Export.** Per-chapter **«в .docx»** in the Chapters list exports one chapter;
+  Story info → **«Экспортировать историю в .docx»** compiles every chapter (in
+  `chapterOrder`) into one file, each title a *Heading 1*. This is a plain, editable
+  Word file — not manuscript formatting.
+
+How it stays reliable and keeps the process boundary clean:
+
+- **Same write path.** Imported chapters go through the *exact* `createChapter` +
+  `saveChapter` path as any other chapter — atomic writes and version snapshots
+  included. No bypass.
+- **Split responsibilities.** Node-side file work stays in main:
+  [`mammoth`](https://www.npmjs.com/package/mammoth) turns `.docx` bytes into HTML
+  (`src/main/docx-import.ts`), and [`docx`](https://www.npmjs.com/package/docx) builds
+  `.docx` from the canon with **native Word footnotes** (`src/main/docx-export.ts`).
+  Doc-model parsing stays in the renderer — HTML/Markdown → ProseMirror JSON via
+  TipTap's `generateJSON` and a small inverse-of-`markdown.ts` Markdown reader
+  (`src/renderer/editor/import/`). The editor schema has no heading node, so headings
+  become split boundaries/titles and any leftover heading text is flattened to a
+  paragraph rather than lost.
+- **Lossy, not lossless — and honest about it.** Import is a one-time conversion;
+  tables, images, comments and tracked changes are dropped and surface a
+  «часть форматирования могла не сохраниться» notice (never a failure). Marks
+  (bold/italic/strike), scene dividers and footnotes round-trip.
+- **Export never touches the library.** It reads canon only and writes the generated
+  `.docx` to the user-chosen path with the same temp-then-rename atomic write used
+  everywhere else, so a failed export can't corrupt anything.
+
 ### Project layout
 
 ```
@@ -506,6 +544,9 @@ src/
     atomic-write.ts       # tmp + fsync + rename atomic write helper
     auto-update.ts        # M12 background auto-update coordinator (Electron-free, DI)
     library-archive.ts    # M13 zips the whole library folder to a user-chosen path
+    markdown.ts           # M7 chapter → .md backup serializer
+    docx-import.ts        # M14 .docx bytes → HTML via mammoth (+ Heading-1 style map)
+    docx-export.ts        # M14 canon → .docx via docx.js (native footnotes)
   preload/index.ts        # contextBridge → window.api (typed, decodes AppError)
   preload/index.d.ts      # global Window.api typing
   renderer/
@@ -516,6 +557,7 @@ src/
     store/                # zustand stores: editorStore, storyStore, settingsStore, uiStore, bootstrap
     editor/               # TipTap editor, toolbar, footer, SceneDivider + Footnote nodes
     editor/cleanup/       # M8 cleanup wand: rules, span diff, preview plugin, action bar
+    editor/import/        # M14 import: markdown/html → ProseMirror JSON, split, orchestration
     views/                # EditorView, Library, Chapters, StoryInfo, Notes, Statistics, Settings, VersionHistory
     components/           # AppFrame (leather frame + grid), Sidebar
   shared/

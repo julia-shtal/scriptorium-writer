@@ -24,6 +24,15 @@ describe('atomicWriteFile', () => {
     expect(await fsp.readFile(target, 'utf8')).toBe('{"ok":true}')
   })
 
+  it('writes binary (non-UTF8) bytes verbatim', async () => {
+    const target = join(dir, 'export.docx')
+    // Bytes that are not valid UTF-8: a NUL, 0xff, then "PK" (the .docx/zip magic).
+    const bytes = Buffer.from([0x00, 0xff, 0x50, 0x4b])
+    await atomicWriteFile(target, bytes)
+    const readBack = await fsp.readFile(target) // no encoding → raw Buffer
+    expect(Buffer.compare(readBack, bytes)).toBe(0)
+  })
+
   it('leaves the original file intact if interrupted before the rename', async () => {
     const target = join(dir, 'data.json')
     await atomicWriteFile(target, 'GOOD')

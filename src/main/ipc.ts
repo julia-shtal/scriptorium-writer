@@ -28,6 +28,15 @@ export interface IpcServices {
   setSpellLanguages(langs: string[]): void
   /** Show a save dialog and export the library to the chosen `.zip` (M13). */
   exportLibrary(): Promise<import('@shared/types').ExportLibraryResult>
+  /** Show an open dialog and return normalized import content (M14). */
+  readImportFile(): Promise<import('@shared/types').ImportFileResult>
+  /** Export one chapter to a user-chosen .docx (M14). */
+  exportChapterDocx(
+    storyId: string,
+    chapterId: string
+  ): Promise<import('@shared/types').ExportDocxResult>
+  /** Export the whole story to one .docx (M14). */
+  exportStoryDocx(storyId: string): Promise<import('@shared/types').ExportDocxResult>
 }
 
 /** All channels, kept in lockstep with the `Api` surface (compile-checked below). */
@@ -53,7 +62,10 @@ export const IPC_CHANNELS = [
   'applySpellLanguages',
   'scanLibrary',
   'revealInFolder',
-  'exportLibrary'
+  'exportLibrary',
+  'readImportFile',
+  'exportChapterDocx',
+  'exportStoryDocx'
 ] as const
 
 // Compile-time guarantee that IPC_CHANNELS covers exactly the Api surface.
@@ -66,7 +78,15 @@ void _channelsCoverApi
 void _apiCoversChannels
 
 export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServices): void {
-  const { fileService: fs, revealInFolder, setSpellLanguages, exportLibrary } = services
+  const {
+    fileService: fs,
+    revealInFolder,
+    setSpellLanguages,
+    exportLibrary,
+    readImportFile,
+    exportChapterDocx,
+    exportStoryDocx
+  } = services
 
   // Each entry receives the raw IPC args and returns a promise/value. Arg types are
   // guaranteed by the preload wrappers, whose signatures come from `Api`; here we
@@ -101,7 +121,11 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     applySpellLanguages: ([langs]) => setSpellLanguages(langs as string[]),
     scanLibrary: () => fs.scanLibrary(),
     revealInFolder: ([path]) => revealInFolder(path as string),
-    exportLibrary: () => exportLibrary()
+    exportLibrary: () => exportLibrary(),
+    readImportFile: () => readImportFile(),
+    exportChapterDocx: ([storyId, chapterId]) =>
+      exportChapterDocx(storyId as string, chapterId as string),
+    exportStoryDocx: ([storyId]) => exportStoryDocx(storyId as string)
   }
 
   for (const channel of IPC_CHANNELS) {
