@@ -419,8 +419,7 @@ inline diff preview.
   (`// TODO(post-v1)`): collapse multiple spaces, normalize spacing around
   `, . ; : ! ?`, fix stray spaces in hyphenated words, `-` → em dash `—`, trim
   trailing whitespace per line, and straight double quotes `"` → Russian
-  guillemets `«…»` by open/close alternation (paired per text node; an unpaired
-  `"` yields a lone guillemet — M17).
+  guillemets `«…»` (M17 — see *Typographic quotes* below).
 - **Span computation** (`computeSpans.ts`) walks the text nodes overlapping the
   range and turns each node's rule output into tight edit spans via a **hand-rolled
   char-level diff** (no new dependency). Footnote markers and `hard_break` are
@@ -436,6 +435,22 @@ inline diff preview.
   preserving the marks at its position, tagged `wandCleanup` — so the whole cleanup
   is one Ctrl+Z. Cancel leaves the document byte-identical. Zero proposed edits show
   a brief "Нечего чистить" note instead of entering preview.
+
+### Typographic quotes (M17)
+
+A cleanup-wand rule (`rules.ts`) turns straight double quotes `"` into Russian
+guillemets `«…»`, pairing them by simple open/close alternation as it scans each
+text node. It runs after the em-dash rule and before trailing-trim, and flows
+through the same preview + single-transaction path as every other wand rule.
+
+- **Narrow by design.** Only the straight double quote `"` (U+0022) is touched;
+  single quotes and apostrophes `'` are left alone (no quote-vs-apostrophe
+  guessing), as are already-typographic and nested quotes. A Western-style `"…"`
+  alternative and per-rule toggles are deferred to M18.
+- **Known limits** (documented in the rule's JSDoc): pairing is per text node, so a
+  quote pair split across a mark boundary — an opening `"` before a **bold** word
+  and its closing `"` after it — can render as two opening `«`; and an unpaired `"`
+  becomes a lone guillemet rather than being left straight.
 
 ### Auto-update (M12)
 
