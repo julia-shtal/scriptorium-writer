@@ -71,7 +71,7 @@ export function EditorFooter(): JSX.Element {
           </span>
         </span>
       )}
-      <button className="save-btn" onClick={() => void save()} disabled={saveStatus === 'saving'}>
+      <button className="save-btn" onClick={() => void save()}>
         <IconDeviceFloppy size={16} />
         Сохранить
       </button>
