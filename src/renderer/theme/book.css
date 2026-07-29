@@ -116,6 +116,17 @@ body {
   border-radius: 4px 0 0 4px;
 }
 
+/* Editor view only: contain scrolling to .editor-surface so the Toolbar and
+   .chapter-head stay put while typing near the bottom of a long chapter. */
+.page--editor {
+  height: calc(100vh - 40px); /* mirrors .book-grid's min-height; 40px = .book-frame padding (20px × 2) */
+  /* Contain vertical overflow only (so .editor-surface is the sole scroller, not
+     .page/body). Must NOT clip horizontally, or the decorative page-stack edges
+     (.page::before / .page::after at right/left: -8px, outside the box) vanish. */
+  overflow-x: visible;
+  overflow-y: clip;
+}
+
 .toolbar {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
   padding: 10px 16px; border-bottom: 1px solid var(--rule);
@@ -142,9 +153,13 @@ body {
 .chapter-title-input:focus { outline: none; }
 .chapter-switcher { font-family: var(--font-sans); font-size: 13px; color: var(--ink-nav); }
 
+/* TipTap's EditorContent wrapper: a transparent flex-column link between .page's
+   flex column and .editor-surface, so the scroll region below actually bounds. */
+.editor-scroll-host { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
 .editor-surface {
   padding: 8px 34px 22px; line-height: 1.85; color: var(--ink);
-  flex: 1; overflow-y: auto;
+  flex: 1; overflow-y: auto; min-height: 0;
   font-family: var(--editor-font-family, var(--font-serif));
   font-size: var(--editor-font-size, 16.5px);
 }

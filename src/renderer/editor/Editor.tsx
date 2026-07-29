@@ -11,5 +11,9 @@ export function EditorSurface({ editor }: { editor: Editor | null }): JSX.Elemen
     editor.view.dom.classList.toggle('indent-on', indentOn)
   }, [editor, indentOn])
 
-  return <EditorContent editor={editor} />
+  // The wrapper div TipTap's EditorContent renders sits between .page's flex column
+  // and the .editor-surface (the ProseMirror element). It must be a transparent
+  // flex-column passthrough, otherwise it sizes to content and .editor-surface's
+  // flex/overflow scroll region never engages (see .editor-scroll-host in book.css).
+  return <EditorContent editor={editor} className="editor-scroll-host" />
 }
