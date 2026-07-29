@@ -9,6 +9,7 @@ export function AppFrame({ children }: { children: ReactNode }): JSX.Element {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleFocus = useUiStore((s) => s.toggleFocus)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
+  const activeView = useUiStore((s) => s.activeView)
 
   const gridClass = [
     'book-grid',
@@ -35,7 +36,7 @@ export function AppFrame({ children }: { children: ReactNode }): JSX.Element {
             <IconLayoutSidebarLeftExpand size={18} />
           </button>
         )}
-        <section className="page">{children}</section>
+        <section className={`page${activeView === 'editor' ? ' page--editor' : ''}`}>{children}</section>
       </div>
     </div>
   )
