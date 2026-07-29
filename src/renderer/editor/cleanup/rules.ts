@@ -67,6 +67,31 @@ export const rules: CleanupRule[] = [
     apply: (text) => text.replace(/ - /g, ' — ')
   },
   {
+    id: 'quotes',
+    name: 'Ёлочки вместо прямых кавычек',
+    // Straight double quotes " (U+0022) → Russian guillemets «…», by simple
+    // open/close alternation within the processed text: 1st " = «, 2nd = », 3rd
+    // = «, and so on. Only U+0022 is matched, so already-typographic quotes,
+    // single quotes, and apostrophes (') pass through untouched.
+    //
+    // KNOWN LIMITATIONS (mirroring the wand's per-node scoping in computeSpans.ts):
+    //   1. Pairing is per-chunk. runRules is applied to each text node separately,
+    //      so a quote PAIR split across text nodes — an opening " right before a
+    //      bold word and the closing " right after it — resets alternation at the
+    //      node boundary and both may render as opening «.
+    //   2. An unpaired " (odd count in a chunk) yields a lone guillemet under
+    //      strict alternation rather than being left straight. Deliberate: simple
+    //      and predictable; never crashes, never duplicates output.
+    apply: (text) => {
+      let open = true
+      return text.replace(/"/g, () => {
+        const ch = open ? '«' : '»'
+        open = !open
+        return ch
+      })
+    }
+  },
+  {
     id: 'trim-trailing',
     name: 'Убрать пробелы в конце строк',
     // Trim trailing spaces/tabs at the end of every line.
