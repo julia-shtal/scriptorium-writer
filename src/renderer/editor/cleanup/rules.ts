@@ -108,6 +108,16 @@ export function runRules(text: string): string {
   return rules.reduce((acc, rule) => rule.apply(acc), text)
 }
 
+/**
+ * Replace a leading dialogue dash — a hyphen immediately followed by a
+ * space/tab at the very start of a string — with an em dash. Applied by
+ * computeSpans.ts only to a paragraph's first text node; never exposed as a
+ * general CleanupRule because mid-paragraph hyphens must be left alone.
+ */
+export function applyDialogueDashAtStart(text: string): string {
+  return text.replace(/^-(?=[ \t])/, '—')
+}
+
 /** Escape a set of characters for safe use inside a RegExp character class. */
 function escapeClass(chars: string): string {
   return chars.replace(/[\\\]^-]/g, '\\$&')

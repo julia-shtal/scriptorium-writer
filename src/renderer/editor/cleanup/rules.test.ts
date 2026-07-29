@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { rules, runRules } from './rules'
+import { applyDialogueDashAtStart, rules, runRules } from './rules'
 
 function apply(id: string, text: string): string {
   const rule = rules.find((r) => r.id === id)
@@ -67,6 +67,28 @@ describe('quotes rule — straight double quotes → guillemets', () => {
 
   test('already-typographic guillemets are a no-op', () => {
     expect(apply('quotes', '«текст»')).toBe('«текст»')
+  })
+})
+
+describe('applyDialogueDashAtStart — leading dialogue dash', () => {
+  test('leading "- " → "— "', () => {
+    expect(applyDialogueDashAtStart('- Слово')).toBe('— Слово')
+  })
+
+  test('leading "-\\t" → "—\\t"', () => {
+    expect(applyDialogueDashAtStart('-\tСлово')).toBe('—\tСлово')
+  })
+
+  test('"-нибудь" (no following whitespace) is untouched', () => {
+    expect(applyDialogueDashAtStart('-нибудь')).toBe('-нибудь')
+  })
+
+  test('already an em dash is untouched', () => {
+    expect(applyDialogueDashAtStart('— Слово')).toBe('— Слово')
+  })
+
+  test('empty string is untouched', () => {
+    expect(applyDialogueDashAtStart('')).toBe('')
   })
 })
 

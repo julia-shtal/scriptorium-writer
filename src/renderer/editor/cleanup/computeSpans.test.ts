@@ -82,6 +82,37 @@ describe('computeSpans — edge cases', () => {
   })
 })
 
+describe('computeSpans — dialogue dash at paragraph start (M23)', () => {
+  /** Build a single paragraph node (not wrapped in a doc). */
+  function para(text: string): ProseMirrorNode {
+    return schema.nodes.paragraph.create(null, schema.text(text))
+  }
+
+  test('leading "- " becomes "—"; mid-string dash still handled; non-hyphen para untouched', () => {
+    const doc = schema.nodes.doc.create(null, [
+      para('- Первая'),
+      para('a - b'),
+      para('текст тут')
+    ])
+    const spans = spansOfWholeDoc(doc)
+
+    // First paragraph: leading hyphen → em dash. Its text node starts at pos 1.
+    const leading = spans.find((s) => s.from === 1)
+    expect(leading).toBeDefined()
+    expect(leading?.oldText).toBe('-')
+    expect(leading?.newText).toBe('—')
+
+    // Second paragraph: mid-string " - " still handled by the existing em-dash rule.
+    const midDash = spans.find((s) => s.oldText === '-' && s.from !== 1)
+    expect(midDash).toBeDefined()
+    expect(midDash?.newText).toBe('—')
+
+    // Third paragraph (no leading hyphen, no dirt) produces no span.
+    // Exactly the two dash conversions above are emitted.
+    expect(spans.length).toBe(2)
+  })
+})
+
 describe('computeSpans — structure preservation', () => {
   test('marks preserved: a bold run is diffed independently, no merge across marks', () => {
     const bold = schema.marks.bold.create()
