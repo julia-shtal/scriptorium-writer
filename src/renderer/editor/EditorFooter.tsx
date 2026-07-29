@@ -1,6 +1,7 @@
 import { IconCloudCheck, IconAbc, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEditorStore, type SaveStatus } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useSettingsStore } from '@renderer/store/settingsStore'
 
 const LANG_LABELS: Record<string, string> = { ru: 'RU', 'en-US': 'EN', en: 'EN' }
 
@@ -26,6 +27,11 @@ function statusLabel(status: SaveStatus, lastSavedAt: string | null): string {
   }
 }
 
+/** Footer info line is shown unless the writer hid it — but a save error always forces it back. */
+export function shouldShowFooterInfo(hideInfo: boolean, saveStatus: SaveStatus): boolean {
+  return !hideInfo || saveStatus === 'error'
+}
+
 export function EditorFooter(): JSX.Element {
   const wordCount = useEditorStore((s) => s.wordCount)
   const selectionWordCount = useEditorStore((s) => s.selectionWordCount)
@@ -34,34 +40,37 @@ export function EditorFooter(): JSX.Element {
   const mdWarning = useEditorStore((s) => s.mdWarning)
   const save = useEditorStore((s) => s.save)
   const spellLanguages = useUiStore((s) => s.spellLanguages)
+  const hideInfo = useSettingsStore((s) => s.settings?.hideEditorFooterInfo ?? false)
 
   return (
     <div className="footer">
-      <span className="footer-left">
-        <span>
-          слов: {wordCount}
-          {selectionWordCount > 0 ? ` · выделено: ${selectionWordCount}` : ''}
+      {shouldShowFooterInfo(hideInfo, saveStatus) && (
+        <span className="footer-left">
+          <span>
+            слов: {wordCount}
+            {selectionWordCount > 0 ? ` · выделено: ${selectionWordCount}` : ''}
+          </span>
+          {/* Live autosave status (saving / saved HH:MM / failed + retry). */}
+          <span className="footer-item">
+            <IconCloudCheck size={16} color="#7a8a4e" />
+            {statusLabel(saveStatus, lastSavedAt)}
+            {saveStatus === 'error' && (
+              <button className="retry-btn" onClick={() => void save()}>
+                повторить
+              </button>
+            )}
+            {mdWarning && (
+              <span className="save-warning" title={mdWarning}>
+                ⚠ копия .md не сохранена
+              </span>
+            )}
+          </span>
+          <span className="footer-item">
+            <IconAbc size={16} />
+            {formatSpellLanguages(spellLanguages)}
+          </span>
         </span>
-        {/* Live autosave status (saving / saved HH:MM / failed + retry). */}
-        <span className="footer-item">
-          <IconCloudCheck size={16} color="#7a8a4e" />
-          {statusLabel(saveStatus, lastSavedAt)}
-          {saveStatus === 'error' && (
-            <button className="retry-btn" onClick={() => void save()}>
-              повторить
-            </button>
-          )}
-          {mdWarning && (
-            <span className="save-warning" title={mdWarning}>
-              ⚠ копия .md не сохранена
-            </span>
-          )}
-        </span>
-        <span className="footer-item">
-          <IconAbc size={16} />
-          {formatSpellLanguages(spellLanguages)}
-        </span>
-      </span>
+      )}
       <button className="save-btn" onClick={() => void save()} disabled={saveStatus === 'saving'}>
         <IconDeviceFloppy size={16} />
         Сохранить
