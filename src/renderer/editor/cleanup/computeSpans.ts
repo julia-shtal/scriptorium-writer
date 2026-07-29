@@ -4,7 +4,7 @@
 // against a ProseMirror doc. Pure: no dispatch, no decorations, no DOM.
 
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { runRules } from './rules'
+import { applyDialogueDashAtStart, runRules } from './rules'
 
 export interface CleanupSpan {
   /** Absolute doc position where the replaced text begins. */
@@ -49,7 +49,18 @@ export function computeSpans(
     if (!node.isText) return
     const oldText = node.text ?? ''
     if (oldText.length === 0) return
-    const newText = runRules(oldText)
+
+    // Dialogue dash: convert a leading `- ` into `— ` only when this text node
+    // sits at the very start of its parent block (`parentOffset === 0`). This
+    // needs the node's doc position, which the per-chunk rules in rules.ts don't
+    // have, so it's pre-applied here before the normal rule pipeline.
+    // TODO(M23+): a dialogue line created by a hard_break (Shift+Enter) within
+    // the same paragraph is not a paragraph start and is out of scope for now.
+    const isParagraphStart = doc.resolve(pos).parentOffset === 0
+    const preprocessed = isParagraphStart ? applyDialogueDashAtStart(oldText) : oldText
+    const newText = runRules(preprocessed)
+    // Diff against the true original `oldText`, not the preprocessed intermediate,
+    // so emitted spans and the wand's inline preview stay correct.
     if (newText === oldText) return
 
     // `pos` is the position immediately before the text node; intra-node index i maps
