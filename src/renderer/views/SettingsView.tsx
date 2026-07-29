@@ -64,6 +64,14 @@ export function SettingsView(): JSX.Element {
                onChange={(e) => void update({ editorFontSizePx: Number(e.target.value) })} />
       </label>
 
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.hideEditorFooterInfo ?? false}
+          onChange={() => void update({ hideEditorFooterInfo: !(settings.hideEditorFooterInfo ?? false) })}
+        /> Минимальная нижняя панель
+      </label>
+
       <label className="settings-field">Версий на главу
         <input type="number" min={1} value={settings.maxVersionsPerChapter}
                onChange={(e) => void update({ maxVersionsPerChapter: Number(e.target.value) })} />

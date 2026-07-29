@@ -132,6 +132,8 @@ export interface Settings {
   libraryPath: string
   /** True once the first-run demo story has been seeded; prevents re-seeding a deliberately-emptied library. */
   demoSeeded?: boolean
+  /** Hide the footer's info line (word count, save status, language badge), keeping only «Сохранить». Persistent, independent of focus mode. */
+  hideEditorFooterInfo?: boolean
   schemaVersion: number
 }
 

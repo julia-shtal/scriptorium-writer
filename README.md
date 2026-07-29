@@ -575,6 +575,18 @@ opens it too. The bar renders below the text (a sibling of the wand's action bar
 Cross-chapter / whole-story replace and regex are intentionally out of scope for v1
 (a natural M16+ follow-up once full-text search exists).
 
+### Minimal footer mode (M20)
+
+A persistent **«Минимальная нижняя панель»** preference hides the editor footer's
+info line (word count, save status, spellcheck-language badge) while keeping the
+«Сохранить» button, for less distraction during ordinary (non-focus) writing. It is
+stored as the optional `Settings.hideEditorFooterInfo` field and toggled from two
+always-in-sync controls — a Settings checkbox and a chapter-header icon
+(`IconLayoutBottombarCollapse`) beside the focus-mode button. A save **error** always
+overrides the hidden state and brings the full info line (with «повторить») back, so
+failures are never silent. Independent of focus mode, which still hides the whole
+footer as before.
+
 ### Project layout
 
 ```

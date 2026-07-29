@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { IconHistory, IconMaximize } from '@tabler/icons-react'
+import { IconHistory, IconMaximize, IconLayoutBottombarCollapse } from '@tabler/icons-react'
 import { useChapterEditor } from '@renderer/editor/useChapterEditor'
 import { EditorSurface } from '@renderer/editor/Editor'
 import { Toolbar } from '@renderer/editor/toolbar/Toolbar'
@@ -11,6 +11,7 @@ import { FindReplaceBar } from '@renderer/editor/find/FindReplaceBar'
 import { useFind } from '@renderer/editor/find/useFind'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useSettingsStore } from '@renderer/store/settingsStore'
 import type { Story } from '@shared/types'
 
 export function EditorView(): JSX.Element {
@@ -24,6 +25,8 @@ export function EditorView(): JSX.Element {
   const openChapter = useEditorStore((s) => s.openChapter)
   const toggleFocus = useUiStore((s) => s.toggleFocus)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const hideFooterInfo = useSettingsStore((s) => s.settings?.hideEditorFooterInfo ?? false)
+  const updateSettings = useSettingsStore((s) => s.update)
 
   // Chapter switcher: list the open story's chapters (title-by-id).
   const [chapters, setChapters] = useState<{ id: string; title: string }[]>([])
@@ -106,6 +109,12 @@ export function EditorView(): JSX.Element {
           onClick={() => setActiveView('versions')}
         />
         <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
+        <IconLayoutBottombarCollapse
+          size={18}
+          title="Минимальная нижняя панель"
+          style={{ cursor: 'pointer' }}
+          onClick={() => void updateSettings({ hideEditorFooterInfo: !hideFooterInfo })}
+        />
         <ExportMenu chapterId={chapterId} triggerLabel="Экспорт" />
       </div>
       <EditorSurface editor={editor} />
