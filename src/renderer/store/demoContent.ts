@@ -1,6 +1,9 @@
 import type { ProseMirrorJSON } from '@shared/types'
 
-/** Pre-seeded content for the demo chapter so the editor shows real text on first run. */
+/**
+ * Pre-seeded content for the demo chapter so the editor shows placeholder text
+ * (generic lorem-ipsum filler, not real prose) on first run.
+ */
 export const DEMO_CHAPTER_1_DOC: ProseMirrorJSON = {
   type: 'doc',
   content: [
@@ -10,7 +13,7 @@ export const DEMO_CHAPTER_1_DOC: ProseMirrorJSON = {
         {
           type: 'text',
           text:
-            'Это ваша рабочая тетрадь. Страница выглядит как тёплый лист книги — пишите здесь длинную прозу, а текст сохранится сам.'
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'
         }
       ]
     },
@@ -20,14 +23,14 @@ export const DEMO_CHAPTER_1_DOC: ProseMirrorJSON = {
         {
           type: 'text',
           text:
-            'Эту главу можно свободно переписать или удалить: она лишь пример, чтобы редактор не встречал вас пустой страницей.'
+            'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.'
         }
       ]
     },
     { type: 'sceneDivider' },
     {
       type: 'paragraph',
-      content: [{ type: 'text', text: 'Доброго письма.' }]
+      content: [{ type: 'text', text: 'Sed ut perspiciatis unde omnis iste natus error.' }]
     }
   ]
 }
