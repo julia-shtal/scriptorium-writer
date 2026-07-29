@@ -43,6 +43,33 @@ describe('cleanup rules — individual', () => {
   })
 })
 
+describe('quotes rule — straight double quotes → guillemets', () => {
+  test('a single pair becomes «…»', () => {
+    expect(apply('quotes', '"текст"')).toBe('«текст»')
+  })
+
+  test('a quoted word inside a sentence', () => {
+    expect(apply('quotes', 'он сказал "привет" ей')).toBe('он сказал «привет» ей')
+  })
+
+  test('multiple pairs alternate correctly', () => {
+    expect(apply('quotes', '"а" и "б"')).toBe('«а» и «б»')
+  })
+
+  test('unpaired quote does not crash or duplicate — strict alternation leaves a lone «', () => {
+    expect(apply('quotes', 'он сказал "привет')).toBe('он сказал «привет')
+  })
+
+  test("apostrophes (single quotes) are never touched", () => {
+    expect(apply('quotes', "it's")).toBe("it's")
+    expect(apply('quotes', "д'Артаньян")).toBe("д'Артаньян")
+  })
+
+  test('already-typographic guillemets are a no-op', () => {
+    expect(apply('quotes', '«текст»')).toBe('«текст»')
+  })
+})
+
 describe('runRules — composed pipeline (TASKS.md acceptance)', () => {
   test('the three headline cases', () => {
     expect(runRules('текст - текст')).toBe('текст — текст')
@@ -62,6 +89,16 @@ describe('runRules — composed pipeline (TASKS.md acceptance)', () => {
     expect(runRules('текст - текст, слово ,слово и что- нибудь ещё   ')).toBe(
       'текст — текст, слово, слово и что-нибудь ещё'
     )
+  })
+
+  test('quotes convert alongside other fixes in one pass', () => {
+    // spacing before comma + space-hyphen-space dash + straight quotes, all fixed.
+    expect(runRules('"текст" - слово ,тут')).toBe('«текст» — слово, тут')
+  })
+
+  test('clean text with guillemets stays a no-op', () => {
+    const clean = '«Чистый» текст — без ошибок.'
+    expect(runRules(clean)).toBe(clean)
   })
 
   test('is a no-op on already-clean text', () => {

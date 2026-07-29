@@ -417,8 +417,10 @@ inline diff preview.
 - **Rules** (`rules.ts`) are an ordered list of pure `(text) => string` transforms,
   each a discrete entry so a later milestone can expose per-rule Settings toggles
   (`// TODO(post-v1)`): collapse multiple spaces, normalize spacing around
-  `, . ; : ! ?`, fix stray spaces in hyphenated words, `-` → em dash `—`, and trim
-  trailing whitespace per line. No quote typography yet (deferred).
+  `, . ; : ! ?`, fix stray spaces in hyphenated words, `-` → em dash `—`, trim
+  trailing whitespace per line, and straight double quotes `"` → Russian
+  guillemets `«…»` by open/close alternation (paired per text node; an unpaired
+  `"` yields a lone guillemet — M17).
 - **Span computation** (`computeSpans.ts`) walks the text nodes overlapping the
   range and turns each node's rule output into tight edit spans via a **hand-rolled
   char-level diff** (no new dependency). Footnote markers and `hard_break` are
