@@ -177,24 +177,48 @@ body {
   margin-left: 6px; font-family: var(--font-sans); font-size: 12.5px;
   color: var(--muted); align-self: center;
 }
-.wand-bar {
+.action-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 9px 34px; border-top: 1px solid var(--rule);
   background: color-mix(in srgb, var(--accent) 8%, var(--page-bg));
   font-family: var(--font-sans); font-size: 13px; color: var(--ink-nav);
 }
-.wand-bar-count { color: var(--ink-heading); font-weight: 500; }
-.wand-bar-spacer { flex: 1; }
-.wand-bar-btn {
+.action-bar-count { color: var(--ink-heading); font-weight: 500; }
+.action-bar-spacer { flex: 1; }
+.action-bar-btn {
   font-family: var(--font-sans); font-size: 13px; padding: 6px 14px;
   border-radius: 5px; cursor: pointer;
 }
-.wand-bar-btn.primary { background: var(--accent); color: #fbf6ea; border: none; }
-.wand-bar-btn.ghost {
+.action-bar-btn.primary { background: var(--accent); color: #fbf6ea; border: none; }
+.action-bar-btn.ghost {
   background: transparent; color: var(--accent);
   border: 1px solid var(--accent);
 }
-.wand-bar-btn.ghost:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.action-bar-btn.ghost:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Toggled-on state for the find bar's Аа / |Слово| option buttons. */
+.action-bar-btn.ghost.active { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+/* M15 Find & Replace: match highlights + panel inputs. */
+.find-match {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 2px;
+}
+.find-match-active {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.find-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--page-bg);
+  color: var(--ink);
+  min-width: 140px;
+}
+/* Muted counter text (e.g. "Нет совпадений"). */
+.action-bar-count--muted { color: var(--muted); }
 
 .footer {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
