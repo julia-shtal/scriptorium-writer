@@ -5,7 +5,8 @@ import {
   IconAlignRight,
   IconArrowBackUp,
   IconArrowForwardUp,
-  IconWand
+  IconWand,
+  IconSearch
 } from '@tabler/icons-react'
 import { useEditorStore } from '@renderer/store/editorStore'
 import type { WandController } from '@renderer/editor/cleanup/useWand'
@@ -14,10 +15,12 @@ const ICON = 18
 
 export function Toolbar({
   editor,
-  wand
+  wand,
+  onFind
 }: {
   editor: Editor | null
   wand: WandController
+  onFind: () => void
 }): JSX.Element | null {
   const indentOn = useEditorStore((s) => s.indentOn)
   const toggleIndent = useEditorStore((s) => s.toggleIndent)
@@ -65,6 +68,9 @@ export function Toolbar({
         disabled={wandActive}
         onClick={wand.trigger}><IconWand size={ICON} /></button>
       {wand.emptyNote && <span className="wand-empty-note">Нечего чистить</span>}
+      <button className="toolbar-btn" title="Найти и заменить (Ctrl+F)" onClick={onFind}>
+        <IconSearch size={ICON} />
+      </button>
     </div>
   )
 }

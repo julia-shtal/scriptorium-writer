@@ -531,6 +531,33 @@ How it stays reliable and keeps the process boundary clean:
   `.docx` to the user-chosen path with the same temp-then-rename atomic write used
   everywhere else, so a failed export can't corrupt anything.
 
+### Find & Replace (M15)
+
+A non-modal find/replace bar for the **currently open chapter**. **Ctrl+F** opens it
+focused on the search field, **Ctrl+H** on the replace field; the toolbar's 🔍 button
+opens it too. The bar renders below the text (a sibling of the wand's action bar), so it
+*shrinks* the page rather than covering a highlighted match.
+
+- **Live highlighting.** Typing highlights every match via ProseMirror decorations
+  (the same technique as the wand preview — no text is changed while searching); the
+  active match gets a stronger highlight and is scrolled into view. A `N / M` counter
+  reports the true total.
+- **Navigation & keys.** **Enter / F3** → next, **Shift+Enter / Shift+F3** → previous
+  (both wrap around), **Ctrl+Alt+Enter** → replace all, **Esc** → close. F3 works with
+  the panel closed too, reopening it with the retained query.
+- **Options.** Case-sensitive (**Аа**) and whole-word (**|Слово|**) toggles, both
+  Cyrillic-aware. Matching is literal substring only (no regex), and never spans a
+  paragraph break or a footnote.
+- **Reliable by construction.** **Заменить** replaces the active match; **Заменить всё**
+  replaces every match in **one** transaction (a single Ctrl+Z reverts the lot), reusing
+  the wand's shared span-replace builder so marks at each match are preserved. Replacements
+  flow through the normal editor transaction path, so autosave, the dirty flag, and version
+  snapshots react automatically — no special-cased save path. The find bar and the wand bar
+  are mutually exclusive: opening one dismisses the other.
+
+Cross-chapter / whole-story replace and regex are intentionally out of scope for v1
+(a natural M16+ follow-up once full-text search exists).
+
 ### Project layout
 
 ```
@@ -559,6 +586,8 @@ src/
     store/                # zustand stores: editorStore, storyStore, settingsStore, uiStore, bootstrap
     editor/               # TipTap editor, toolbar, footer, SceneDivider + Footnote nodes
     editor/cleanup/       # M8 cleanup wand: rules, span diff, preview plugin, action bar
+    editor/shared/        # M15 shared span→transaction builder (wand + find, one undo step)
+    editor/find/          # M15 find & replace: match finder, highlight plugin, controller, bar
     editor/import/        # M14 import: markdown/html → ProseMirror JSON, split, orchestration
     views/                # EditorView, Library, Chapters, StoryInfo, Notes, Statistics, Settings, VersionHistory
     components/           # AppFrame (leather frame + grid), Sidebar

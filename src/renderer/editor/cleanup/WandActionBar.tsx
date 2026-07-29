@@ -38,13 +38,13 @@ export function WandActionBar({ wand }: { wand: WandController }): JSX.Element |
   if (!active) return null
 
   return (
-    <div className="wand-bar" role="dialog" aria-label="Предпросмотр чистки текста">
-      <span className="wand-bar-count">Найдено {fixLabel(spans.length)}</span>
-      <span className="wand-bar-spacer" />
-      <button className="wand-bar-btn ghost" onClick={cancel} title="Отмена (Esc)">
+    <div className="action-bar action-bar--wand" role="dialog" aria-label="Предпросмотр чистки текста">
+      <span className="action-bar-count">Найдено {fixLabel(spans.length)}</span>
+      <span className="action-bar-spacer" />
+      <button className="action-bar-btn ghost" onClick={cancel} title="Отмена (Esc)">
         Отмена
       </button>
-      <button className="wand-bar-btn primary" onClick={confirm} title="Применить (Enter)">
+      <button className="action-bar-btn primary" onClick={confirm} title="Применить (Enter)">
         Применить
       </button>
     </div>

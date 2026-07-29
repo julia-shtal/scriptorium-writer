@@ -7,9 +7,11 @@
 import { useCallback, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import { useEditorStore } from '@renderer/store/editorStore'
+import { useUiStore } from '@renderer/store/uiStore'
 import { computeSpans, type CleanupSpan } from './computeSpans'
 import { buildCleanupTransaction } from './applyCleanup'
 import { wandPreviewKey, type WandPreviewMeta } from './wandPreviewPlugin'
+import { findHighlightKey } from '../find/findHighlightPlugin'
 
 export interface WandController {
   /** Spans currently previewed (empty when not in preview). */
@@ -44,6 +46,15 @@ export function useWand(editor: Editor | null): WandController {
 
   const trigger = useCallback(() => {
     if (!editor) return
+    // Mutual-exclusion invariant (see FindReplaceBar): the wand bar and the find bar must
+    // never be on screen together — they share the screen slot and the Enter/Esc owner.
+    // Close find first. (The reciprocal half — find refusing to open over an active wand
+    // preview — lives in useFind.openPanel.)
+    const ui = useUiStore.getState()
+    if (ui.findOpen) {
+      ui.setFindOpen(false)
+      editor.view.dispatch(editor.state.tr.setMeta(findHighlightKey, null))
+    }
     const { selection, doc } = editor.state
     const range = selection.empty ? { from: 0, to: doc.content.size } : { from: selection.from, to: selection.to }
     const computed = computeSpans(doc, range)
