@@ -6,19 +6,30 @@ export interface BootstrapResult {
 }
 
 /**
- * Ensure there is something to edit on startup. If a story already exists, open its
- * first chapter (creating one if it somehow has none). If the library is empty, seed
- * a demo story ONLY on a genuine first run (tracked by `settings.demoSeeded`); once
- * that flag is set, an empty library (e.g. because the user deleted everything) stays
- * empty instead of resurrecting the demo. This is the M2 stand-in for the
- * Library/Chapters navigation that arrives in M6.
+ * Ensure there is something to edit on startup. If a story already exists, prefer
+ * reopening whatever the user last had open (`settings.lastOpenedStoryId` /
+ * `lastOpenedChapterId`), falling back to the first story/chapter when there's no
+ * recorded choice or it no longer exists (e.g. deleted since). If the library is
+ * empty, seed a demo story ONLY on a genuine first run (tracked by
+ * `settings.demoSeeded`); once that flag is set, an empty library (e.g. because the
+ * user deleted everything) stays empty instead of resurrecting the demo. This is the
+ * M2 stand-in for the Library/Chapters navigation that arrives in M6.
  */
 export async function bootstrapLibrary(): Promise<BootstrapResult> {
   const stories = await window.api.listStories()
+  const settings = await window.api.readSettings()
 
   if (stories.length > 0) {
-    const story = await window.api.readStory(stories[0].id)
-    let chapterId = story.chapterOrder[0]
+    const lastStorySummary = settings.lastOpenedStoryId
+      ? stories.find((s) => s.id === settings.lastOpenedStoryId)
+      : undefined
+    const targetStoryId = lastStorySummary ? lastStorySummary.id : stories[0].id
+
+    const story = await window.api.readStory(targetStoryId)
+    let chapterId =
+      settings.lastOpenedChapterId && story.chapterOrder.includes(settings.lastOpenedChapterId)
+        ? settings.lastOpenedChapterId
+        : story.chapterOrder[0]
     if (!chapterId) {
       const chapter = await window.api.createChapter(story.id, 'Глава 1')
       chapterId = chapter.id
@@ -29,7 +40,6 @@ export async function bootstrapLibrary(): Promise<BootstrapResult> {
   // Empty library: seed the demo only on a genuine first run. Once the user has
   // deleted everything (demoSeeded already set), leave the library empty instead of
   // resurrecting a story they deliberately removed.
-  const settings = await window.api.readSettings()
   if (settings.demoSeeded) {
     return { storyId: null, chapterId: null }
   }

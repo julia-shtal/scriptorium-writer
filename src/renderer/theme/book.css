@@ -400,7 +400,22 @@ body {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 8px;
+}
+.modal-danger {
+  background: var(--danger);
+  color: #fbf6ea;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 16px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.modal-danger:hover {
+  background: color-mix(in srgb, var(--danger) 85%, black);
 }
 
 /* --- Import dialog (M14.1) --- */
@@ -694,6 +709,22 @@ body {
   background: var(--page-bg);
   color: var(--ink);
 }
+.library-create input::placeholder {
+  /* ~75% ink clears WCAG AA ~4.5:1 against --page-bg; color-mix blends in
+     gamma-encoded sRGB, so a lower ratio (e.g. 60%) falls short of 4.5:1. */
+  color: color-mix(in srgb, var(--ink) 75%, var(--page-bg));
+  opacity: 1;
+}
+.library-create .linkish {
+  background: var(--accent);
+  color: #fbf6ea;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.library-create .linkish:disabled {
+  opacity: 0.45;
+}
 .library-list {
   list-style: none;
   margin: 0;
@@ -701,7 +732,9 @@ body {
   overflow-y: auto;
 }
 .library-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 140px 90px 28px;
+  /* title | status chip | chapters·words | date | delete icon */
   align-items: center;
   gap: 14px;
   padding: 10px 6px;
@@ -714,17 +747,27 @@ body {
 .library-card-title {
   font-weight: 500;
   color: var(--ink-heading);
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* Keep the pill its natural width inside a fixed column; align its left edge. */
+.library-card .chip {
+  justify-self: start;
 }
 .library-meta {
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: 12.5px;
   white-space: nowrap;
+  /* Trailing edge (not the variable leading edge) is what lines up across rows. */
+  justify-self: end;
+  text-align: right;
+}
+/* Delete icon centered in its fixed trailing column. */
+.library-card > .linkish {
+  justify-self: center;
 }
 .library-confirm {
   display: inline-flex;
@@ -796,9 +839,11 @@ body {
   overflow-y: auto;
 }
 .chapters-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 64px 32px 64px 32px;
+  /* grip | title | "открыть" | export icon | word count | delete icon */
+  column-gap: 14px;
   align-items: center;
-  gap: 10px;
   padding: 8px 6px;
   border-bottom: 1px solid var(--rule);
 }
@@ -811,7 +856,6 @@ body {
   flex-shrink: 0;
 }
 .chapters-title-input {
-  flex: 1;
   min-width: 0;
   font: inherit;
   font-size: 14px;
@@ -827,6 +871,10 @@ body {
 }
 .chapters-open {
   white-space: nowrap;
+  justify-self: start;
+}
+.chapters-row .export-menu {
+  justify-self: center;
 }
 .chapters-export {
   opacity: 0;
@@ -851,6 +899,8 @@ body {
   font-family: var(--font-sans);
   font-size: 12.5px;
   white-space: nowrap;
+  justify-self: end;
+  text-align: right;
 }
 .chapters-confirm {
   display: inline-flex;
@@ -860,6 +910,9 @@ body {
   font-size: 12.5px;
   color: var(--muted);
   white-space: nowrap;
+}
+.chapters-row > .linkish:last-child {
+  justify-self: center;
 }
 
 /* --- Story info view (M6) --- */
