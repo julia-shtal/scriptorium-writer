@@ -9,6 +9,7 @@ export type ViewId =
   | 'versions'
   | 'notes'
   | 'statistics'
+  | 'search'
   | 'library'
   | 'settings'
 
