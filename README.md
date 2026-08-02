@@ -339,9 +339,12 @@ pure `(text) => string` rules over the selection — or the whole chapter when n
 selected — and applies them as **one undoable transaction** behind an inline diff preview.
 Rules: collapse multiple spaces, normalize punctuation spacing, fix stray spaces in
 hyphenated words, `-` → em dash `—`, trailing-whitespace trim, and straight double quotes
-`"` → Russian guillemets «…». Span computation is a hand-rolled char-level diff (no new
-dependency); text content only — marks and node structure are never altered. Preview is
-decoration-only and suppresses autosave so no snapshot of the uncommitted state is taken.
+`"` → Russian guillemets «…». A separate paragraph-start pass also converts a leading
+dialogue hyphen (`- Слово` → `— Слово`), applied by `computeSpans.ts` only to a paragraph's
+first text node so mid-paragraph hyphens and `-нибудь` stay untouched. Span computation is a
+hand-rolled char-level diff (no new dependency); text content only — marks and node
+structure are never altered. Preview is decoration-only and suppresses autosave so no
+snapshot of the uncommitted state is taken.
 
 **Find & Replace.** A non-modal bar for the open chapter (**Ctrl+F** / **Ctrl+H**, or the
 🔍 toolbar button) rendered below the text so it shrinks the page rather than covering a
@@ -366,6 +369,16 @@ folder into one `.zip` (via `archiver`), including `.trash/`, reproducing the on
 file and renames over the destination only once complete, so a failure never touches the
 source or leaves a truncated archive.
 
+**Markdown backup (.md shadow).** Every successful chapter save also writes a
+human-readable Markdown copy beside the `.json` canon, through the same temp-then-rename
+atomic write (`src/main/markdown.ts`). Bold/italic/strike map to standard Markdown, the
+scene divider to `---`, and footnotes to `[^n]` markers plus a definitions block (reusing
+`src/shared/footnote-markdown.ts`); paragraph alignment is intentionally dropped — which is
+why the canon stays JSON. The `.md` write is **best-effort**: a failure never fails the save
+or touches the canon, surfacing only as a soft «копия .md не сохранена» warning, and
+soft-delete / reorder keep the `.md` sibling in sync with its `.json`. v1 never re-imports
+from `.md`.
+
 **Typographic quotes.** A cleanup-wand rule turns straight double quotes `"` into Russian
 guillemets «…», pairing by open/close alternation per text node. Narrow by design: only
 `"` (U+0022) is touched; single quotes/apostrophes are left alone. Runs after the em-dash
@@ -387,12 +400,59 @@ brings the full info line (with «повторить») back, so failures are ne
 </details>
 
 <details>
-<summary>Milestone history (M0–M13)</summary>
+<summary>Milestone history (M0–M23)</summary>
+
+**M23 — Cleanup wand: leading dialogue dash.** A separate paragraph-start pass converts a
+leading dialogue hyphen (`- Слово` → `— Слово`, the Russian dialogue convention) to an em
+dash, applied by `computeSpans.ts` only to a paragraph's first text node — so mid-paragraph
+hyphens (still the existing `-`→`—` rule's job) and hyphenated words like `-нибудь` are left
+untouched.
+
+**M22 — Stable «Сохранить» button.** Removes the save-button opacity flicker that fired on
+every autosave tick (most visible in minimal footer mode, where the button is the only
+footer element). Purely cosmetic — the underlying `flush()` already serializes concurrent
+saves, so nothing in the data-layer save path changed.
+
+**M21 — Editor scroll containment.** Contains scrolling to the writing surface so the
+toolbar and chapter header (title, chapter switcher, history/focus/export icons) stay put
+while typing near the bottom of a long chapter, with reliable caret auto-follow. Scoped to
+the editor view only; other views' scrolling is unchanged.
+
+**M20 — Minimal footer mode.** A persistent «Минимальная нижняя панель» preference
+(`Settings.hideEditorFooterInfo`) that hides the footer's info line (word count, save
+status, spellcheck badge) while keeping the «Сохранить» button. A save **error** overrides
+the hidden state so failures are never silent.
+
+**M17 — Quote typography (wand rule).** A new wand rule converting straight double quotes
+`"` to Russian guillemets «…» by open/close alternation per text node; narrow by design —
+only `"` (U+0022) is touched, apostrophes/single quotes are left alone. Runs after the
+em-dash rule through the same preview + single-transaction path.
+
+**M15 — Find & Replace.** A non-modal in-chapter find/replace bar (**Ctrl+F** / **Ctrl+H**)
+with live decoration highlighting, an accurate `N / M` counter, Enter/F3 wrapping
+navigation, case-sensitive and whole-word (Cyrillic-aware) toggles, and a single-transaction
+Replace-all reusing the wand's shared span-replace builder — so autosave/dirty/snapshots
+react automatically.
+
+**M14 — Import & export (.docx / .md).** Import a `.md`/`.docx` file as one chapter or split
+it by top-level headings, and export any chapter or the whole story to `.docx` with native
+Word footnotes (also includes the M14.1 UX consolidation). Imports go through the exact
+`createChapter` + `saveChapter` atomic-write path; export reads canon only and never touches
+the source library.
 
 **M13 — Library export.** A one-click "Экспортировать библиотеку" action in Settings
 streams the whole library folder into a single `.zip` via `archiver`, including `.trash/`,
 reproducing the on-disk layout exactly on extraction; writes to a `.part` file and renames
 over the destination only once complete.
+
+**M12 — Auto-update.** Packaged builds check GitHub Releases in the background via
+`electron-updater`'s GitHub provider (no separate update server). The check never blocks or
+delays launch (skipped in dev, fire-and-forget in packaged builds); a downloaded update
+shows a dismissible restart notice that routes through the M5 quit-guard flush.
+
+**M9 — Packaging & release.** A Windows **NSIS** installer with app icon and per-user
+install, bundling `resources/dictionaries` so offline spellcheck works in the packaged app,
+plus a "Reveal library in Explorer" action in Settings.
 
 **M8 — Cleanup wand (minimal rules).** The toolbar wand runs a pluggable, ordered set of
 pure text-cleanup rules over the selection — or the whole chapter when nothing is selected
