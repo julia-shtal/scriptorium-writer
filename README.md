@@ -450,6 +450,11 @@ over the destination only once complete.
 delays launch (skipped in dev, fire-and-forget in packaged builds); a downloaded update
 shows a dismissible restart notice that routes through the M5 quit-guard flush.
 
+**M10 — electron-vite 5 / Vite upgrade.** Moved the build toolchain onto
+`electron-vite@5` (Vite 7 / Vitest 3), clearing the old dev-server-only Vite advisory
+flagged under *Known residual*; the M4 spellcheck dict-server and `configureSpellcheck()`
+ordering were verified unchanged, and `npm audit` now reports 0 vulnerabilities.
+
 **M9 — Packaging & release.** A Windows **NSIS** installer with app icon and per-user
 install, bundling `resources/dictionaries` so offline spellcheck works in the packaged app,
 plus a "Reveal library in Explorer" action in Settings.
