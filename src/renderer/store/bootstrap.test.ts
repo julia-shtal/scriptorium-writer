@@ -9,14 +9,86 @@ describe('bootstrapLibrary', () => {
     const readStory = vi.fn(async () => ({ id: 's1', chapterOrder: ['c1', 'c2'] }))
     const createStory = vi.fn()
     const createChapter = vi.fn()
+    const readSettings = vi.fn(async () => ({}))
     vi.stubGlobal('window', {
-      api: { listStories, readStory, createStory, createChapter }
+      api: { listStories, readStory, createStory, createChapter, readSettings }
     })
 
     const result = await bootstrapLibrary()
 
     expect(result).toEqual({ storyId: 's1', chapterId: 'c1' })
     expect(createStory).not.toHaveBeenCalled()
+  })
+
+  test('prefers lastOpenedStoryId/lastOpenedChapterId when both are still valid', async () => {
+    const listStories = vi.fn(async () => [{ id: 's1' }, { id: 's2' }])
+    const readStory = vi.fn(async (id: string) => {
+      if (id === 's1') return { id: 's1', chapterOrder: ['c1', 'c2'] }
+      if (id === 's2') return { id: 's2', chapterOrder: ['c3', 'c4'] }
+      throw new Error(`unexpected story id: ${id}`)
+    })
+    const createStory = vi.fn()
+    const createChapter = vi.fn()
+    const readSettings = vi.fn(async () => ({
+      lastOpenedStoryId: 's2',
+      lastOpenedChapterId: 'c4'
+    }))
+    vi.stubGlobal('window', {
+      api: { listStories, readStory, createStory, createChapter, readSettings }
+    })
+
+    const result = await bootstrapLibrary()
+
+    expect(result).toEqual({ storyId: 's2', chapterId: 'c4' })
+    expect(createStory).not.toHaveBeenCalled()
+    expect(createChapter).not.toHaveBeenCalled()
+  })
+
+  test('falls back to the first story when lastOpenedStoryId no longer exists', async () => {
+    const listStories = vi.fn(async () => [{ id: 's1' }, { id: 's2' }])
+    const readStory = vi.fn(async (id: string) => {
+      if (id === 's1') return { id: 's1', chapterOrder: ['c1', 'c2'] }
+      if (id === 's2') return { id: 's2', chapterOrder: ['c3', 'c4'] }
+      throw new Error(`unexpected story id: ${id}`)
+    })
+    const createStory = vi.fn()
+    const createChapter = vi.fn()
+    const readSettings = vi.fn(async () => ({
+      lastOpenedStoryId: 'deleted-story',
+      lastOpenedChapterId: 'c99'
+    }))
+    vi.stubGlobal('window', {
+      api: { listStories, readStory, createStory, createChapter, readSettings }
+    })
+
+    const result = await bootstrapLibrary()
+
+    expect(result).toEqual({ storyId: 's1', chapterId: 'c1' })
+    expect(createStory).not.toHaveBeenCalled()
+    expect(createChapter).not.toHaveBeenCalled()
+  })
+
+  test('falls back to chapterOrder[0] when lastOpenedChapterId is stale', async () => {
+    const listStories = vi.fn(async () => [{ id: 's1' }])
+    const readStory = vi.fn(async (id: string) => {
+      if (id === 's1') return { id: 's1', chapterOrder: ['c1', 'c2'] }
+      throw new Error(`unexpected story id: ${id}`)
+    })
+    const createStory = vi.fn()
+    const createChapter = vi.fn()
+    const readSettings = vi.fn(async () => ({
+      lastOpenedStoryId: 's1',
+      lastOpenedChapterId: 'deleted-chapter'
+    }))
+    vi.stubGlobal('window', {
+      api: { listStories, readStory, createStory, createChapter, readSettings }
+    })
+
+    const result = await bootstrapLibrary()
+
+    expect(result).toEqual({ storyId: 's1', chapterId: 'c1' })
+    expect(createStory).not.toHaveBeenCalled()
+    expect(createChapter).not.toHaveBeenCalled()
   })
 
   test('seeds a demo story + one chapter when the library is empty', async () => {

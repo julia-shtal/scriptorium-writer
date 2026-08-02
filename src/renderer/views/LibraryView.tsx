@@ -3,6 +3,7 @@ import { IconBooks, IconTrash, IconPlus } from '@tabler/icons-react'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { ConfirmDialog } from '@renderer/components/ConfirmDialog'
 import type { StorySummary } from '@shared/types'
 import { STATUS_RU, formatDate } from './format'
 
@@ -39,6 +40,9 @@ export function LibraryView(): JSX.Element {
     await refresh()
   }
 
+  // The story targeted by the open delete-confirmation dialog, if it's still present.
+  const confirmTarget = confirmId ? rows.find((x) => x.id === confirmId) : undefined
+
   return (
     <div className="library-view">
       <div className="library-head">
@@ -66,31 +70,27 @@ export function LibraryView(): JSX.Element {
               {r.chapterCount} гл · {r.wordCount} сл
             </span>
             <span className="library-meta">{formatDate(r.updatedAt)}</span>
-            {confirmId === r.id ? (
-              <span className="library-confirm" onClick={(e) => e.stopPropagation()}>
-                Удалить?{' '}
-                <button className="linkish" onClick={() => void remove(r.id)}>
-                  да
-                </button>
-                <button className="linkish" onClick={() => setConfirmId(null)}>
-                  нет
-                </button>
-              </span>
-            ) : (
-              <button
-                className="linkish"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setConfirmId(r.id)
-                }}
-              >
-                <IconTrash size={15} />
-              </button>
-            )}
+            <button
+              className="linkish"
+              onClick={(e) => {
+                e.stopPropagation()
+                setConfirmId(r.id)
+              }}
+            >
+              <IconTrash size={15} />
+            </button>
           </li>
         ))}
         {rows.length === 0 && <li className="library-empty">Пока нет работ. Создайте первую.</li>}
       </ul>
+      {confirmTarget && (
+        <ConfirmDialog
+          title="Удалить работу?"
+          message={`«${confirmTarget.title}» будет перемещена в корзину.`}
+          onConfirm={() => void remove(confirmTarget.id)}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
     </div>
   )
 }

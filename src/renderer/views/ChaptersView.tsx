@@ -5,6 +5,7 @@ import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { ExportMenu } from '@renderer/editor/ExportMenu'
+import { ConfirmDialog } from '@renderer/components/ConfirmDialog'
 import { ImportDialog } from './ImportDialog'
 
 type ImportPayload = Extract<ImportFileResult, { canceled: false }>
@@ -44,6 +45,9 @@ export function ChaptersView(): JSX.Element {
     if (result.canceled) return
     setImportFile(result)
   }
+
+  // The chapter targeted by the open delete-confirmation dialog, if it's still present.
+  const confirmTarget = confirmId ? chapters.find((x) => x.id === confirmId) : undefined
 
   return (
     <div className="chapters-view">
@@ -87,27 +91,9 @@ export function ChaptersView(): JSX.Element {
               triggerClassName="chapters-export"
             />
             <span className="chapters-words">{c.wordCount} сл</span>
-            {confirmId === c.id ? (
-              <span className="chapters-confirm">
-                удалить?{' '}
-                <button
-                  className="linkish"
-                  onClick={() => {
-                    void useStoryStore.getState().removeChapter(c.id)
-                    setConfirmId(null)
-                  }}
-                >
-                  да
-                </button>
-                <button className="linkish" onClick={() => setConfirmId(null)}>
-                  нет
-                </button>
-              </span>
-            ) : (
-              <button className="linkish" onClick={() => setConfirmId(c.id)}>
-                <IconTrash size={15} />
-              </button>
-            )}
+            <button className="linkish" onClick={() => setConfirmId(c.id)}>
+              <IconTrash size={15} />
+            </button>
           </li>
         ))}
       </ul>
@@ -116,6 +102,17 @@ export function ChaptersView(): JSX.Element {
           storyId={story.id}
           file={importFile}
           onClose={() => setImportFile(null)}
+        />
+      )}
+      {confirmTarget && (
+        <ConfirmDialog
+          title="Удалить главу?"
+          message={`«${confirmTarget.title || 'Без названия'}» будет перемещена в корзину.`}
+          onConfirm={() => {
+            void useStoryStore.getState().removeChapter(confirmTarget.id)
+            setConfirmId(null)
+          }}
+          onCancel={() => setConfirmId(null)}
         />
       )}
     </div>

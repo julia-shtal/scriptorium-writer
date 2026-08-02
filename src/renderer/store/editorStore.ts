@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ProseMirrorJSON, SaveResult } from '@shared/types'
 import { countWords, countWordsInText } from '@shared/word-count'
+import { useSettingsStore } from './settingsStore'
 
 /** Footer save-status states. */
 export type SaveStatus = 'idle' | 'editing' | 'saving' | 'saved' | 'error'
@@ -89,6 +90,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionWordCount: 0,
       saveStatus: 'idle'
     })
+    // Fire-and-forget: remember the last-opened story/chapter for next launch. Guard
+    // against the very first boot (before settingsStore.load() has run) explicitly,
+    // even though update() itself already no-ops when settings is null.
+    if (useSettingsStore.getState().settings) {
+      // Best-effort, non-critical write: swallow rejections so a failed settings save
+      // (disk full, permissions) never surfaces as an unhandled rejection on chapter
+      // open. Losing this pointer only falls launch back to the first story.
+      void useSettingsStore
+        .getState()
+        .update({ lastOpenedStoryId: storyId, lastOpenedChapterId: chapterId })
+        .catch(() => {})
+    }
   },
 
   applyDocUpdate: (doc, selectionText) => {

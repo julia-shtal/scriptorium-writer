@@ -134,6 +134,10 @@ export interface Settings {
   demoSeeded?: boolean
   /** Hide the footer's info line (word count, save status, language badge), keeping only «Сохранить». Persistent, independent of focus mode. */
   hideEditorFooterInfo?: boolean
+  /** Id of the story the user last had open, so launch can reopen it instead of stories[0]. */
+  lastOpenedStoryId?: string
+  /** Id of the chapter the user last had open within `lastOpenedStoryId`. */
+  lastOpenedChapterId?: string
   schemaVersion: number
 }
 
