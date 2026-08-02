@@ -8,6 +8,7 @@ import {
   IconHistory,
   IconNotebook,
   IconChartBar,
+  IconSearch,
   IconBooks,
   IconSettings
 } from '@tabler/icons-react'
@@ -26,6 +27,7 @@ const WORK: NavDef[] = [
   { id: 'story', label: 'О работе', icon: <IconInfoCircle size={17} /> },
   { id: 'versions', label: 'История версий', icon: <IconHistory size={17} /> },
   { id: 'notes', label: 'Заметки', icon: <IconNotebook size={17} /> },
+  { id: 'search', label: 'Поиск', icon: <IconSearch size={17} /> },
   { id: 'statistics', label: 'Статистика', icon: <IconChartBar size={17} /> }
 ]
 const GENERAL: NavDef[] = [

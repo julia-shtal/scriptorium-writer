@@ -1147,3 +1147,24 @@ fieldset.settings-field {
 .settings-note--error {
   color: var(--danger);
 }
+
+/* M16 — full-text search */
+.search-view { padding: 28px 34px; overflow-y: auto; }
+.search-head { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+.search-input {
+  flex: 1; padding: 7px 10px; font: inherit;
+  color: var(--ink); background: var(--page-bg);
+  border: 1px solid var(--book-frame); border-radius: 6px;
+}
+.search-note { color: var(--ink); opacity: 0.7; margin: 10px 0; }
+.search-results { list-style: none; margin: 0; padding: 0; }
+.search-result {
+  padding: 10px 12px; border-radius: 6px; cursor: pointer;
+  border-bottom: 1px solid var(--book-frame);
+}
+.search-result:hover { background: var(--sidebar-bg); }
+.search-result-head { display: flex; justify-content: space-between; gap: 12px; }
+.search-result-label { font-weight: 600; color: var(--accent); }
+.search-result-count { opacity: 0.6; }
+.search-snippet { margin-top: 4px; opacity: 0.85; }
+.search-snippet mark { background: var(--accent); color: var(--page-bg); padding: 0 2px; border-radius: 2px; }

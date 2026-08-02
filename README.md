@@ -55,6 +55,7 @@ a full disk, or closing the laptop mid-save can never corrupt what you already w
 | **Navigation & views** | Sidebar router: Editor, Chapters (native drag-to-reorder), Story info, Notes codex, Statistics + writing streak, Library, Settings — settings apply live. |
 | **Cleanup wand** | Runs pluggable text-cleanup rules (spacing, punctuation, `-`→`—` em dash, straight `"` → «guillemets») over a selection or the whole chapter as one undoable transaction behind a diff preview. |
 | **Find & Replace** | Non-modal bar with live highlighting, case-sensitive / whole-word (Cyrillic-aware) toggles, and a single-transaction Replace-all. |
+| **Full-text search** | Read-only «Поиск» view sweeps every chapter's canon and all Notes sections for a phrase, listing per-source hit counts with context snippets; a chapter hit opens the chapter with the Find bar seeded to highlight in place. |
 | **Import / Export** | Import a `.md`/`.docx` file as one chapter or split by headings; export any chapter or the whole story to `.docx`/`.md`. |
 | **Library backup** | One click zips the entire library folder (stories, snapshots, notes, `.trash/`) to a chosen path — atomic, read-only against your data. |
 | **Auto-update** | Packaged builds check GitHub Releases in the background and offer a dismissible restart that routes through the same quit-guard flush. |
@@ -326,8 +327,8 @@ regardless of suffix — surviving Chromium version bumps. Dictionaries
 offline spellcheck works in packaged builds too.
 
 **Navigation & views.** The sidebar drives a view router keyed on `uiStore.activeView`:
-**РАБОТА** (Editor, Chapters, Story info, Version history, Notes, Statistics) and **ОБЩЕЕ**
-(Library, Settings). Chapters supports native HTML5 drag-to-reorder (no dependency). Notes
+**РАБОТА** (Editor, Chapters, Story info, Version history, Notes, Search, Statistics) and
+**ОБЩЕЕ** (Library, Settings). Chapters supports native HTML5 drag-to-reorder (no dependency). Notes
 is a per-story codex (characters / locations / world / timeline + scratchpad), saved
 debounced. Statistics shows totals, a per-chapter breakdown, and a daily writing streak
 (streak data in renderer `localStorage`, not part of the canon). Settings apply live via
@@ -353,6 +354,17 @@ Enter/F3 navigation (wrapping), case-sensitive and whole-word (Cyrillic-aware) t
 Matching is literal substring, never spanning a paragraph break or footnote. Replace-all
 runs in one transaction (one Ctrl+Z) reusing the wand's shared span-replace builder, so
 autosave/dirty/snapshots react automatically.
+
+**Full-text search.** The «Поиск» sidebar view runs a read-only, in-memory sweep of the
+open story on submit: every chapter's canon plus every Notes section (characters, locations,
+world, timeline, scratch). Chapters and notes are read through `window.api` and never
+written — a pure read that cannot corrupt the library; a chapter that fails to read is
+skipped and surfaced as a soft "couldn't read part of the work" notice rather than
+blanking results. Matching is literal, case-insensitive substring over the same canon
+text-walker word count uses (`extractPlainText`), so the two always agree on "the text";
+results are one row per source with an occurrence count and a context snippet. Clicking a
+chapter result opens it in the editor and seeds the M15 Find bar so the matches highlight
+in place; a notes result lands on the Notes view.
 
 **Import & export (.docx / .md).** Import a single `.md`/`.docx` file as one chapter, or
 split it into one chapter per top-level heading, with a preview dialog before confirming.
@@ -427,6 +439,15 @@ the hidden state so failures are never silent.
 `"` to Russian guillemets «…» by open/close alternation per text node; narrow by design —
 only `"` (U+0022) is touched, apostrophes/single quotes are left alone. Runs after the
 em-dash rule through the same preview + single-transaction path.
+
+**M16 — Full-text search.** A read-only «Поиск» sidebar view that sweeps the whole open
+story on submit — every chapter's canon plus every Notes section — for a literal,
+case-insensitive substring, returning one row per source with an occurrence count and a
+context snippet. Reuses the shared canon walker (`extractPlainText`, factored out of the
+word-count code so search and word count agree on "the text") and never calls a write API,
+so it cannot corrupt the library; a chapter that fails to read is skipped and reported as a
+soft notice. A chapter hit opens the chapter and seeds the M15 Find bar to highlight matches
+in place; a notes hit lands on the Notes view.
 
 **M15 — Find & Replace.** A non-modal in-chapter find/replace bar (**Ctrl+F** / **Ctrl+H**)
 with live decoration highlighting, an accurate `N / M` counter, Enter/F3 wrapping

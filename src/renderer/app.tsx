@@ -7,6 +7,7 @@ import { ChaptersView } from '@renderer/views/ChaptersView'
 import { StoryInfoView } from '@renderer/views/StoryInfoView'
 import { NotesView } from '@renderer/views/NotesView'
 import { StatisticsView } from '@renderer/views/StatisticsView'
+import { SearchView } from '@renderer/views/SearchView'
 import { SettingsView } from '@renderer/views/SettingsView'
 import { RecoveryDialog } from '@renderer/components/RecoveryDialog'
 import { UpdateNotice } from '@renderer/components/UpdateNotice'
@@ -67,6 +68,7 @@ export default function App(): JSX.Element {
       case 'story': return <StoryInfoView />
       case 'notes': return <NotesView />
       case 'statistics': return <StatisticsView />
+      case 'search': return <SearchView />
       case 'versions': return <VersionHistoryView />
       case 'editor':
       default: return <EditorView />
