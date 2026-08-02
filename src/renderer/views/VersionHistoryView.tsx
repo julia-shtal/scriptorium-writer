@@ -4,6 +4,10 @@ import { IconArrowBackUp, IconHistory, IconRestore } from '@tabler/icons-react'
 import { bookExtensions } from '@renderer/editor/extensions/bookExtensions'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 import type { VersionSummary } from '@shared/types'
 import { formatDateTime } from './format'
 
@@ -14,6 +18,8 @@ export function VersionHistoryView(): JSX.Element {
   const chapterId = useEditorStore((s) => s.chapterId)
   const openChapter = useEditorStore((s) => s.openChapter)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
+  const t = useT()
 
   const [versions, setVersions] = useState<VersionSummary[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -32,7 +38,7 @@ export function VersionHistoryView(): JSX.Element {
   }, [storyId, chapterId])
 
   if (!storyId || !chapterId) {
-    return <div style={{ padding: 34 }}>Нет открытой главы.</div>
+    return <div style={{ padding: 34 }}>{t.versions.noChapter}</div>
   }
 
   const preview = async (versionId: string): Promise<void> => {
@@ -56,10 +62,10 @@ export function VersionHistoryView(): JSX.Element {
     <div className="history-view">
       <div className="history-head">
         <span className="history-title">
-          <IconHistory size={18} /> История версий · {versions.length}
+          <IconHistory size={18} /> {format(t.versions.heading, { count: String(versions.length) })}
         </span>
         <button className="linkish" onClick={() => setActiveView('editor')}>
-          <IconArrowBackUp size={16} /> к редактору
+          <IconArrowBackUp size={16} /> {t.versions.toEditor}
         </button>
       </div>
       <div className="history-body">
@@ -70,8 +76,8 @@ export function VersionHistoryView(): JSX.Element {
               className={v.versionId === selected ? 'active' : ''}
               onClick={() => void preview(v.versionId)}
             >
-              <span>{formatDateTime(v.savedAt)}</span>
-              <span className="history-words">{v.wordCount} сл.</span>
+              <span>{formatDateTime(v.savedAt, language)}</span>
+              <span className="history-words">{v.wordCount} {plural(v.wordCount, t.plurals.words, language)}</span>
               <button
                 className="linkish"
                 disabled={busy}
@@ -80,14 +86,14 @@ export function VersionHistoryView(): JSX.Element {
                   void restore(v.versionId)
                 }}
               >
-                <IconRestore size={15} /> восстановить
+                <IconRestore size={15} /> {t.versions.restore}
               </button>
             </li>
           ))}
-          {versions.length === 0 && <li className="history-empty">Снимков пока нет.</li>}
+          {versions.length === 0 && <li className="history-empty">{t.versions.empty}</li>}
         </ul>
         <div className="history-preview">
-          {selected ? <EditorContent editor={previewEditor} /> : <p>Выберите снимок слева для просмотра.</p>}
+          {selected ? <EditorContent editor={previewEditor} /> : <p>{t.versions.selectPrompt}</p>}
         </div>
       </div>
     </div>

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { IconFileImport } from '@tabler/icons-react'
 import type { ImportFileResult } from '@shared/types'
 import { useStoryStore } from '@renderer/store/storyStore'
+import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 import {
   planImportChapters,
   commitImport,
@@ -22,6 +26,8 @@ interface Props {
  * commit still reloads so any partially-created chapters remain visible/deletable.
  */
 export function ImportDialog({ storyId, file, onClose }: Props): JSX.Element {
+  const t = useT()
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
   const [mode, setMode] = useState<ImportMode>('single')
   const [committing, setCommitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,9 +61,7 @@ export function ImportDialog({ storyId, file, onClose }: Props): JSX.Element {
       } catch {
         // ignore — showing the error still matters more than a fresh list here
       }
-      setError(
-        'Не удалось импортировать файл целиком. Возможно, он повреждён или в неподдерживаемом формате; часть глав могла быть создана.'
-      )
+      setError(t.errors.importFailed)
     } finally {
       // Always clear the in-flight flag so the dialog can never strand disabled. On the
       // success path onClose() has already unmounted, making this a harmless no-op.
@@ -73,7 +77,7 @@ export function ImportDialog({ storyId, file, onClose }: Props): JSX.Element {
     <div className="modal-backdrop" onClick={() => !committing && onClose()}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
-          <IconFileImport size={20} /> Импорт
+          <IconFileImport size={20} /> {t.importDialog.title}
         </h2>
 
         <div className="import-modes">
@@ -85,7 +89,7 @@ export function ImportDialog({ storyId, file, onClose }: Props): JSX.Element {
               disabled={committing}
               onChange={() => setMode('single')}
             />
-            Одним файлом → одна глава
+            {t.importDialog.modeSingle}
           </label>
           <label className="import-mode">
             <input
@@ -95,36 +99,38 @@ export function ImportDialog({ storyId, file, onClose }: Props): JSX.Element {
               disabled={committing}
               onChange={() => setMode('split')}
             />
-            Разбить по заголовкам на отдельные главы
+            {t.importDialog.modeSplit}
           </label>
         </div>
 
         <div className="import-preview">
-          <div className="import-preview-count">Будет создано {count} глав:</div>
+          <div className="import-preview-count">
+            {format(t.importDialog.previewCount, {
+              count: String(count),
+              chapters: plural(count, t.plurals.chapters, language)
+            })}
+          </div>
           <ul className="import-preview-list">
             {planned.map((ch, i) => (
-              <li key={`${ch.title}-${i}`}>{ch.title || 'Без названия'}</li>
+              <li key={`${ch.title}-${i}`}>{ch.title || t.importDialog.untitled}</li>
             ))}
           </ul>
         </div>
 
         {showSplitWarning && (
-          <div className="import-warn">
-            Импорт применяется по одной главе, поэтому если он прервётся на середине, уже
-            созданные главы останутся.
-          </div>
+          <div className="import-warn">{t.importDialog.splitWarning}</div>
         )}
         {showLossyNotice && (
-          <div className="import-warn">Часть форматирования могла не сохраниться при импорте.</div>
+          <div className="import-warn">{t.importDialog.lossyNotice}</div>
         )}
         {error && <div className="import-warn import-warn--error">{error}</div>}
 
         <div className="modal-actions">
           <button className="linkish" disabled={committing} onClick={onClose}>
-            Отмена
+            {t.importDialog.cancel}
           </button>
           <button className="linkish" disabled={committing} onClick={() => void confirm()}>
-            {committing ? 'Импорт…' : 'Импортировать'}
+            {committing ? t.importDialog.committing : t.importDialog.commit}
           </button>
         </div>
       </div>

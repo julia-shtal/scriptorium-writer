@@ -5,7 +5,7 @@ import type { Settings } from '@shared/types'
 const base: Settings = {
   theme: 'book', autosaveIntervalMs: 120000, autosaveDebounceMs: 2000,
   spellLanguages: ['ru', 'en-US'], editorFontFamily: 'PT Serif', editorFontSizePx: 19,
-  maxVersionsPerChapter: 20, libraryPath: '/lib', schemaVersion: 1
+  maxVersionsPerChapter: 20, libraryPath: '/lib', language: 'ru', schemaVersion: 1
 }
 
 // No jsdom in this repo (vitest.config.ts runs `environment: 'node'`); fake just the

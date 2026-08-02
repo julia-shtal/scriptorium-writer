@@ -4,21 +4,17 @@
 // cancels the whole diff. Enter = Confirm, Esc = Cancel while it's on screen.
 
 import { useEffect } from 'react'
+import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 import type { WandController } from './useWand'
-
-/** Russian pluralization for "N исправлений". */
-function fixLabel(n: number): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  let word = 'исправлений'
-  if (mod10 === 1 && mod100 !== 11) word = 'исправление'
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = 'исправления'
-  return `${n} ${word}`
-}
 
 export function WandActionBar({ wand }: { wand: WandController }): JSX.Element | null {
   const { spans, confirm, cancel } = wand
   const active = spans.length > 0
+  const t = useT()
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
 
   useEffect(() => {
     if (!active) return
@@ -38,14 +34,18 @@ export function WandActionBar({ wand }: { wand: WandController }): JSX.Element |
   if (!active) return null
 
   return (
-    <div className="action-bar action-bar--wand" role="dialog" aria-label="Предпросмотр чистки текста">
-      <span className="action-bar-count">Найдено {fixLabel(spans.length)}</span>
+    <div className="action-bar action-bar--wand" role="dialog" aria-label={t.editor.wandPreview}>
+      <span className="action-bar-count">
+        {format(t.editor.wandFound, {
+          label: `${spans.length} ${plural(spans.length, t.plurals.fixes, language)}`
+        })}
+      </span>
       <span className="action-bar-spacer" />
-      <button className="action-bar-btn ghost" onClick={cancel} title="Отмена (Esc)">
-        Отмена
+      <button className="action-bar-btn ghost" onClick={cancel} title={t.editor.wandCancelTitle}>
+        {t.editor.wandCancel}
       </button>
-      <button className="action-bar-btn primary" onClick={confirm} title="Применить (Enter)">
-        Применить
+      <button className="action-bar-btn primary" onClick={confirm} title={t.editor.wandApplyTitle}>
+        {t.editor.wandApply}
       </button>
     </div>
   )

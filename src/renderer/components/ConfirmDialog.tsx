@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useT } from '@renderer/i18n/useT'
 
 interface ConfirmDialogProps {
   title: string
@@ -19,11 +20,16 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Удалить',
-  cancelLabel = 'Отмена',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel
 }: ConfirmDialogProps): JSX.Element {
+  const t = useT()
+  // Callers pass their own title/message but rely on these localized defaults for the
+  // button labels (Library/Chapters delete). Fall back to the dictionary when undefined.
+  const confirm = confirmLabel ?? t.confirmDialog.confirm
+  const cancel = cancelLabel ?? t.confirmDialog.cancel
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onCancel()
@@ -39,10 +45,10 @@ export function ConfirmDialog({
         <p>{message}</p>
         <div className="modal-actions">
           <button className="linkish" onClick={onCancel}>
-            {cancelLabel}
+            {cancel}
           </button>
           <button className="modal-danger" onClick={onConfirm}>
-            {confirmLabel}
+            {confirm}
           </button>
         </div>
       </div>

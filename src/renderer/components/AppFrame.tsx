@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { IconLayoutSidebarLeftExpand } from '@tabler/icons-react'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useT } from '@renderer/i18n/useT'
 import { Sidebar } from './Sidebar'
 
 /** Leather-brown frame + page-stack grid. Hosts the sidebar and the active view. */
 export function AppFrame({ children }: { children: ReactNode }): JSX.Element {
+  const t = useT()
   const focusMode = useUiStore((s) => s.focusMode)
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleFocus = useUiStore((s) => s.toggleFocus)
@@ -22,7 +24,7 @@ export function AppFrame({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div className={`book-frame${focusMode ? ' focus-mode' : ''}`}>
       {focusMode && (
-        <button className="focus-exit" onClick={toggleFocus}>Выйти из фокуса</button>
+        <button className="focus-exit" onClick={toggleFocus}>{t.nav.exitFocus}</button>
       )}
       <div className={gridClass}>
         <Sidebar />
@@ -30,8 +32,8 @@ export function AppFrame({ children }: { children: ReactNode }): JSX.Element {
           <button
             className="sidebar-expand"
             onClick={toggleSidebar}
-            title="Показать меню"
-            aria-label="Показать меню"
+            title={t.nav.expandSidebar}
+            aria-label={t.nav.expandSidebar}
           >
             <IconLayoutSidebarLeftExpand size={18} />
           </button>

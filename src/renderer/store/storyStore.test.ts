@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useStoryStore } from './storyStore'
 import { useEditorStore } from './editorStore'
-import type { Story, Chapter } from '@shared/types'
+import { useSettingsStore } from './settingsStore'
+import type { Story, Chapter, Settings } from '@shared/types'
+
+const settings = (language: 'ru' | 'en'): Settings => ({
+  theme: 'book', autosaveIntervalMs: 1, autosaveDebounceMs: 1, spellLanguages: [],
+  editorFontFamily: 'x', editorFontSizePx: 16, maxVersionsPerChapter: 5,
+  libraryPath: '/lib', language, schemaVersion: 1
+})
 
 const story: Story = {
   id: 's1', title: 'S', description: '', tags: [], status: 'draft',
@@ -14,6 +21,8 @@ const chapter = (id: string, title: string): Chapter => ({
 
 beforeEach(() => {
   useStoryStore.setState({ story: null, chapters: [] })
+  // Reset settings so a prior test's language never leaks into the default-title picker.
+  useSettingsStore.setState({ settings: null })
   vi.stubGlobal('window', {
     api: {
       readStory: vi.fn(async () => story),
@@ -89,5 +98,61 @@ describe('storyStore.renameChapter', () => {
     expect(window.api.saveChapter).toHaveBeenCalledWith('s1', {
       id: 'c2', title: 'Two Renamed', doc: { type: 'doc', content: [] }
     })
+  })
+})
+
+describe('storyStore.addChapter default title is localized by UI language', () => {
+  beforeEach(() => {
+    // addChapter opens the new chapter in the editor after creating it.
+    useEditorStore.setState({ openChapter: vi.fn(async () => {}) } as never)
+  })
+
+  it('uses the English default when language is en and no title is given', async () => {
+    useSettingsStore.setState({ settings: settings('en') })
+    await useStoryStore.getState().load('s1')
+    await useStoryStore.getState().addChapter('')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'New chapter')
+  })
+
+  it('uses the Russian default when language is ru', async () => {
+    useSettingsStore.setState({ settings: settings('ru') })
+    await useStoryStore.getState().load('s1')
+    await useStoryStore.getState().addChapter('')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+  })
+
+  it('defaults to Russian when settings are unloaded', async () => {
+    await useStoryStore.getState().load('s1')
+    await useStoryStore.getState().addChapter('')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+  })
+
+  it('respects an explicit title over the localized default', async () => {
+    useSettingsStore.setState({ settings: settings('en') })
+    await useStoryStore.getState().load('s1')
+    await useStoryStore.getState().addChapter('My Chapter')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'My Chapter')
+  })
+})
+
+describe('storyStore.openStory first-chapter default title is localized', () => {
+  // A story with no chapters yet: openStory seeds the first chapter.
+  const emptyStory: Story = { ...story, chapterOrder: [] }
+
+  beforeEach(() => {
+    useEditorStore.setState({ openChapter: vi.fn(async () => {}) } as never)
+    ;(window.api.readStory as ReturnType<typeof vi.fn>).mockImplementation(async () => emptyStory)
+  })
+
+  it('seeds "Chapter 1" when language is en', async () => {
+    useSettingsStore.setState({ settings: settings('en') })
+    await useStoryStore.getState().openStory('s1')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Chapter 1')
+  })
+
+  it('seeds "Глава 1" when language is ru', async () => {
+    useSettingsStore.setState({ settings: settings('ru') })
+    await useStoryStore.getState().openStory('s1')
+    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Глава 1')
   })
 })

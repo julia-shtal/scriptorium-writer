@@ -134,6 +134,13 @@ export interface Settings {
   demoSeeded?: boolean
   /** Hide the footer's info line (word count, save status, language badge), keeping only «Сохранить». Persistent, independent of focus mode. */
   hideEditorFooterInfo?: boolean
+  /**
+   * UI language for the app's own chrome and system messages (M26). Author content
+   * (story/chapter/notes text) is never affected. Existing installs with no `language`
+   * key default to 'ru' via readSettings' merge-over-defaults, so behavior is unchanged
+   * until the user switches; a genuine first run seeds it from the OS locale.
+   */
+  language: 'ru' | 'en'
   /** Id of the story the user last had open, so launch can reopen it instead of stories[0]. */
   lastOpenedStoryId?: string
   /** Id of the chapter the user last had open within `lastOpenedStoryId`. */

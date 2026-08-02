@@ -27,11 +27,18 @@ export interface SearchOutcome {
   notesFailed: boolean
 }
 
-const SECTION_LABELS: Record<Exclude<NoteSection, 'scratch'>, string> = {
-  characters: 'Персонажи',
-  locations: 'Локации',
-  world: 'Мир',
-  timeline: 'Хронология'
+/**
+ * Localized section-chrome labels, threaded in from the caller (where `useT` is
+ * available). Author data — chapter titles and note entry names — is never
+ * routed through here; only the fixed section headings and untitled fallback.
+ */
+export interface SearchLabels {
+  characters: string
+  locations: string
+  world: string
+  timeline: string
+  scratch: string
+  untitled: string
 }
 
 /**
@@ -60,7 +67,11 @@ export function findOffsets(haystack: string, query: string): number[] {
  *
  * TODO(M16+): the single-`story` signature is the seam for cross-story search.
  */
-export async function searchStory(story: Story, query: string): Promise<SearchOutcome> {
+export async function searchStory(
+  story: Story,
+  query: string,
+  labels: SearchLabels
+): Promise<SearchOutcome> {
   const q = query.trim()
   if (q.length === 0) return { matches: [], failedChapters: 0, notesFailed: false }
 
@@ -76,7 +87,7 @@ export async function searchStory(story: Story, query: string): Promise<SearchOu
         matches.push({
           kind: 'chapter',
           chapterId,
-          label: chapter.title || 'Без названия',
+          label: chapter.title || labels.untitled,
           count: offsets.length,
           snippet: makeSnippet(text, offsets[0], q.length)
         })
@@ -92,7 +103,7 @@ export async function searchStory(story: Story, query: string): Promise<SearchOu
     const pushField = (section: NoteSection, entryName: string | undefined, text: string): void => {
       const offsets = findOffsets(text, q)
       if (offsets.length === 0) return
-      const sectionLabel = section === 'scratch' ? 'Черновик' : SECTION_LABELS[section]
+      const sectionLabel = labels[section]
       matches.push({
         kind: 'note',
         noteSection: section,

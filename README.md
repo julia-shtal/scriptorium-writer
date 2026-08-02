@@ -59,6 +59,7 @@ a full disk, or closing the laptop mid-save can never corrupt what you already w
 | **Import / Export** | Import a `.md`/`.docx` file as one chapter or split by headings; export any chapter or the whole story to `.docx`/`.md`. |
 | **Library backup** | One click zips the entire library folder (stories, snapshots, notes, `.trash/`) to a chosen path — atomic, read-only against your data. |
 | **Auto-update** | Packaged builds check GitHub Releases in the background and offer a dismissible restart that routes through the same quit-guard flush. |
+| **UI language (RU / EN)** | Switch the whole interface between Русский and English live from Settings — no restart. Defaults to Russian; only the app's own chrome and system messages change, never your story text. |
 
 ---
 
@@ -332,8 +333,26 @@ offline spellcheck works in packaged builds too.
 is a per-story codex (characters / locations / world / timeline + scratchpad), saved
 debounced. Statistics shows totals, a per-chapter breakdown, and a daily writing streak
 (streak data in renderer `localStorage`, not part of the canon). Settings apply live via
-`settingsStore` — font, autosave interval, and spellcheck languages (through an
-`applySpellLanguages` IPC) all take effect without a restart.
+`settingsStore` — font, autosave interval, spellcheck languages (through an
+`applySpellLanguages` IPC), and **UI language (RU / EN)** all take effect without a restart.
+
+**UI localization (RU / EN).** Every static interface string and renderer-surfaced
+system/error message lives in a hand-rolled, dependency-free dictionary at
+`src/renderer/i18n/strings.ts` (parallel `ru` / `en` trees), read through the reactive
+`useT()` hook. The active language is `Settings.language`. On a **genuine first run** it is
+seeded from the OS locale (`app.getLocale()` — English → `'en'`, otherwise `'ru'`); any
+existing install keeps its stored value, and one predating the `language` key stays Russian
+(`readSettings`' merge-over-defaults never applies the OS seed). `en` is typed against
+`typeof ru`, so a missing/extra key fails `npm run typecheck`, and `strings.test.ts` asserts
+identical `ru`/`en` key sets at runtime. Dates render per-locale (`ru-RU` / `en-US`), and
+counts are properly pluralized per language — a tiny `plural()` engine (`src/renderer/i18n/plural.ts`)
+applies the Russian one/few/many rule and English singular/plural, so word/chapter counts read
+"1 слово / 2 слова / 5 слов" and "1 word / 2 words". **Author content — story/chapter/notes
+text, titles, footnote text — is never routed through the dictionary and never changes with the
+switch.** New chapters seed a language-appropriate default title *at creation time*
+(`«Новая глава»` / `"New chapter"`), which then becomes ordinary author data; existing titles
+are never rewritten. The first-run demo story stays Russian by design (its body is a Russian
+writing sample).
 
 **Cleanup wand.** The toolbar wand (`src/renderer/editor/cleanup/`) runs an ordered set of
 pure `(text) => string` rules over the selection — or the whole chapter when nothing is

@@ -4,14 +4,20 @@ import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { ConfirmDialog } from '@renderer/components/ConfirmDialog'
+import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 import type { StorySummary } from '@shared/types'
-import { STATUS_RU, formatDate } from './format'
+import { formatDate } from './format'
 
 export function LibraryView(): JSX.Element {
   const [rows, setRows] = useState<StorySummary[]>([])
   const [title, setTitle] = useState('')
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
+  const t = useT()
 
   const refresh = async (): Promise<void> => setRows(await window.api.listStories())
   useEffect(() => {
@@ -47,17 +53,17 @@ export function LibraryView(): JSX.Element {
     <div className="library-view">
       <div className="library-head">
         <span className="library-title">
-          <IconBooks size={18} /> Библиотека · {rows.length}
+          <IconBooks size={18} /> {t.library.title} · {rows.length}
         </span>
         <div className="library-create">
           <input
             value={title}
-            placeholder="Название новой работы"
+            placeholder={t.library.createPlaceholder}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void create()}
           />
           <button className="linkish" disabled={!title.trim()} onClick={() => void create()}>
-            <IconPlus size={15} /> создать
+            <IconPlus size={15} /> {t.library.createButton}
           </button>
         </div>
       </div>
@@ -65,11 +71,14 @@ export function LibraryView(): JSX.Element {
         {rows.map((r) => (
           <li key={r.id} className="library-card" onClick={() => void open(r.id)}>
             <span className="library-card-title">{r.title}</span>
-            <span className={`chip chip-${r.status}`}>{STATUS_RU[r.status]}</span>
+            <span className={`chip chip-${r.status}`}>{t.status[r.status]}</span>
             <span className="library-meta">
-              {r.chapterCount} гл · {r.wordCount} сл
+              {format(t.library.meta, {
+                chapters: `${r.chapterCount} ${plural(r.chapterCount, t.plurals.chapters, language)}`,
+                words: `${r.wordCount} ${plural(r.wordCount, t.plurals.words, language)}`
+              })}
             </span>
-            <span className="library-meta">{formatDate(r.updatedAt)}</span>
+            <span className="library-meta">{formatDate(r.updatedAt, language)}</span>
             <button
               className="linkish"
               onClick={(e) => {
@@ -81,12 +90,12 @@ export function LibraryView(): JSX.Element {
             </button>
           </li>
         ))}
-        {rows.length === 0 && <li className="library-empty">Пока нет работ. Создайте первую.</li>}
+        {rows.length === 0 && <li className="library-empty">{t.library.empty}</li>}
       </ul>
       {confirmTarget && (
         <ConfirmDialog
-          title="Удалить работу?"
-          message={`«${confirmTarget.title}» будет перемещена в корзину.`}
+          title={t.library.deleteConfirmTitle}
+          message={format(t.library.deleteConfirmMessage, { title: confirmTarget.title })}
           onConfirm={() => void remove(confirmTarget.id)}
           onCancel={() => setConfirmId(null)}
         />

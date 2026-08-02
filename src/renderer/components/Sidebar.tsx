@@ -14,28 +14,31 @@ import {
 } from '@tabler/icons-react'
 import { useUiStore, type ViewId } from '@renderer/store/uiStore'
 import { useEditorStore } from '@renderer/store/editorStore'
+import { useT } from '@renderer/i18n/useT'
 
 interface NavDef {
+  // `id` doubles as the stable `t.nav` lookup key — labels come from the active
+  // dictionary, never hard-coded, so the mapping survives a live language switch.
   id: ViewId
-  label: string
   icon: JSX.Element
 }
 
 const WORK: NavDef[] = [
-  { id: 'editor', label: 'Редактор', icon: <IconEdit size={17} /> },
-  { id: 'chapters', label: 'Главы', icon: <IconList size={17} /> },
-  { id: 'story', label: 'О работе', icon: <IconInfoCircle size={17} /> },
-  { id: 'versions', label: 'История версий', icon: <IconHistory size={17} /> },
-  { id: 'notes', label: 'Заметки', icon: <IconNotebook size={17} /> },
-  { id: 'search', label: 'Поиск', icon: <IconSearch size={17} /> },
-  { id: 'statistics', label: 'Статистика', icon: <IconChartBar size={17} /> }
+  { id: 'editor', icon: <IconEdit size={17} /> },
+  { id: 'chapters', icon: <IconList size={17} /> },
+  { id: 'story', icon: <IconInfoCircle size={17} /> },
+  { id: 'versions', icon: <IconHistory size={17} /> },
+  { id: 'notes', icon: <IconNotebook size={17} /> },
+  { id: 'search', icon: <IconSearch size={17} /> },
+  { id: 'statistics', icon: <IconChartBar size={17} /> }
 ]
 const GENERAL: NavDef[] = [
-  { id: 'library', label: 'Библиотека', icon: <IconBooks size={17} /> },
-  { id: 'settings', label: 'Настройки', icon: <IconSettings size={17} /> }
+  { id: 'library', icon: <IconBooks size={17} /> },
+  { id: 'settings', icon: <IconSettings size={17} /> }
 ]
 
 export function Sidebar(): JSX.Element {
+  const t = useT()
   const activeView = useUiStore((s) => s.activeView)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const setActiveView = useUiStore((s) => s.setActiveView)
@@ -58,7 +61,7 @@ export function Sidebar(): JSX.Element {
       <div key={def.id} className={`nav-item${active ? ' active' : ''}`}
            onClick={() => setActiveView(def.id)}>
         {def.icon}
-        {def.label}
+        {t.nav[def.id]}
         {def.id === 'versions' && versionCount > 0 && (
           <span className="nav-badge">{versionCount}</span>
         )}
@@ -70,14 +73,14 @@ export function Sidebar(): JSX.Element {
     <aside className="sidebar">
       <div className="sidebar-header">
         <IconFeather size={20} className="sidebar-icon" />
-        <span className="sidebar-title">Моя книга</span>
+        <span className="sidebar-title">{t.nav.bookTitle}</span>
         <IconLayoutSidebarLeftCollapse
-          size={19} className="sidebar-collapse" title="Свернуть меню" onClick={toggleSidebar}
+          size={19} className="sidebar-collapse" title={t.nav.collapseSidebar} onClick={toggleSidebar}
         />
       </div>
-      <div className="sidebar-section">РАБОТА</div>
+      <div className="sidebar-section">{t.nav.sectionWork}</div>
       <nav className="sidebar-nav">{WORK.map(item)}</nav>
-      <div className="sidebar-section">ОБЩЕЕ</div>
+      <div className="sidebar-section">{t.nav.sectionGeneral}</div>
       <nav className="sidebar-nav">{GENERAL.map(item)}</nav>
     </aside>
   )

@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { searchStory, findOffsets } from './searchStory'
+import { searchStory, findOffsets, type SearchLabels } from './searchStory'
 import type { Story, Chapter, Notes } from '@shared/types'
+
+// Russian labels fixture: keeps the existing section-chrome assertions valid
+// (author titles/entry names still flow through untouched).
+const LABELS: SearchLabels = {
+  characters: 'Персонажи',
+  locations: 'Локации',
+  world: 'Мир',
+  timeline: 'Хронология',
+  scratch: 'Черновик',
+  untitled: 'Без названия'
+}
 
 const story: Story = {
   id: 's1', title: 'S', description: '', tags: [], status: 'draft',
@@ -53,7 +64,7 @@ describe('findOffsets', () => {
 
 describe('searchStory', () => {
   it('returns matches from chapters and every notes section', async () => {
-    const out = await searchStory(story, 'иван')
+    const out = await searchStory(story, 'иван', LABELS)
     const labels = out.matches.map((m) => m.label)
     expect(labels).toContain('Глава 1')            // chapter hit
     expect(labels).toContain('Персонажи · Иван')   // notes entry hit
@@ -62,7 +73,7 @@ describe('searchStory', () => {
   })
 
   it('is a pure read — never calls a write API', async () => {
-    await searchStory(story, 'иван')
+    await searchStory(story, 'иван', LABELS)
     expect(saveChapter).not.toHaveBeenCalled()
     expect(saveNotes).not.toHaveBeenCalled()
   })
@@ -72,12 +83,12 @@ describe('searchStory', () => {
     readChapter.mockImplementationOnce(async () => {
       throw new Error('corrupt canon')
     })
-    const out = await searchStory(story, 'ничего')
+    const out = await searchStory(story, 'ничего', LABELS)
     expect(out.failedChapters).toBe(1)
   })
 
   it('returns empty for a blank query without touching the api', async () => {
-    const out = await searchStory(story, '   ')
+    const out = await searchStory(story, '   ', LABELS)
     expect(out.matches).toEqual([])
     expect(window.api.readChapter).not.toHaveBeenCalled()
   })

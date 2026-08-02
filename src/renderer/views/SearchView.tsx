@@ -3,17 +3,20 @@ import { IconSearch } from '@tabler/icons-react'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
 import { searchStory, type SearchMatch, type SearchOutcome } from '@renderer/search/searchStory'
 import { navigateToResult } from '@renderer/search/navigateToResult'
 
 export function SearchView(): JSX.Element {
+  const t = useT()
   const story = useStoryStore((s) => s.story)
   const [query, setQuery] = useState('')
   const [submitted, setSubmitted] = useState('')
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null)
   const [searching, setSearching] = useState(false)
 
-  if (!story) return <div style={{ padding: 34 }}>Нет открытой работы.</div>
+  if (!story) return <div style={{ padding: 34 }}>{t.search.noStory}</div>
 
   const run = async (): Promise<void> => {
     const q = query.trim()
@@ -25,7 +28,16 @@ export function SearchView(): JSX.Element {
     setSearching(true)
     setSubmitted(q)
     try {
-      setOutcome(await searchStory(story, q))
+      setOutcome(
+        await searchStory(story, q, {
+          characters: t.notes.characters,
+          locations: t.notes.locations,
+          world: t.notes.world,
+          timeline: t.notes.timeline,
+          scratch: t.notes.scratch,
+          untitled: t.chapters.untitled
+        })
+      )
     } finally {
       setSearching(false)
     }
@@ -46,27 +58,30 @@ export function SearchView(): JSX.Element {
         <IconSearch size={17} />
         <input
           className="search-input"
-          placeholder="Искать в работе…"
+          placeholder={t.search.placeholder}
           value={query}
           autoFocus
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void run()}
         />
-        <button className="linkish" onClick={() => void run()}>Найти</button>
+        <button className="linkish" onClick={() => void run()}>{t.search.find}</button>
       </div>
 
-      {searching && <div className="search-note">Поиск…</div>}
+      {searching && <div className="search-note">{t.search.searching}</div>}
 
       {outcome && !searching && (
         <>
           {(outcome.failedChapters > 0 || outcome.notesFailed) && (
             <div className="search-note">
-              Не удалось прочитать часть работы
-              {outcome.failedChapters > 0 ? ` (глав: ${outcome.failedChapters})` : ''}.
+              {t.search.partialRead}
+              {outcome.failedChapters > 0
+                ? format(t.search.partialReadChapters, { count: String(outcome.failedChapters) })
+                : ''}
+              .
             </div>
           )}
           {outcome.matches.length === 0 ? (
-            <div className="search-note">Ничего не найдено.</div>
+            <div className="search-note">{t.search.empty}</div>
           ) : (
             <ul className="search-results">
               {outcome.matches.map((m, i) => (

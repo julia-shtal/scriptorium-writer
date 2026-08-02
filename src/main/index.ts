@@ -175,7 +175,11 @@ app.whenReady().then(async () => {
   // design (unit-tested against temp dirs); the app supplies the machine paths here.
   const fileService = new FileService({
     userDataPath: app.getPath('userData'),
-    defaultLibraryPath: join(app.getPath('documents'), 'Scriptorium-Writer')
+    defaultLibraryPath: join(app.getPath('documents'), 'Scriptorium-Writer'),
+    // First-run only: default the UI language from the OS locale (English → 'en',
+    // otherwise 'ru'). getLocale() is reliable here (post-ready); it returns '' before
+    // ready, which startsWith('en') treats as false → 'ru' (safe fallback).
+    firstRunLanguage: app.getLocale().toLowerCase().startsWith('en') ? 'en' : 'ru'
   })
   await fileService.ensureLibrary()
 
