@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { IconDots } from '@tabler/icons-react'
 import { useExport } from '@renderer/export/useExport'
+import { useT } from '@renderer/i18n/useT'
 
 /**
  * Reusable export popover, backed by {@link useExport}.
@@ -42,6 +43,7 @@ export function ExportMenu({
   triggerLabel,
   triggerClassName
 }: ExportMenuProps): JSX.Element {
+  const t = useT()
   const { exportChapter, exportStory, busy, error, clearError } = useExport()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -126,16 +128,16 @@ export function ExportMenu({
   }
 
   const chapterActions: MenuAction[] = [
-    { key: 'ch-docx', label: 'Глава → .docx', run: () => exportChapter(chapterId, 'docx') },
-    { key: 'ch-md', label: 'Глава → .md', run: () => exportChapter(chapterId, 'md') }
+    { key: 'ch-docx', label: t.exportMenu.chapterDocx, run: () => exportChapter(chapterId, 'docx') },
+    { key: 'ch-md', label: t.exportMenu.chapterMd, run: () => exportChapter(chapterId, 'md') }
   ]
   const storyActions: MenuAction[] = [
-    { key: 'st-docx', label: 'Работа → .docx', run: (): Promise<boolean> => exportStory('docx') },
-    { key: 'st-md', label: 'Работа → .md', run: (): Promise<boolean> => exportStory('md') }
+    { key: 'st-docx', label: t.exportMenu.storyDocx, run: (): Promise<boolean> => exportStory('docx') },
+    { key: 'st-md', label: t.exportMenu.storyMd, run: (): Promise<boolean> => exportStory('md') }
   ]
   const compactActions: MenuAction[] = [
-    { key: 'c-docx', label: '.docx', run: () => exportChapter(chapterId, 'docx') },
-    { key: 'c-md', label: '.md', run: () => exportChapter(chapterId, 'md') }
+    { key: 'c-docx', label: t.exportMenu.compactDocx, run: () => exportChapter(chapterId, 'docx') },
+    { key: 'c-md', label: t.exportMenu.compactMd, run: () => exportChapter(chapterId, 'md') }
   ]
 
   // itemRefs is rebuilt each render; index counter keeps refs aligned with DOM order.
@@ -160,7 +162,7 @@ export function ExportMenu({
     )
   }
 
-  const label = triggerLabel ?? 'Экспорт'
+  const label = triggerLabel ?? t.exportMenu.trigger
 
   return (
     <div className="export-menu" ref={containerRef}>
@@ -185,9 +187,9 @@ export function ExportMenu({
         >
           {variant === 'full' ? (
             <>
-              <div className="export-menu-caption">Экспорт главы</div>
+              <div className="export-menu-caption">{t.exportMenu.captionChapter}</div>
               {chapterActions.map(renderItem)}
-              <div className="export-menu-caption">Экспорт работы</div>
+              <div className="export-menu-caption">{t.exportMenu.captionStory}</div>
               {storyActions.map(renderItem)}
             </>
           ) : (

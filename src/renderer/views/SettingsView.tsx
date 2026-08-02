@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
 import { isAppError } from '@shared/errors'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
@@ -8,12 +9,13 @@ const LANGS: { code: string; label: string }[] = [
 ]
 
 export function SettingsView(): JSX.Element {
+  const t = useT()
   const settings = useSettingsStore((s) => s.settings)
   const update = useSettingsStore((s) => s.update)
   const [exportState, setExportState] = useState<
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; path: string } | { kind: 'error'; msg: string }
   >({ kind: 'idle' })
-  if (!settings) return <div style={{ padding: 34 }}>Загрузка настроек…</div>
+  if (!settings) return <div style={{ padding: 34 }}>{t.settings.loading}</div>
 
   const exportLibrary = async (): Promise<void> => {
     setExportState({ kind: 'busy' })
@@ -22,8 +24,8 @@ export function SettingsView(): JSX.Element {
       setExportState(result.canceled ? { kind: 'idle' } : { kind: 'done', path: result.path })
     } catch (err) {
       const msg = isAppError(err)
-        ? 'Не удалось сохранить архив библиотеки. Проверьте место на диске и права доступа.'
-        : 'Не удалось экспортировать библиотеку.'
+        ? t.errors.exportLibraryFailedDisk
+        : t.errors.exportLibraryFailed
       setExportState({ kind: 'error', msg })
     }
   }
@@ -36,15 +38,22 @@ export function SettingsView(): JSX.Element {
 
   return (
     <div className="settings-view">
-      <h2 className="settings-h">Настройки</h2>
+      <h2 className="settings-h">{t.settings.title}</h2>
 
-      <label className="settings-field">Автосохранение, сек
+      <label className="settings-field">{t.settings.language}
+        <select value={settings.language} onChange={(e) => void update({ language: e.target.value as 'ru' | 'en' })}>
+          <option value="ru">{t.settings.languageRu}</option>
+          <option value="en">{t.settings.languageEn}</option>
+        </select>
+      </label>
+
+      <label className="settings-field">{t.settings.autosaveSec}
         <input type="number" min={5} value={Math.round(settings.autosaveIntervalMs / 1000)}
                onChange={(e) => void update({ autosaveIntervalMs: Number(e.target.value) * 1000 })} />
       </label>
 
       <fieldset className="settings-field">
-        <legend>Языки проверки</legend>
+        <legend>{t.settings.spellLanguages}</legend>
         {LANGS.map((l) => (
           <label key={l.code} className="settings-check">
             <input type="checkbox" checked={settings.spellLanguages.includes(l.code)}
@@ -53,13 +62,13 @@ export function SettingsView(): JSX.Element {
         ))}
       </fieldset>
 
-      <label className="settings-field">Шрифт
+      <label className="settings-field">{t.settings.font}
         <select value={settings.editorFontFamily} onChange={(e) => void update({ editorFontFamily: e.target.value })}>
           {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
       </label>
 
-      <label className="settings-field">Размер шрифта, px
+      <label className="settings-field">{t.settings.fontSizePx}
         <input type="number" min={12} max={32} value={settings.editorFontSizePx}
                onChange={(e) => void update({ editorFontSizePx: Number(e.target.value) })} />
       </label>
@@ -69,30 +78,30 @@ export function SettingsView(): JSX.Element {
           type="checkbox"
           checked={settings.hideEditorFooterInfo ?? false}
           onChange={() => void update({ hideEditorFooterInfo: !(settings.hideEditorFooterInfo ?? false) })}
-        /> Минимальная нижняя панель
+        /> {t.settings.minimalFooter}
       </label>
 
-      <label className="settings-field">Версий на главу
+      <label className="settings-field">{t.settings.versionsPerChapter}
         <input type="number" min={1} value={settings.maxVersionsPerChapter}
                onChange={(e) => void update({ maxVersionsPerChapter: Number(e.target.value) })} />
       </label>
 
-      <div className="settings-field">Папка библиотеки
+      <div className="settings-field">{t.settings.libraryFolder}
         <div className="settings-path">
           <code>{settings.libraryPath}</code>
           <button className="linkish" onClick={() => void window.api.revealInFolder(settings.libraryPath)}>
-            показать
+            {t.settings.reveal}
           </button>
           <button
             className="linkish"
             disabled={exportState.kind === 'busy'}
             onClick={() => void exportLibrary()}
           >
-            {exportState.kind === 'busy' ? 'Экспорт…' : 'Экспортировать библиотеку'}
+            {exportState.kind === 'busy' ? t.settings.exporting : t.settings.exportLibrary}
           </button>
         </div>
         {exportState.kind === 'done' && (
-          <div className="settings-note">Библиотека сохранена: <code>{exportState.path}</code></div>
+          <div className="settings-note">{t.settings.librarySaved} <code>{exportState.path}</code></div>
         )}
         {exportState.kind === 'error' && (
           <div className="settings-note settings-note--error">{exportState.msg}</div>

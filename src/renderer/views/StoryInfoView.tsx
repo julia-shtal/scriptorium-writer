@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { parseTags, formatTags } from './story-tags'
-import { STATUS_RU } from './format'
+import { useT } from '@renderer/i18n/useT'
 import type { Story, StoryStatus } from '@shared/types'
 
 export function StoryInfoView(): JSX.Element {
   const story = useStoryStore((s) => s.story)
-  if (!story) return <div style={{ padding: 34 }}>Нет открытой работы.</div>
+  const t = useT()
+  if (!story) return <div style={{ padding: 34 }}>{t.storyInfo.noStory}</div>
   return <StoryInfoForm story={story} />
 }
 
@@ -19,6 +20,7 @@ export function StoryInfoView(): JSX.Element {
  */
 function StoryInfoForm({ story }: { story: Story }): JSX.Element {
   const updateMeta = useStoryStore((s) => s.updateMeta)
+  const t = useT()
   const [title, setTitle] = useState(story.title)
   const [description, setDescription] = useState(story.description)
   const [tags, setTags] = useState(formatTags(story.tags))
@@ -29,9 +31,9 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
 
   return (
     <div className="storyinfo-view">
-      <h2 className="storyinfo-h">О работе</h2>
+      <h2 className="storyinfo-h">{t.storyInfo.heading}</h2>
       <label className="storyinfo-field">
-        Название
+        {t.storyInfo.titleLabel}
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -39,7 +41,7 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
         />
       </label>
       <label className="storyinfo-field">
-        Описание
+        {t.storyInfo.descriptionLabel}
         <textarea
           value={description}
           rows={5}
@@ -48,7 +50,7 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
         />
       </label>
       <label className="storyinfo-field">
-        Теги
+        {t.storyInfo.tagsLabel}
         <input
           value={tags}
           onChange={(e) => setTags(e.target.value)}
@@ -56,14 +58,14 @@ function StoryInfoForm({ story }: { story: Story }): JSX.Element {
         />
       </label>
       <label className="storyinfo-field">
-        Статус
+        {t.storyInfo.statusLabel}
         <select
           value={story.status}
           onChange={(e) => void updateMeta({ status: e.target.value as StoryStatus })}
         >
-          {(Object.keys(STATUS_RU) as StoryStatus[]).map((s) => (
+          {(Object.keys(t.status) as StoryStatus[]).map((s) => (
             <option key={s} value={s}>
-              {STATUS_RU[s]}
+              {t.status[s]}
             </option>
           ))}
         </select>

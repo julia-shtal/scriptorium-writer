@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppFrame } from '@renderer/components/AppFrame'
 import { EditorView } from '@renderer/views/EditorView'
 import { VersionHistoryView } from '@renderer/views/VersionHistoryView'
@@ -17,14 +17,23 @@ import { useUiStore } from '@renderer/store/uiStore'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useAutosaveLifecycle } from '@renderer/editor/useAutosaveLifecycle'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
 import type { ChapterRecovery } from '@shared/types'
 
 export default function App(): JSX.Element {
+  const t = useT()
   const openChapter = useEditorStore((s) => s.openChapter)
   const activeView = useUiStore((s) => s.activeView)
   const [error, setError] = useState<string | null>(null)
   const [recoveries, setRecoveries] = useState<ChapterRecovery[]>([])
   const [booting, setBooting] = useState(true)
+
+  // The boot effect must run exactly once, so it can't depend on the reactive `t`
+  // (a live language switch would otherwise re-scan + re-open the library). Read the
+  // current dictionary through a ref instead — only the rare non-Error fallback uses it.
+  const tRef = useRef(t)
+  tRef.current = t
 
   useAutosaveLifecycle()
 
@@ -43,7 +52,7 @@ export default function App(): JSX.Element {
         }
         await useSettingsStore.getState().load()
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Не удалось открыть библиотеку')
+        setError(err instanceof Error ? err.message : tRef.current.errors.openLibraryFailed)
       } finally {
         setBooting(false)
       }
@@ -56,7 +65,7 @@ export default function App(): JSX.Element {
       setError(null)
       await openChapter(r.storyId, r.chapterId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось открыть восстановлённую главу')
+      setError(err instanceof Error ? err.message : t.errors.openRecoveredChapterFailed)
     }
   }
 
@@ -78,9 +87,9 @@ export default function App(): JSX.Element {
   return (
     <AppFrame>
       {error ? (
-        <div style={{ padding: 34 }}>Ошибка: {error}</div>
+        <div style={{ padding: 34 }}>{format(t.errors.fatalPrefix, { message: error })}</div>
       ) : booting ? (
-        <div style={{ padding: 34 }}>Загрузка…</div>
+        <div style={{ padding: 34 }}>{t.errors.booting}</div>
       ) : (
         renderView()
       )}

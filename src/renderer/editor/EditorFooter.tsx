@@ -2,6 +2,9 @@ import { IconCloudCheck, IconAbc, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEditorStore, type SaveStatus } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format, type Dictionary } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 
 const LANG_LABELS: Record<string, string> = { ru: 'RU', 'en-US': 'EN', en: 'EN' }
 
@@ -11,19 +14,29 @@ export function formatSpellLanguages(langs: readonly string[]): string {
   return langs.map((l) => LANG_LABELS[l] ?? l.split('-')[0].toUpperCase()).join(' · ')
 }
 
-function statusLabel(status: SaveStatus, lastSavedAt: string | null): string {
+function statusLabel(
+  t: Dictionary,
+  language: string,
+  status: SaveStatus,
+  lastSavedAt: string | null
+): string {
   switch (status) {
     case 'saving':
-      return 'сохранение…'
+      return t.editor.saving
     case 'error':
-      return 'ошибка сохранения'
+      return t.editor.saveError
     case 'saved':
     case 'idle':
       return lastSavedAt
-        ? `сохранено ${new Date(lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-        : 'не сохранено'
+        ? format(t.editor.savedAt, {
+            time: new Date(lastSavedAt).toLocaleTimeString(language === 'en' ? 'en-US' : 'ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+          })
+        : t.editor.unsaved
     default:
-      return 'редактирование…'
+      return t.editor.editing
   }
 }
 
@@ -41,27 +54,33 @@ export function EditorFooter(): JSX.Element {
   const save = useEditorStore((s) => s.save)
   const spellLanguages = useUiStore((s) => s.spellLanguages)
   const hideInfo = useSettingsStore((s) => s.settings?.hideEditorFooterInfo ?? false)
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
+  const t = useT()
 
   return (
     <div className="footer">
       {shouldShowFooterInfo(hideInfo, saveStatus) && (
         <span className="footer-left">
           <span>
-            слов: {wordCount}
-            {selectionWordCount > 0 ? ` · выделено: ${selectionWordCount}` : ''}
+            {wordCount} {plural(wordCount, t.plurals.words, language)}
+            {selectionWordCount > 0
+              ? format(t.editor.selected, {
+                  phrase: `${selectionWordCount} ${plural(selectionWordCount, t.plurals.words, language)}`
+                })
+              : ''}
           </span>
           {/* Live autosave status (saving / saved HH:MM / failed + retry). */}
           <span className="footer-item">
             <IconCloudCheck size={16} color="#7a8a4e" />
-            {statusLabel(saveStatus, lastSavedAt)}
+            {statusLabel(t, language, saveStatus, lastSavedAt)}
             {saveStatus === 'error' && (
               <button className="retry-btn" onClick={() => void save()}>
-                повторить
+                {t.editor.retry}
               </button>
             )}
             {mdWarning && (
               <span className="save-warning" title={mdWarning}>
-                ⚠ копия .md не сохранена
+                {t.editor.mdWarning}
               </span>
             )}
           </span>
@@ -73,7 +92,7 @@ export function EditorFooter(): JSX.Element {
       )}
       <button className="save-btn" onClick={() => void save()}>
         <IconDeviceFloppy size={16} />
-        Сохранить
+        {t.editor.save}
       </button>
     </div>
   )

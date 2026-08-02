@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
+import { useT } from '@renderer/i18n/useT'
 import { footnoteNumberAt } from './footnote-numbering'
 
 /**
@@ -18,6 +19,7 @@ import { footnoteNumberAt } from './footnote-numbering'
  */
 export function FootnoteView(props: ReactNodeViewProps): JSX.Element {
   const { editor, node, getPos, selected, updateAttributes } = props
+  const t = useT()
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   // Bumped on every doc change to force a re-render (see effect below).
@@ -98,7 +100,7 @@ export function FootnoteView(props: ReactNodeViewProps): JSX.Element {
             ref={inputRef}
             className="footnote-input"
             defaultValue={text}
-            placeholder="Текст сноски…"
+            placeholder={t.editor.footnotePlaceholder}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault()
@@ -109,7 +111,7 @@ export function FootnoteView(props: ReactNodeViewProps): JSX.Element {
           />
           <button
             className="footnote-close"
-            title="Закрыть"
+            title={t.editor.footnoteClose}
             // Keep the textarea focused through the click so onBlur doesn't double-fire.
             onMouseDown={(e) => e.preventDefault()}
             onClick={close}
@@ -120,7 +122,7 @@ export function FootnoteView(props: ReactNodeViewProps): JSX.Element {
       ) : (
         hovered && (
           <span className="footnote-popover" contentEditable={false}>
-            {text.trim() ? text : <span className="footnote-empty">(пустая сноска)</span>}
+            {text.trim() ? text : <span className="footnote-empty">{t.editor.footnoteEmpty}</span>}
           </span>
         )
       )}

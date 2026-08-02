@@ -8,11 +8,14 @@
 
 import { useEffect, useRef } from 'react'
 import { IconChevronUp, IconChevronDown, IconX } from '@tabler/icons-react'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
 import type { FindController } from './useFind'
 
 const ICON = 16
 
 export function FindReplaceBar({ find }: { find: FindController }): JSX.Element | null {
+  const t = useT()
   const {
     open, query, replacement, options, matches, activeIndex, replacedNote, focusTarget,
     closePanel, setQuery, setReplacement, setOptions, next, prev, replaceCurrent, replaceAll
@@ -59,54 +62,57 @@ export function FindReplaceBar({ find }: { find: FindController }): JSX.Element 
   const navDisabled = matches.length === 0
 
   return (
-    <div className="action-bar action-bar--find" role="dialog" aria-label="Найти и заменить">
+    <div className="action-bar action-bar--find" role="dialog" aria-label={t.findReplace.dialogLabel}>
       <input
         ref={findRef}
         className="find-input"
-        placeholder="Найти"
+        placeholder={t.findReplace.findPlaceholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
       <input
         ref={replaceRef}
         className="find-input"
-        placeholder="Заменить на"
+        placeholder={t.findReplace.replacePlaceholder}
         value={replacement}
         onChange={(e) => setReplacement(e.target.value)}
       />
       <button
         className={`action-bar-btn ghost${options.caseSensitive ? ' active' : ''}`}
-        title="Учитывать регистр"
+        title={t.findReplace.caseSensitive}
         onClick={() => setOptions({ caseSensitive: !options.caseSensitive })}
-      >Аа</button>
+      >{t.findReplace.caseSensitiveLabel}</button>
       <button
         className={`action-bar-btn ghost${options.wholeWord ? ' active' : ''}`}
-        title="Слово целиком"
+        title={t.findReplace.wholeWord}
         onClick={() => setOptions({ wholeWord: !options.wholeWord })}
-      >|Слово|</button>
+      >{t.findReplace.wholeWordLabel}</button>
 
       <span className="action-bar-count">
         {replacedNote !== null
-          ? `Заменено: ${replacedNote}`
+          ? format(t.findReplace.replacedN, { count: String(replacedNote) })
           : noMatches
-            ? <span className="action-bar-count--muted">Нет совпадений</span>
+            ? <span className="action-bar-count--muted">{t.findReplace.noMatches}</span>
             : hasQuery
-              ? `${activeIndex + 1} / ${matches.length}`
+              ? format(t.findReplace.position, {
+                  current: String(activeIndex + 1),
+                  total: String(matches.length)
+                })
               : ''}
       </span>
 
-      <button className="action-bar-btn ghost" title="Предыдущее (Shift+Enter / Shift+F3)"
+      <button className="action-bar-btn ghost" title={t.findReplace.prev}
         disabled={navDisabled} onClick={prev}><IconChevronUp size={ICON} /></button>
-      <button className="action-bar-btn ghost" title="Следующее (Enter / F3)"
+      <button className="action-bar-btn ghost" title={t.findReplace.next}
         disabled={navDisabled} onClick={next}><IconChevronDown size={ICON} /></button>
 
-      <button className="action-bar-btn ghost" title="Заменить"
-        disabled={navDisabled} onClick={replaceCurrent}>Заменить</button>
-      <button className="action-bar-btn ghost" title="Заменить всё (Ctrl+Alt+Enter)"
-        disabled={navDisabled} onClick={replaceAll}>Заменить всё</button>
+      <button className="action-bar-btn ghost" title={t.findReplace.replace}
+        disabled={navDisabled} onClick={replaceCurrent}>{t.findReplace.replace}</button>
+      <button className="action-bar-btn ghost" title={t.findReplace.replaceAll}
+        disabled={navDisabled} onClick={replaceAll}>{t.findReplace.replaceAllButton}</button>
 
       <span className="action-bar-spacer" />
-      <button className="action-bar-btn ghost" title="Закрыть (Esc)" onClick={closePanel}>
+      <button className="action-bar-btn ghost" title={t.findReplace.close} onClick={closePanel}>
         <IconX size={ICON} />
       </button>
     </div>

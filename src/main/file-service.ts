@@ -55,6 +55,12 @@ export interface FileServiceOptions {
   userDataPath: string
   /** Default library root when settings carry no override (documents/Scriptorium-Writer). */
   defaultLibraryPath: string
+  /**
+   * UI language to seed ONLY on a genuine first run (no settings file). Absent → 'ru'.
+   * Never affects an existing settings file (including an older one missing `language`,
+   * which stays 'ru' via the merge-over-defaults path).
+   */
+  firstRunLanguage?: 'ru' | 'en'
 }
 
 const nowIso = (): string => new Date().toISOString()
@@ -65,6 +71,7 @@ const clonePmDoc = (doc: ProseMirrorJSON): ProseMirrorJSON =>
 export class FileService {
   private readonly userDataPath: string
   private readonly defaultLibraryPath: string
+  private readonly firstRunLanguage: 'ru' | 'en'
   private readonly settingsPath: string
   private settingsCache: Settings | null = null
   /** Guarantees strictly-increasing, unique, lexically-sortable snapshot names. */
@@ -73,6 +80,7 @@ export class FileService {
   constructor(options: FileServiceOptions) {
     this.userDataPath = options.userDataPath
     this.defaultLibraryPath = options.defaultLibraryPath
+    this.firstRunLanguage = options.firstRunLanguage ?? 'ru'
     this.settingsPath = join(this.userDataPath, 'settings.json')
   }
 
@@ -89,6 +97,7 @@ export class FileService {
       maxVersionsPerChapter: 20,
       libraryPath: this.defaultLibraryPath,
       demoSeeded: false,
+      language: 'ru',
       schemaVersion: SETTINGS_SCHEMA_VERSION
     }
   }
@@ -102,8 +111,12 @@ export class FileService {
       this.settingsCache = { ...this.defaultSettings(), ...parsed }
     } catch (err) {
       if (isNotFound(err)) {
-        this.settingsCache = this.defaultSettings()
-        await this.writeSettingsFile(this.settingsCache)
+        // Genuine first run: no settings file on disk. Seed `language` from the OS
+        // locale (via firstRunLanguage). The merge-over-defaults branch above does
+        // NOT do this, so an existing file missing `language` stays 'ru'.
+        const seeded: Settings = { ...this.defaultSettings(), language: this.firstRunLanguage }
+        this.settingsCache = seeded
+        await this.writeSettingsFile(seeded)
       } else {
         // Corrupt settings are non-precious: fall back to defaults in memory, but do
         // NOT overwrite the file (it may be recoverable by hand).

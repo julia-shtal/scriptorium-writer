@@ -436,6 +436,81 @@ describe('settings', () => {
     await svc.saveSettings({ ...settings, editorFontSizePx: 20 })
     expect((await svc.readSettings()).editorFontSizePx).toBe(20)
   })
+
+  it('defaults language to ru on a fresh install (M26)', async () => {
+    const { svc } = await makeService()
+    expect((await svc.readSettings()).language).toBe('ru')
+  })
+
+  it('backfills language to ru for a settings file lacking the key (M26)', async () => {
+    // Construct a fresh service with an empty cache: write a partial settings.json
+    // (no `language` key) FIRST, then instantiate, so the very first readSettings must
+    // merge the on-disk partial over defaults. (makeService warms the cache via
+    // ensureLibrary → readSettings, which would mask a from-disk backfill.)
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, lib)
+    await fsp.writeFile(
+      join(userData, 'settings.json'),
+      JSON.stringify({ editorFontSizePx: 19 }),
+      'utf8'
+    )
+    const svc = new FileService({ userDataPath: userData, defaultLibraryPath: lib })
+
+    const settings = await svc.readSettings()
+    expect(settings.language).toBe('ru')
+    // Sanity: the on-disk override still applied, proving we read the partial file.
+    expect(settings.editorFontSizePx).toBe(19)
+  })
+
+  it('seeds language from firstRunLanguage on a genuine fresh install (no settings file)', async () => {
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, lib)
+    const svc = new FileService({
+      userDataPath: userData,
+      defaultLibraryPath: lib,
+      firstRunLanguage: 'en'
+    })
+
+    const settings = await svc.readSettings()
+    expect(settings.language).toBe('en')
+    // The seed is persisted to disk, not just held in memory.
+    const onDisk = JSON.parse(await fsp.readFile(join(userData, 'settings.json'), 'utf8'))
+    expect(onDisk.language).toBe('en')
+  })
+
+  it('defaults language to ru on a fresh install when firstRunLanguage is omitted', async () => {
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, lib)
+    const svc = new FileService({ userDataPath: userData, defaultLibraryPath: lib })
+
+    expect((await svc.readSettings()).language).toBe('ru')
+  })
+
+  it('keeps ru for an existing file missing language even when firstRunLanguage is en', async () => {
+    // Critical regression guard: an existing install that predates the `language` key
+    // must stay Russian. The first-run seed applies ONLY when no settings file exists.
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, lib)
+    await fsp.writeFile(
+      join(userData, 'settings.json'),
+      JSON.stringify({ editorFontSizePx: 19 }),
+      'utf8'
+    )
+    const svc = new FileService({
+      userDataPath: userData,
+      defaultLibraryPath: lib,
+      firstRunLanguage: 'en'
+    })
+
+    const settings = await svc.readSettings()
+    expect(settings.language).toBe('ru')
+    // Sanity: we really read the partial on-disk file (merge path), not the seed path.
+    expect(settings.editorFontSizePx).toBe(19)
+  })
 })
 
 describe('exportLibraryArchive (M13)', () => {

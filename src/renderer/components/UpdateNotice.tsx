@@ -1,5 +1,7 @@
 import { IconDownload } from '@tabler/icons-react'
 import { useUiStore } from '@renderer/store/uiStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
 
 /**
  * Small, dismissible "update ready" notice (M12). Shown as a footer-style strip (not a
@@ -8,6 +10,7 @@ import { useUiStore } from '@renderer/store/uiStore'
  * "Позже" just clears the flag and hides the strip until the next launch.
  */
 export function UpdateNotice(): JSX.Element | null {
+  const t = useT()
   const version = useUiStore((s) => s.updateReadyVersion)
   const setUpdateReadyVersion = useUiStore((s) => s.setUpdateReadyVersion)
 
@@ -23,13 +26,13 @@ export function UpdateNotice(): JSX.Element | null {
     <div className="update-notice" role="status">
       <IconDownload size={16} className="update-notice-icon" />
       <span className="update-notice-text">
-        Обновление загружено (версия {version}). Перезапустите, чтобы установить.
+        {format(t.updateNotice.ready, { version })}
       </span>
       <button className="update-notice-btn primary" onClick={restart}>
-        Перезапустить
+        {t.updateNotice.restart}
       </button>
       <button className="update-notice-btn ghost" onClick={() => setUpdateReadyVersion(null)}>
-        Позже
+        {t.updateNotice.later}
       </button>
     </div>
   )

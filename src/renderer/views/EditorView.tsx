@@ -12,6 +12,7 @@ import { useFind } from '@renderer/editor/find/useFind'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
 import type { Story } from '@shared/types'
 
 export function EditorView(): JSX.Element {
@@ -27,6 +28,7 @@ export function EditorView(): JSX.Element {
   const setActiveView = useUiStore((s) => s.setActiveView)
   const hideFooterInfo = useSettingsStore((s) => s.settings?.hideEditorFooterInfo ?? false)
   const updateSettings = useSettingsStore((s) => s.update)
+  const t = useT()
 
   // Chapter switcher: list the open story's chapters (title-by-id).
   const [chapters, setChapters] = useState<{ id: string; title: string }[]>([])
@@ -70,13 +72,13 @@ export function EditorView(): JSX.Element {
   if (!chapterId) {
     return (
       <div className="editor-empty">
-        <p>Нет открытой работы.</p>
+        <p>{t.editor.emptyTitle}</p>
         <p>
-          Создайте новую работу в{' '}
+          {t.editor.emptyBefore}
           <button className="linkish" onClick={() => setActiveView('library')}>
-            Библиотеке
+            {t.editor.emptyLink}
           </button>
-          , затем начните писать.
+          {t.editor.emptyAfter}
         </p>
       </div>
     )
@@ -104,18 +106,18 @@ export function EditorView(): JSX.Element {
         )}
         <IconHistory
           size={18}
-          title="История версий"
+          title={t.editor.versionHistory}
           style={{ cursor: 'pointer' }}
           onClick={() => setActiveView('versions')}
         />
-        <IconMaximize size={18} title="Режим фокуса" style={{ cursor: 'pointer' }} onClick={toggleFocus} />
+        <IconMaximize size={18} title={t.editor.focusMode} style={{ cursor: 'pointer' }} onClick={toggleFocus} />
         <IconLayoutBottombarCollapse
           size={18}
-          title="Минимальная нижняя панель"
+          title={t.editor.minimalFooter}
           style={{ cursor: 'pointer' }}
           onClick={() => void updateSettings({ hideEditorFooterInfo: !hideFooterInfo })}
         />
-        <ExportMenu chapterId={chapterId} triggerLabel="Экспорт" />
+        <ExportMenu chapterId={chapterId} triggerLabel={t.editor.export} />
       </div>
       <EditorSurface editor={editor} />
       <FindReplaceBar find={find} />

@@ -6,11 +6,17 @@ import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { ExportMenu } from '@renderer/editor/ExportMenu'
 import { ConfirmDialog } from '@renderer/components/ConfirmDialog'
+import { useSettingsStore } from '@renderer/store/settingsStore'
+import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
+import { plural } from '@renderer/i18n/plural'
 import { ImportDialog } from './ImportDialog'
 
 type ImportPayload = Extract<ImportFileResult, { canceled: false }>
 
 export function ChaptersView(): JSX.Element {
+  const t = useT()
+  const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
   const story = useStoryStore((s) => s.story)
   const chapters = useStoryStore((s) => s.chapters)
   const setActiveView = useUiStore((s) => s.setActiveView)
@@ -24,7 +30,7 @@ export function ChaptersView(): JSX.Element {
     void useStoryStore.getState().reload()
   }, [])
 
-  if (!story) return <div style={{ padding: 34 }}>Нет открытой работы.</div>
+  if (!story) return <div style={{ padding: 34 }}>{t.chapters.noStory}</div>
 
   const openCh = async (id: string): Promise<void> => {
     await useEditorStore.getState().openChapter(story.id, id)
@@ -37,7 +43,7 @@ export function ChaptersView(): JSX.Element {
     setDragIndex(null)
   }
   const addChapter = async (): Promise<void> => {
-    await useStoryStore.getState().addChapter('Новая глава')
+    await useStoryStore.getState().addChapter('')
     setActiveView('editor')
   }
   const startImport = async (): Promise<void> => {
@@ -52,13 +58,15 @@ export function ChaptersView(): JSX.Element {
   return (
     <div className="chapters-view">
       <div className="chapters-head">
-        <span className="chapters-title">Главы · {chapters.length}</span>
+        <span className="chapters-title">
+          {format(t.chapters.heading, { count: String(chapters.length) })}
+        </span>
         <div className="chapters-actions">
           <button className="linkish" onClick={() => void addChapter()}>
-            <IconPlus size={15} /> глава
+            <IconPlus size={15} /> {t.chapters.addChapter}
           </button>
           <button className="linkish" onClick={() => void startImport()}>
-            Импортировать…
+            {t.chapters.import}
           </button>
         </div>
       </div>
@@ -81,16 +89,18 @@ export function ChaptersView(): JSX.Element {
               onBlur={(e) => void useStoryStore.getState().renameChapter(c.id, e.target.value)}
             />
             <span className="chapters-open linkish" onClick={() => void openCh(c.id)}>
-              открыть
+              {t.chapters.open}
             </span>
             <ExportMenu
               chapterId={c.id}
               variant="chapter"
               trigger={<IconDownload size={15} />}
-              triggerLabel="Экспортировать главу"
+              triggerLabel={t.chapters.exportChapter}
               triggerClassName="chapters-export"
             />
-            <span className="chapters-words">{c.wordCount} сл</span>
+            <span className="chapters-words">
+              {c.wordCount} {plural(c.wordCount, t.plurals.words, language)}
+            </span>
             <button className="linkish" onClick={() => setConfirmId(c.id)}>
               <IconTrash size={15} />
             </button>
@@ -106,8 +116,10 @@ export function ChaptersView(): JSX.Element {
       )}
       {confirmTarget && (
         <ConfirmDialog
-          title="Удалить главу?"
-          message={`«${confirmTarget.title || 'Без названия'}» будет перемещена в корзину.`}
+          title={t.chapters.deleteConfirmTitle}
+          message={format(t.chapters.deleteConfirmMessage, {
+            title: confirmTarget.title || t.chapters.untitled
+          })}
           onConfirm={() => {
             void useStoryStore.getState().removeChapter(confirmTarget.id)
             setConfirmId(null)
