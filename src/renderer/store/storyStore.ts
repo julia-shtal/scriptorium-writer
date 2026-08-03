@@ -3,6 +3,7 @@ import type { Story, StoryMeta } from '@shared/types'
 import { useEditorStore } from './editorStore'
 import { useSettingsStore } from './settingsStore'
 import { moveItem } from '@renderer/views/chapters-reorder'
+import { api } from '@renderer/platform'
 
 // Persisted seed titles (author data), picked by the active UI language at creation
 // time — intentionally NOT in the i18n dictionary: once written they become chapter/
@@ -38,7 +39,7 @@ interface StoryState {
 async function loadRows(story: Story): Promise<ChapterRow[]> {
   return Promise.all(
     story.chapterOrder.map(async (id) => {
-      const ch = await window.api.readChapter(story.id, id)
+      const ch = await api().readChapter(story.id, id)
       return { id: ch.id, title: ch.title, wordCount: ch.wordCount }
     })
   )
@@ -49,7 +50,7 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   chapters: [],
 
   load: async (storyId) => {
-    const story = await window.api.readStory(storyId)
+    const story = await api().readStory(storyId)
     set({ story, chapters: await loadRows(story) })
   },
 
@@ -59,11 +60,11 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   },
 
   openStory: async (storyId) => {
-    const story = await window.api.readStory(storyId)
+    const story = await api().readStory(storyId)
     set({ story, chapters: await loadRows(story) })
     let chapterId = story.chapterOrder[0]
     if (!chapterId) {
-      const ch = await window.api.createChapter(storyId, FIRST_CHAPTER_TITLE[currentLanguage()])
+      const ch = await api().createChapter(storyId, FIRST_CHAPTER_TITLE[currentLanguage()])
       chapterId = ch.id
       await get().reload()
     }
@@ -73,7 +74,7 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   reorder: async (chapterIds) => {
     const { story } = get()
     if (!story) return
-    await window.api.reorderChapters(story.id, chapterIds)
+    await api().reorderChapters(story.id, chapterIds)
     const byId = new Map(get().chapters.map((c) => [c.id, c]))
     set({
       story: { ...story, chapterOrder: chapterIds },
@@ -89,7 +90,7 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   addChapter: async (title) => {
     const { story } = get()
     if (!story) return
-    const ch = await window.api.createChapter(story.id, title || NEW_CHAPTER_TITLE[currentLanguage()])
+    const ch = await api().createChapter(story.id, title || NEW_CHAPTER_TITLE[currentLanguage()])
     await get().reload()
     await useEditorStore.getState().openChapter(story.id, ch.id)
   },
@@ -106,8 +107,8 @@ export const useStoryStore = create<StoryState>((set, get) => ({
       editor.setTitle(title)
       await editor.flush()
     } else {
-      const ch = await window.api.readChapter(story.id, chapterId)
-      await window.api.saveChapter(story.id, { id: chapterId, title, doc: ch.doc })
+      const ch = await api().readChapter(story.id, chapterId)
+      await api().saveChapter(story.id, { id: chapterId, title, doc: ch.doc })
     }
     await get().reload()
   },
@@ -115,14 +116,14 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   removeChapter: async (chapterId) => {
     const { story } = get()
     if (!story) return
-    await window.api.deleteChapter(story.id, chapterId)
+    await api().deleteChapter(story.id, chapterId)
     await get().reload()
   },
 
   updateMeta: async (patch) => {
     const { story } = get()
     if (!story) return
-    const updated = await window.api.updateStoryMeta(story.id, patch)
+    const updated = await api().updateStoryMeta(story.id, patch)
     set({ story: updated })
   },
 

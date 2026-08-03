@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ProseMirrorJSON, SaveResult } from '@shared/types'
 import { countWords, countWordsInText } from '@shared/word-count'
+import { api } from '@renderer/platform'
 import { useSettingsStore } from './settingsStore'
 
 /** Footer save-status states. */
@@ -79,7 +80,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       debounceTimer = null
     }
     if (get().dirty) await get().flush()
-    const chapter = await window.api.readChapter(storyId, chapterId)
+    const chapter = await api().readChapter(storyId, chapterId)
     set({
       storyId,
       chapterId,
@@ -136,7 +137,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ saveStatus: 'saving', mdWarning: null })
     const run = (async () => {
       try {
-        const result: SaveResult = await window.api.saveChapter(storyId, {
+        const result: SaveResult = await api().saveChapter(storyId, {
           id: chapterId,
           title,
           doc

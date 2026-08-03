@@ -9,6 +9,7 @@ import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
 import { plural } from '@renderer/i18n/plural'
 import type { StorySummary } from '@shared/types'
+import { api } from '@renderer/platform'
 import { formatDate } from './format'
 
 export function LibraryView(): JSX.Element {
@@ -19,7 +20,7 @@ export function LibraryView(): JSX.Element {
   const language = useSettingsStore((s) => s.settings?.language ?? 'ru')
   const t = useT()
 
-  const refresh = async (): Promise<void> => setRows(await window.api.listStories())
+  const refresh = async (): Promise<void> => setRows(await api().listStories())
   useEffect(() => {
     void refresh()
   }, [])
@@ -30,12 +31,12 @@ export function LibraryView(): JSX.Element {
   }
   const create = async (): Promise<void> => {
     if (!title.trim()) return
-    await window.api.createStory({ title: title.trim() })
+    await api().createStory({ title: title.trim() })
     setTitle('')
     await refresh()
   }
   const remove = async (id: string): Promise<void> => {
-    await window.api.deleteStory(id)
+    await api().deleteStory(id)
     setConfirmId(null)
     // If we just deleted the story currently open in the editor, close it so the UI
     // doesn't keep showing a deleted story's chapters/history/editor.

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { planImportChapters, commitImport, type PlannedChapter } from './importChapters'
 import type { ImportFileResult, ProseMirrorJSON } from '@shared/types'
+import { resetPlatform } from '@renderer/platform'
+import { setFakeApi } from '@renderer/test/fakePlatform'
 
 const md = (text: string): ImportFileResult => ({ canceled: false, kind: 'md', text })
 
@@ -29,7 +31,7 @@ describe('planImportChapters (markdown)', () => {
 
 describe('commitImport', () => {
   afterEach(() => {
-    vi.unstubAllGlobals()
+    resetPlatform()
   })
 
   const doc = (marker: string): ProseMirrorJSON =>
@@ -44,7 +46,7 @@ describe('commitImport', () => {
     const saveChapter = vi.fn(async (_storyId: string, ch: { id: string }) => {
       calls.push(`save:${ch.id}`)
     })
-    vi.stubGlobal('window', { api: { createChapter, saveChapter } })
+    setFakeApi({ createChapter, saveChapter })
 
     const planned: PlannedChapter[] = [
       { title: 'A', doc: doc('a') },
@@ -68,7 +70,7 @@ describe('commitImport', () => {
   it('returns 0 and touches nothing for an empty plan', async () => {
     const createChapter = vi.fn()
     const saveChapter = vi.fn()
-    vi.stubGlobal('window', { api: { createChapter, saveChapter } })
+    setFakeApi({ createChapter, saveChapter })
 
     const created = await commitImport('story-1', [])
 

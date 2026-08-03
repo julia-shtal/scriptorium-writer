@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Settings } from '@shared/types'
+import { api } from '@renderer/platform'
 import { useEditorStore } from './editorStore'
 import { useUiStore } from './uiStore'
 
@@ -24,7 +25,7 @@ function liveDeps(): SettingsEffectDeps {
   return {
     configureAutosave: useEditorStore.getState().configureAutosave,
     setSpellLanguages: useUiStore.getState().setSpellLanguages,
-    applySpellLanguages: (langs) => window.api.applySpellLanguages(langs)
+    applySpellLanguages: (langs) => api().applySpellLanguages(langs)
   }
 }
 
@@ -37,7 +38,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: null,
   load: async () => {
-    const settings = await window.api.readSettings()
+    const settings = await api().readSettings()
     set({ settings })
     applySettingsEffects(settings, liveDeps())
   },
@@ -45,7 +46,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const current = get().settings
     if (!current) return
     const next: Settings = { ...current, ...patch }
-    await window.api.saveSettings(next)
+    await api().saveSettings(next)
     set({ settings: next })
     applySettingsEffects(next, liveDeps())
   }

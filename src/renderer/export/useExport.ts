@@ -3,6 +3,7 @@ import type { ExportFormat } from '@shared/types'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
+import { api } from '@renderer/platform'
 
 /**
  * Shared export controller for the editor export menu and the chapters list.
@@ -41,7 +42,7 @@ export function useExport(): UseExport {
       if (busy || !storyId) return false
       setBusy(true)
       try {
-        const res = await window.api.exportChapter(storyId, chapterId, fmt)
+        const res = await api().exportChapter(storyId, chapterId, fmt)
         // Canceled dialog is not an error and not a success — leave state as-is.
         return res.canceled === false
       } catch {
@@ -59,7 +60,7 @@ export function useExport(): UseExport {
       if (busy || !storyId) return false
       setBusy(true)
       try {
-        const res = await window.api.exportStory(storyId, fmt)
+        const res = await api().exportStory(storyId, fmt)
         return res.canceled === false
       } catch {
         setError(format(t.errors.exportStoryFailed, { ext: ext(fmt) }))

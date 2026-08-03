@@ -3,6 +3,8 @@ import { useStoryStore } from './storyStore'
 import { useEditorStore } from './editorStore'
 import { useSettingsStore } from './settingsStore'
 import type { Story, Chapter, Settings } from '@shared/types'
+import { api, resetPlatform } from '@renderer/platform'
+import { setFakeApi } from '@renderer/test/fakePlatform'
 
 const settings = (language: 'ru' | 'en'): Settings => ({
   theme: 'book', autosaveIntervalMs: 1, autosaveDebounceMs: 1, spellLanguages: [],
@@ -23,20 +25,18 @@ beforeEach(() => {
   useStoryStore.setState({ story: null, chapters: [] })
   // Reset settings so a prior test's language never leaks into the default-title picker.
   useSettingsStore.setState({ settings: null })
-  vi.stubGlobal('window', {
-    api: {
-      readStory: vi.fn(async () => story),
-      readChapter: vi.fn(async (_s: string, id: string) => chapter(id, id === 'c1' ? 'One' : 'Two')),
-      reorderChapters: vi.fn(async () => {}),
-      createChapter: vi.fn(async () => chapter('c3', 'Three')),
-      deleteChapter: vi.fn(async () => {}),
-      updateStoryMeta: vi.fn(async () => ({ ...story, title: 'Renamed' })),
-      saveChapter: vi.fn(async () => ({ savedAt: 'x', wordCount: 0, versionId: 'v' }))
-    }
+  setFakeApi({
+    readStory: vi.fn(async () => story),
+    readChapter: vi.fn(async (_s: string, id: string) => chapter(id, id === 'c1' ? 'One' : 'Two')),
+    reorderChapters: vi.fn(async () => {}),
+    createChapter: vi.fn(async () => chapter('c3', 'Three')),
+    deleteChapter: vi.fn(async () => {}),
+    updateStoryMeta: vi.fn(async () => ({ ...story, title: 'Renamed' })),
+    saveChapter: vi.fn(async () => ({ savedAt: 'x', wordCount: 0, versionId: 'v' }))
   })
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => resetPlatform())
 
 describe('storyStore.load', () => {
   it('loads the story and its chapter summaries in order', async () => {
@@ -54,7 +54,7 @@ describe('storyStore.reorder', () => {
   it('persists the new order and reflects it locally', async () => {
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().reorder(['c2', 'c1'])
-    expect(window.api.reorderChapters).toHaveBeenCalledWith('s1', ['c2', 'c1'])
+    expect(api().reorderChapters).toHaveBeenCalledWith('s1', ['c2', 'c1'])
     expect(useStoryStore.getState().chapters.map((c) => c.id)).toEqual(['c2', 'c1'])
   })
 })
@@ -63,7 +63,7 @@ describe('storyStore.updateMeta', () => {
   it('persists a meta patch and stores the returned story', async () => {
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().updateMeta({ title: 'Renamed' })
-    expect(window.api.updateStoryMeta).toHaveBeenCalledWith('s1', { title: 'Renamed' })
+    expect(api().updateStoryMeta).toHaveBeenCalledWith('s1', { title: 'Renamed' })
     expect(useStoryStore.getState().story?.title).toBe('Renamed')
   })
 })
@@ -88,14 +88,14 @@ describe('storyStore.renameChapter', () => {
     await useStoryStore.getState().renameChapter('c1', 'New Title')
     expect(setTitle).toHaveBeenCalledWith('New Title')
     expect(flush).toHaveBeenCalled()
-    expect(window.api.saveChapter).not.toHaveBeenCalled()
+    expect(api().saveChapter).not.toHaveBeenCalled()
   })
 
   it('resaves a NON-open chapter directly (no live editor doc to preserve)', async () => {
     useEditorStore.setState({ chapterId: 'c1', setTitle: vi.fn(), flush: vi.fn(async () => {}) } as never)
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().renameChapter('c2', 'Two Renamed')
-    expect(window.api.saveChapter).toHaveBeenCalledWith('s1', {
+    expect(api().saveChapter).toHaveBeenCalledWith('s1', {
       id: 'c2', title: 'Two Renamed', doc: { type: 'doc', content: [] }
     })
   })
@@ -111,27 +111,27 @@ describe('storyStore.addChapter default title is localized by UI language', () =
     useSettingsStore.setState({ settings: settings('en') })
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'New chapter')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'New chapter')
   })
 
   it('uses the Russian default when language is ru', async () => {
     useSettingsStore.setState({ settings: settings('ru') })
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
   })
 
   it('defaults to Russian when settings are unloaded', async () => {
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
   })
 
   it('respects an explicit title over the localized default', async () => {
     useSettingsStore.setState({ settings: settings('en') })
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('My Chapter')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'My Chapter')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'My Chapter')
   })
 })
 
@@ -141,18 +141,18 @@ describe('storyStore.openStory first-chapter default title is localized', () => 
 
   beforeEach(() => {
     useEditorStore.setState({ openChapter: vi.fn(async () => {}) } as never)
-    ;(window.api.readStory as ReturnType<typeof vi.fn>).mockImplementation(async () => emptyStory)
+    ;(api().readStory as ReturnType<typeof vi.fn>).mockImplementation(async () => emptyStory)
   })
 
   it('seeds "Chapter 1" when language is en', async () => {
     useSettingsStore.setState({ settings: settings('en') })
     await useStoryStore.getState().openStory('s1')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Chapter 1')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Chapter 1')
   })
 
   it('seeds "Глава 1" when language is ru', async () => {
     useSettingsStore.setState({ settings: settings('ru') })
     await useStoryStore.getState().openStory('s1')
-    expect(window.api.createChapter).toHaveBeenCalledWith('s1', 'Глава 1')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Глава 1')
   })
 })

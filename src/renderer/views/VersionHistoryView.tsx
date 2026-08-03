@@ -8,6 +8,7 @@ import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
 import { plural } from '@renderer/i18n/plural'
+import { api } from '@renderer/platform'
 import type { VersionSummary } from '@shared/types'
 import { formatDateTime } from './format'
 
@@ -34,7 +35,7 @@ export function VersionHistoryView(): JSX.Element {
 
   useEffect(() => {
     if (!storyId || !chapterId) return
-    void window.api.listVersions(storyId, chapterId).then(setVersions)
+    void api().listVersions(storyId, chapterId).then(setVersions)
   }, [storyId, chapterId])
 
   if (!storyId || !chapterId) {
@@ -42,7 +43,7 @@ export function VersionHistoryView(): JSX.Element {
   }
 
   const preview = async (versionId: string): Promise<void> => {
-    const ch = await window.api.readVersion(storyId, chapterId, versionId)
+    const ch = await api().readVersion(storyId, chapterId, versionId)
     setSelected(versionId)
     previewEditor?.commands.setContent(ch.doc, { emitUpdate: false })
   }
@@ -50,7 +51,7 @@ export function VersionHistoryView(): JSX.Element {
   const restore = async (versionId: string): Promise<void> => {
     setBusy(true)
     try {
-      await window.api.restoreVersion(storyId, chapterId, versionId)
+      await api().restoreVersion(storyId, chapterId, versionId)
       await openChapter(storyId, chapterId) // reload the new canon into the editor
       setActiveView('editor')
     } finally {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { IconAlertTriangle } from '@tabler/icons-react'
 import type { ChapterRecovery } from '@shared/types'
 import { useT } from '@renderer/i18n/useT'
+import { api } from '@renderer/platform'
 
 interface Props {
   recoveries: ChapterRecovery[]
@@ -24,7 +25,7 @@ export function RecoveryDialog({ recoveries, onResolved, onClose }: Props): JSX.
     setBusy(r.chapterId)
     setFailed(null)
     try {
-      await window.api.restoreVersion(r.storyId, r.chapterId, r.newestVersionId)
+      await api().restoreVersion(r.storyId, r.chapterId, r.newestVersionId)
       onResolved(r)
     } catch {
       setFailed(r.chapterId)
