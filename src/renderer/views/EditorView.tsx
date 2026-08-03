@@ -13,6 +13,7 @@ import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
+import { api } from '@renderer/platform'
 import type { Story } from '@shared/types'
 
 export function EditorView(): JSX.Element {
@@ -34,10 +35,10 @@ export function EditorView(): JSX.Element {
   const [chapters, setChapters] = useState<{ id: string; title: string }[]>([])
   useEffect(() => {
     if (!storyId) return
-    void window.api.readStory(storyId).then(async (story: Story) => {
+    void api().readStory(storyId).then(async (story: Story) => {
       const rows = await Promise.all(
         story.chapterOrder.map(async (id) => {
-          const ch = await window.api.readChapter(storyId, id)
+          const ch = await api().readChapter(storyId, id)
           return { id: ch.id, title: ch.title }
         })
       )

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ProseMirrorJSON } from '@shared/types'
 import { useEditorStore } from './editorStore'
+import { resetPlatform } from '@renderer/platform'
+import { setFakeApi } from '@renderer/test/fakePlatform'
 
 const para = (text: string): ProseMirrorJSON => ({
   type: 'doc',
@@ -43,10 +45,10 @@ describe('editorStore', () => {
       wordCount: 3,
       versionId: 'v1'
     }))
-    vi.stubGlobal('window', { api: { readChapter, saveChapter } })
+    setFakeApi({ readChapter, saveChapter })
   })
 
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => resetPlatform())
 
   // add alongside the existing afterEach
   afterEach(() => {
@@ -54,7 +56,7 @@ describe('editorStore', () => {
     vi.useRealTimers()
   })
 
-  test('openChapter loads via window.api.readChapter and is not dirty', async () => {
+  test('openChapter loads via the platform api readChapter and is not dirty', async () => {
     await useEditorStore.getState().openChapter('s1', 'c1')
     expect(readChapter).toHaveBeenCalledWith('s1', 'c1')
     const s = useEditorStore.getState()

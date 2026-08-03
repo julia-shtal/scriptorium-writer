@@ -2,13 +2,15 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
+import { getPlatform } from '@renderer/platform'
 
 /**
  * Registers the lifecycle flush triggers that don't originate from typing:
  *  - window `blur` → flush (leaving the app shouldn't strand unsaved edits);
- *  - the main-process quit handshake (window.lifecycle.onQuitFlush) → flush.
+ *  - the main-process quit handshake (the platform lifecycle's onQuitFlush) → flush.
  *  - the main-process update-downloaded push (M12) → surface the update notice.
- * Mounted once at the app root.
+ * Mounted once at the app root. The lifecycle capability is optional (absent on
+ * platforms with no host lifecycle, e.g. web/PWA), so every call is null-checked.
  */
 export function useAutosaveLifecycle(): void {
   useEffect(() => {
@@ -21,13 +23,15 @@ export function useAutosaveLifecycle(): void {
     }
     window.addEventListener('blur', onBlur)
 
+    const { lifecycle } = getPlatform()
+
     // onQuitFlush registers a persistent listener in preload; register it once here.
-    window.lifecycle.onQuitFlush(async () => {
+    lifecycle?.onQuitFlush(async () => {
       await flush()
     })
 
     // Auto-update ready notice (M12): main pushes once a download completes.
-    window.lifecycle.onUpdateDownloaded((info) => {
+    lifecycle?.onUpdateDownloaded((info) => {
       useUiStore.getState().setUpdateReadyVersion(info.version)
     })
 

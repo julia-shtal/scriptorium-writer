@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { bootstrapLibrary } from './bootstrap'
+import { resetPlatform } from '@renderer/platform'
+import { setFakeApi } from '@renderer/test/fakePlatform'
 
 describe('bootstrapLibrary', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => resetPlatform())
 
   test('opens the first existing story/chapter when the library is non-empty', async () => {
     const listStories = vi.fn(async () => [{ id: 's1' }])
@@ -10,9 +12,7 @@ describe('bootstrapLibrary', () => {
     const createStory = vi.fn()
     const createChapter = vi.fn()
     const readSettings = vi.fn(async () => ({}))
-    vi.stubGlobal('window', {
-      api: { listStories, readStory, createStory, createChapter, readSettings }
-    })
+    setFakeApi({ listStories, readStory, createStory, createChapter, readSettings })
 
     const result = await bootstrapLibrary()
 
@@ -33,9 +33,7 @@ describe('bootstrapLibrary', () => {
       lastOpenedStoryId: 's2',
       lastOpenedChapterId: 'c4'
     }))
-    vi.stubGlobal('window', {
-      api: { listStories, readStory, createStory, createChapter, readSettings }
-    })
+    setFakeApi({ listStories, readStory, createStory, createChapter, readSettings })
 
     const result = await bootstrapLibrary()
 
@@ -57,9 +55,7 @@ describe('bootstrapLibrary', () => {
       lastOpenedStoryId: 'deleted-story',
       lastOpenedChapterId: 'c99'
     }))
-    vi.stubGlobal('window', {
-      api: { listStories, readStory, createStory, createChapter, readSettings }
-    })
+    setFakeApi({ listStories, readStory, createStory, createChapter, readSettings })
 
     const result = await bootstrapLibrary()
 
@@ -80,9 +76,7 @@ describe('bootstrapLibrary', () => {
       lastOpenedStoryId: 's1',
       lastOpenedChapterId: 'deleted-chapter'
     }))
-    vi.stubGlobal('window', {
-      api: { listStories, readStory, createStory, createChapter, readSettings }
-    })
+    setFakeApi({ listStories, readStory, createStory, createChapter, readSettings })
 
     const result = await bootstrapLibrary()
 
@@ -98,9 +92,7 @@ describe('bootstrapLibrary', () => {
     const saveChapter = vi.fn(async () => ({ savedAt: '', wordCount: 0, versionId: 'v' }))
     const readSettings = vi.fn(async () => ({ demoSeeded: false }))
     const saveSettings = vi.fn(async () => {})
-    vi.stubGlobal('window', {
-      api: { listStories, createStory, createChapter, saveChapter, readSettings, saveSettings }
-    })
+    setFakeApi({ listStories, createStory, createChapter, saveChapter, readSettings, saveSettings })
 
     const result = await bootstrapLibrary()
 
@@ -116,9 +108,7 @@ describe('bootstrapLibrary', () => {
     const createStory = vi.fn()
     const saveSettings = vi.fn()
     const readSettings = vi.fn(async () => ({ demoSeeded: true }))
-    vi.stubGlobal('window', {
-      api: { listStories, createStory, saveSettings, readSettings }
-    })
+    setFakeApi({ listStories, createStory, saveSettings, readSettings })
 
     const result = await bootstrapLibrary()
 

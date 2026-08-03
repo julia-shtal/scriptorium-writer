@@ -19,6 +19,7 @@ import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useAutosaveLifecycle } from '@renderer/editor/useAutosaveLifecycle'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
+import { api } from '@renderer/platform'
 import type { ChapterRecovery } from '@shared/types'
 
 export default function App(): JSX.Element {
@@ -40,7 +41,7 @@ export default function App(): JSX.Element {
   useEffect(() => {
     void (async () => {
       try {
-        const found = await window.api.scanLibrary()
+        const found = await api().scanLibrary()
         if (found.length > 0) setRecoveries(found)
         const { storyId, chapterId } = await bootstrapLibrary()
         if (storyId && chapterId) {

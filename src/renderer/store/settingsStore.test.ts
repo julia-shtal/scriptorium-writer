@@ -10,7 +10,7 @@ const base: Settings = {
 
 // No jsdom in this repo (vitest.config.ts runs `environment: 'node'`); fake just the
 // CSSStyleDeclaration surface applySettingsEffects touches, mirroring how other store
-// tests stub `window.api` instead of pulling in a full DOM.
+// tests inject a fake platform instead of pulling in a full DOM.
 function fakeDocument(): Document {
   const props = new Map<string, string>()
   const style = {

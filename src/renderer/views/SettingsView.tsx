@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { isAppError } from '@shared/errors'
+import { api } from '@renderer/platform'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
 const LANGS: { code: string; label: string }[] = [
@@ -20,7 +21,7 @@ export function SettingsView(): JSX.Element {
   const exportLibrary = async (): Promise<void> => {
     setExportState({ kind: 'busy' })
     try {
-      const result = await window.api.exportLibrary()
+      const result = await api().exportLibrary()
       setExportState(result.canceled ? { kind: 'idle' } : { kind: 'done', path: result.path })
     } catch (err) {
       const msg = isAppError(err)
@@ -89,7 +90,7 @@ export function SettingsView(): JSX.Element {
       <div className="settings-field">{t.settings.libraryFolder}
         <div className="settings-path">
           <code>{settings.libraryPath}</code>
-          <button className="linkish" onClick={() => void window.api.revealInFolder(settings.libraryPath)}>
+          <button className="linkish" onClick={() => void api().revealInFolder(settings.libraryPath)}>
             {t.settings.reveal}
           </button>
           <button

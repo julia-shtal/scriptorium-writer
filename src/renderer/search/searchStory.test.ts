@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { searchStory, findOffsets, type SearchLabels } from './searchStory'
 import type { Story, Chapter, Notes } from '@shared/types'
+import { api, resetPlatform } from '@renderer/platform'
+import { setFakeApi } from '@renderer/test/fakePlatform'
 
 // Russian labels fixture: keeps the existing section-chrome assertions valid
 // (author titles/entry names still flow through untouched).
@@ -41,19 +43,17 @@ const saveNotes = vi.fn()
 beforeEach(() => {
   saveChapter.mockClear()
   saveNotes.mockClear()
-  vi.stubGlobal('window', {
-    api: {
-      readChapter: vi.fn(async (_s: string, id: string) =>
-        id === 'c1' ? chapter('c1', 'Глава 1', 'Ветер нёс Ивана домой')
-                     : chapter('c2', 'Глава 2', 'Здесь ничего')),
-      readNotes: vi.fn(async () => notes),
-      saveChapter,
-      saveNotes
-    }
+  setFakeApi({
+    readChapter: vi.fn(async (_s: string, id: string) =>
+      id === 'c1' ? chapter('c1', 'Глава 1', 'Ветер нёс Ивана домой')
+                   : chapter('c2', 'Глава 2', 'Здесь ничего')),
+    readNotes: vi.fn(async () => notes),
+    saveChapter,
+    saveNotes
   })
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => resetPlatform())
 
 describe('findOffsets', () => {
   it('finds all non-overlapping matches case-insensitively', () => {
@@ -79,7 +79,7 @@ describe('searchStory', () => {
   })
 
   it('skips and counts a chapter that fails to read', async () => {
-    const readChapter = window.api.readChapter as ReturnType<typeof vi.fn>
+    const readChapter = api().readChapter as ReturnType<typeof vi.fn>
     readChapter.mockImplementationOnce(async () => {
       throw new Error('corrupt canon')
     })
@@ -87,9 +87,9 @@ describe('searchStory', () => {
     expect(out.failedChapters).toBe(1)
   })
 
-  it('returns empty for a blank query without touching the api', async () => {
+  it('returns empty for a blank query without touching the injected fake api', async () => {
     const out = await searchStory(story, '   ', LABELS)
     expect(out.matches).toEqual([])
-    expect(window.api.readChapter).not.toHaveBeenCalled()
+    expect(api().readChapter).not.toHaveBeenCalled()
   })
 })

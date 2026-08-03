@@ -1,10 +1,11 @@
 /**
  * M14 import orchestration. `planImportChapters` is pure: it maps a normalized import
  * payload + granularity to the chapters to create. `commitImport` performs the side
- * effects — creating and saving each chapter through the SAME `window.api.createChapter`
+ * effects — creating and saving each chapter through the SAME `api().createChapter`
  * / `saveChapter` path as any other chapter (atomic writes + snapshots preserved).
  */
 import type { ImportFileResult, ProseMirrorJSON } from '@shared/types'
+import { api } from '@renderer/platform'
 import { markdownToDoc, splitMarkdownByHeading } from './markdownToDoc'
 import { htmlToDoc, splitHtmlByHeading } from './htmlToDoc'
 
@@ -38,8 +39,8 @@ export function planImportChapters(result: ImportFileResult, mode: ImportMode): 
 
 /**
  * Create + save each planned chapter for `storyId`, in order, through the SAME
- * `window.api.createChapter` / `saveChapter` path as any other chapter (atomic writes +
- * snapshots preserved). Returns how many chapters were created. Reads `window.api`.
+ * `api().createChapter` / `saveChapter` path as any other chapter (atomic writes +
+ * snapshots preserved). Returns how many chapters were created. Reads the platform api.
  *
  * NOTE: a split import is not transactional — if a later chapter's save throws, earlier
  * chapters remain created. Acceptable for M14: imported chapters are normal, deletable
@@ -50,8 +51,8 @@ export async function commitImport(
   planned: PlannedChapter[]
 ): Promise<number> {
   for (const ch of planned) {
-    const created = await window.api.createChapter(storyId, ch.title)
-    await window.api.saveChapter(storyId, { id: created.id, title: ch.title, doc: ch.doc })
+    const created = await api().createChapter(storyId, ch.title)
+    await api().saveChapter(storyId, { id: created.id, title: ch.title, doc: ch.doc })
   }
   return planned.length
 }

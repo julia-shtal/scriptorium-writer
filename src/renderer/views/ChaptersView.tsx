@@ -10,6 +10,7 @@ import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
 import { plural } from '@renderer/i18n/plural'
+import { api } from '@renderer/platform'
 import { ImportDialog } from './ImportDialog'
 
 type ImportPayload = Extract<ImportFileResult, { canceled: false }>
@@ -47,7 +48,7 @@ export function ChaptersView(): JSX.Element {
     setActiveView('editor')
   }
   const startImport = async (): Promise<void> => {
-    const result = await window.api.readImportFile()
+    const result = await api().readImportFile()
     if (result.canceled) return
     setImportFile(result)
   }

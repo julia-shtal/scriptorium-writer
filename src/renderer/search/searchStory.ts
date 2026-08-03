@@ -1,5 +1,6 @@
 import type { Story } from '@shared/types'
 import { extractPlainText } from '@shared/doc-text'
+import { api } from '@renderer/platform'
 import { makeSnippet, type Snippet } from './snippet'
 
 export type NoteSection = 'characters' | 'locations' | 'world' | 'timeline' | 'scratch'
@@ -80,7 +81,7 @@ export async function searchStory(
 
   for (const chapterId of story.chapterOrder) {
     try {
-      const chapter = await window.api.readChapter(story.id, chapterId)
+      const chapter = await api().readChapter(story.id, chapterId)
       const text = extractPlainText(chapter.doc)
       const offsets = findOffsets(text, q)
       if (offsets.length > 0) {
@@ -99,7 +100,7 @@ export async function searchStory(
 
   let notesFailed = false
   try {
-    const notes = await window.api.readNotes(story.id)
+    const notes = await api().readNotes(story.id)
     const pushField = (section: NoteSection, entryName: string | undefined, text: string): void => {
       const offsets = findOffsets(text, q)
       if (offsets.length === 0) return

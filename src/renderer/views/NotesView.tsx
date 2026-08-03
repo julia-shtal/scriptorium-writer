@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import { useStoryStore } from '@renderer/store/storyStore'
 import { useT } from '@renderer/i18n/useT'
+import { api } from '@renderer/platform'
 import type { Notes, NoteEntry } from '@shared/types'
 
 // Fixed Notes categories from the data model. `key` is the persisted category
@@ -24,14 +25,14 @@ export function NotesView(): JSX.Element {
       timer.current = null
     }
     if (pending.current) {
-      void window.api.saveNotes(pending.current.storyId, pending.current.notes)
+      void api().saveNotes(pending.current.storyId, pending.current.notes)
       pending.current = null
     }
   }
 
   useEffect(() => {
     if (!storyId) return
-    void window.api.readNotes(storyId).then(setNotes)
+    void api().readNotes(storyId).then(setNotes)
     // Flush the departing story's pending edits before this view unmounts or the
     // story changes — otherwise a debounced save inside the 500ms window is lost
     // (reliability #1: never silently drop user edits).

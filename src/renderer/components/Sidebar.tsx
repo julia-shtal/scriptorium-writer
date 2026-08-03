@@ -15,6 +15,7 @@ import {
 import { useUiStore, type ViewId } from '@renderer/store/uiStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useT } from '@renderer/i18n/useT'
+import { api } from '@renderer/platform'
 
 interface NavDef {
   // `id` doubles as the stable `t.nav` lookup key — labels come from the active
@@ -52,7 +53,7 @@ export function Sidebar(): JSX.Element {
 
   useEffect(() => {
     if (!storyId || !chapterId) return
-    void window.api.listVersions(storyId, chapterId).then((v) => setVersionCount(v.length))
+    void api().listVersions(storyId, chapterId).then((v) => setVersionCount(v.length))
   }, [storyId, chapterId, lastSavedAt])
 
   const item = (def: NavDef): JSX.Element => {
