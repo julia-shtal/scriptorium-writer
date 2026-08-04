@@ -221,8 +221,16 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 Standard Electron three-process split. The
 security boundary is strict and must not be weakened:
 
-- **main** (`src/main/`) — window lifecycle, IPC handlers, and all filesystem I/O via
-  `FileService` (atomic writes, snapshots, scan/restore).
+- **main** (`src/main/`) — window lifecycle, IPC handlers, spellcheck, docx/zip, and
+  the Electron wiring that hands `FileService` a Node filesystem port.
+- **data** (`src/data/`) — the platform-neutral data layer: `FileService` (atomic
+  writes, snapshots, scan/restore), Markdown backup, path helpers. All disk work goes
+  through an injected `FsPort` (`src/data/fs-port.ts`) — no direct Node imports, with one
+  remaining exception: `exportLibraryArchive` still reaches into `src/main/library-archive`
+  (Node + `archiver`), to be hoisted behind a port in a later milestone.
+- **platform** (`src/platform/node/`) — per-platform `FsPort` implementations. Today:
+  `NodeFsPort`, a thin adapter over `node:fs/promises`. Browser (OPFS) / Android
+  (Capacitor) ports plug in here later without touching the data layer.
 - **preload** (`src/preload/`) — a typed `contextBridge` `window.api` surface; thin
   wrappers over `ipcRenderer.invoke`.
 - **renderer** (`src/renderer/`) — React UI. **Never imports `fs`, `path`, or any Node
@@ -273,7 +281,9 @@ which is why the canon is JSON, not Markdown.
 electron.vite.config.ts   # main / preload / renderer build config
 electron-builder.yml      # Windows NSIS packaging + GitHub publish (auto-update) config
 src/
-  main/                   # ALL disk I/O: FileService, atomic-write, snapshots, markdown/docx, auto-update, library-archive
+  main/                   # Electron wiring: IPC, spellcheck, docx/zip, auto-update, library-archive
+  data/                   # Platform-neutral data layer: FileService, atomic-write, snapshots, markdown, paths (injected FsPort — no Node imports)
+  platform/node/          # NodeFsPort — the Node/Electron FsPort implementation (only place in the data path that touches node:fs)
   preload/                # contextBridge → window.api (typed, decodes AppError)
   renderer/
     theme/book.css        # book theme tokens + page-stack texture
@@ -402,7 +412,7 @@ source or leaves a truncated archive.
 
 **Markdown backup (.md shadow).** Every successful chapter save also writes a
 human-readable Markdown copy beside the `.json` canon, through the same temp-then-rename
-atomic write (`src/main/markdown.ts`). Bold/italic/strike map to standard Markdown, the
+atomic write (`src/data/markdown.ts`). Bold/italic/strike map to standard Markdown, the
 scene divider to `---`, and footnotes to `[^n]` markers plus a definitions block (reusing
 `src/shared/footnote-markdown.ts`); paragraph alignment is intentionally dropped — which is
 why the canon stays JSON. The `.md` write is **best-effort**: a failure never fails the save

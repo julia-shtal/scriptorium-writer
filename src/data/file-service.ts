@@ -10,13 +10,17 @@
  *  - Corrupt/missing canon is surfaced for recovery, never silently blanked.
  *  - Deletes are soft (moved to `.trash/`), never destructive.
  *
- * The service is deliberately free of any Electron import so it can be unit-tested
- * against real temp directories. The main process supplies `userDataPath` and the
- * default library path at construction time.
+ * The service's own logic is Electron/Node-free and platform-portable: all disk work
+ * flows through an injected {@link FsPort}, so it can be unit-tested against real temp
+ * directories and run on any platform. The main process supplies that port
+ * (`NodeFsPort`), `userDataPath`, and the default library path at construction time.
+ * One exception remains at the module-graph level: `exportLibraryArchive` still imports
+ * `zipDirectory` from `../main/library-archive` (Node-only, `archiver`), which MP2
+ * deliberately left in `src/main` — see the TODO at that import.
  */
 
-import * as fsp from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import type { FsPort } from './fs-port'
+import { basenamePath as basename, joinPath as join } from './path-utils'
 import type {
   Chapter,
   ChapterRecovery,
@@ -40,7 +44,10 @@ import {
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
 import { serializeChapterToMarkdown } from './markdown'
-import { zipDirectory } from './library-archive'
+// TODO(MP6): the remaining Node coupling in the data layer — `library-archive` uses
+// `node:fs` + `archiver` and stays in `src/main` for now. Hoist zip/export behind a
+// port so this module graph is fully Node-free.
+import { zipDirectory } from '../main/library-archive'
 import { countWords } from '@shared/word-count'
 import {
   chapterFileStem,
@@ -51,6 +58,8 @@ import {
 } from './paths'
 
 export interface FileServiceOptions {
+  /** The platform filesystem port. Electron/main passes `new NodeFsPort()`. */
+  fs: FsPort
   /** Where per-machine settings live (`app.getPath('userData')` in production). */
   userDataPath: string
   /** Default library root when settings carry no override (documents/Scriptorium-Writer). */
@@ -69,6 +78,7 @@ const clonePmDoc = (doc: ProseMirrorJSON): ProseMirrorJSON =>
   JSON.parse(JSON.stringify(doc)) as ProseMirrorJSON
 
 export class FileService {
+  private readonly fs: FsPort
   private readonly userDataPath: string
   private readonly defaultLibraryPath: string
   private readonly firstRunLanguage: 'ru' | 'en'
@@ -78,6 +88,7 @@ export class FileService {
   private lastSnapshotMs = 0
 
   constructor(options: FileServiceOptions) {
+    this.fs = options.fs
     this.userDataPath = options.userDataPath
     this.defaultLibraryPath = options.defaultLibraryPath
     this.firstRunLanguage = options.firstRunLanguage ?? 'ru'
@@ -105,7 +116,7 @@ export class FileService {
   async readSettings(): Promise<Settings> {
     if (this.settingsCache) return this.settingsCache
     try {
-      const raw = await fsp.readFile(this.settingsPath, 'utf8')
+      const raw = await this.fs.readFile(this.settingsPath)
       const parsed = JSON.parse(raw) as Partial<Settings>
       // Merge over defaults so a settings file from an older schema still boots.
       this.settingsCache = { ...this.defaultSettings(), ...parsed }
@@ -133,7 +144,7 @@ export class FileService {
   }
 
   private async writeSettingsFile(settings: Settings): Promise<void> {
-    await atomicWriteFile(this.settingsPath, pretty(settings))
+    await atomicWriteFile(this.fs, this.settingsPath, pretty(settings))
   }
 
   private async getLibraryRoot(): Promise<string> {
@@ -144,8 +155,8 @@ export class FileService {
   /** Create the top-level library folders. Called once at app init. */
   async ensureLibrary(): Promise<void> {
     const root = await this.getLibraryRoot()
-    await fsp.mkdir(layout.storiesDir(root), { recursive: true })
-    await fsp.mkdir(layout.trashDir(root), { recursive: true })
+    await this.fs.mkdir(layout.storiesDir(root), { recursive: true })
+    await this.fs.mkdir(layout.trashDir(root), { recursive: true })
   }
 
   // ── Library / stories ───────────────────────────────────────────────────────
@@ -195,9 +206,9 @@ export class FileService {
       schemaVersion: STORY_SCHEMA_VERSION
     }
     // Materialize the story's folders up front.
-    await fsp.mkdir(layout.chaptersDir(root, id), { recursive: true })
-    await fsp.mkdir(layout.versionsDir(root, id), { recursive: true })
-    await fsp.mkdir(layout.notesDir(root, id), { recursive: true })
+    await this.fs.mkdir(layout.chaptersDir(root, id), { recursive: true })
+    await this.fs.mkdir(layout.versionsDir(root, id), { recursive: true })
+    await this.fs.mkdir(layout.notesDir(root, id), { recursive: true })
     await this.writeStory(root, story)
     return story
   }
@@ -226,10 +237,10 @@ export class FileService {
   async deleteStory(id: string): Promise<void> {
     const root = await this.getLibraryRoot()
     const from = layout.storyDir(root, id)
-    await assertExists(from, () => new AppError('NOT_FOUND', `story "${id}" not found`))
+    await assertExists(this.fs, from, () => new AppError('NOT_FOUND', `story "${id}" not found`))
     const dest = join(layout.trashDir(root), `${id}-${isoSafeTimestamp(new Date())}`)
-    await fsp.mkdir(layout.trashDir(root), { recursive: true })
-    await fsp.rename(from, dest)
+    await this.fs.mkdir(layout.trashDir(root), { recursive: true })
+    await this.fs.rename(from, dest)
   }
 
   async reorderChapters(id: string, chapterIds: string[]): Promise<void> {
@@ -272,7 +283,7 @@ export class FileService {
       if (!entry) continue // corrupt/missing file; leave it, resolve-by-id still holds
       const stem = chapterFileStem(i + 1, entry.chapter.title)
       const tempPath = join(chaptersDir, `.reorder-${i}-${Date.now()}.tmp`)
-      await fsp.rename(entry.path, tempPath)
+      await this.fs.rename(entry.path, tempPath)
 
       const item: {
         tempPath: string
@@ -282,18 +293,18 @@ export class FileService {
       } = { tempPath, finalName: `${stem}.json` }
 
       const mdSource = entry.path.replace(/\.json$/, '.md')
-      if (await exists(mdSource)) {
+      if (await exists(this.fs, mdSource)) {
         const mdTempPath = join(chaptersDir, `.reorder-md-${i}-${Date.now()}.tmp`)
-        await fsp.rename(mdSource, mdTempPath)
+        await this.fs.rename(mdSource, mdTempPath)
         item.mdTempPath = mdTempPath
         item.mdFinalName = `${stem}.md`
       }
       staged.push(item)
     }
     for (const s of staged) {
-      await fsp.rename(s.tempPath, join(chaptersDir, s.finalName))
+      await this.fs.rename(s.tempPath, join(chaptersDir, s.finalName))
       if (s.mdTempPath && s.mdFinalName) {
-        await fsp.rename(s.mdTempPath, join(chaptersDir, s.mdFinalName))
+        await this.fs.rename(s.mdTempPath, join(chaptersDir, s.mdFinalName))
       }
     }
   }
@@ -307,7 +318,7 @@ export class FileService {
   private async freeChapterPath(dir: string, ordinal: number, title: string): Promise<string> {
     const stem = chapterFileStem(ordinal, title)
     let candidate = join(dir, `${stem}.json`)
-    for (let n = 2; await exists(candidate); n++) {
+    for (let n = 2; await exists(this.fs, candidate); n++) {
       candidate = join(dir, `${stem}-${n}.json`)
     }
     return candidate
@@ -334,7 +345,7 @@ export class FileService {
     // library already carrying duplicate `NN-slug` names (from before that fix) could
     // still collide — pick a free name rather than clobber good data.
     const target = await this.freeChapterPath(layout.chaptersDir(root, storyId), ordinal, title)
-    await atomicWriteFile(target, pretty(chapter))
+    await atomicWriteFile(this.fs, target, pretty(chapter))
     await this.writeStory(root, {
       ...story,
       chapterOrder: [...story.chapterOrder, id],
@@ -384,14 +395,14 @@ export class FileService {
     const target =
       existingPath ??
       join(layout.chaptersDir(root, storyId), `${chapterFileStem(ordinal, incoming.title)}.json`)
-    await atomicWriteFile(target, pretty(chapter))
+    await atomicWriteFile(this.fs, target, pretty(chapter))
 
     // M7: write the human-readable Markdown backup alongside the canon. Best-effort —
     // a failure here must never fail the save or corrupt the .json canon (SPEC §5, §8).
     let mdWarning: string | undefined
     try {
       const mdTarget = target.replace(/\.json$/, '.md')
-      await atomicWriteFile(mdTarget, serializeChapterToMarkdown(chapter.title, chapter.doc))
+      await atomicWriteFile(this.fs, mdTarget, serializeChapterToMarkdown(chapter.title, chapter.doc))
     } catch (err) {
       mdWarning = `Markdown backup failed: ${err instanceof Error ? err.message : String(err)}`
       console.error(`[saveChapter] ${mdWarning}`, err)
@@ -421,18 +432,18 @@ export class FileService {
     // Soft-delete the canon file and the chapter's version history together.
     const path = await this.resolveChapterPath(root, storyId, story, chapterId)
     if (path) {
-      await fsp.mkdir(join(trashRoot, 'chapters'), { recursive: true })
-      await fsp.rename(path, join(trashRoot, 'chapters', basename(path)))
+      await this.fs.mkdir(join(trashRoot, 'chapters'), { recursive: true })
+      await this.fs.rename(path, join(trashRoot, 'chapters', basename(path)))
       // M7: the Markdown backup follows its canon into the trash so no orphan lingers.
       const mdPath = path.replace(/\.json$/, '.md')
-      if (await exists(mdPath)) {
-        await fsp.rename(mdPath, join(trashRoot, 'chapters', basename(mdPath)))
+      if (await exists(this.fs, mdPath)) {
+        await this.fs.rename(mdPath, join(trashRoot, 'chapters', basename(mdPath)))
       }
     }
     const versionsDir = layout.chapterVersionsDir(root, storyId, chapterId)
-    if (await exists(versionsDir)) {
-      await fsp.mkdir(trashRoot, { recursive: true })
-      await fsp.rename(versionsDir, join(trashRoot, 'versions'))
+    if (await exists(this.fs, versionsDir)) {
+      await this.fs.mkdir(trashRoot, { recursive: true })
+      await this.fs.rename(versionsDir, join(trashRoot, 'versions'))
     }
     // Renumber the survivors so their `NN-` prefixes stay contiguous — otherwise the
     // deleted ordinal becomes a gap the next create would reuse, colliding with (and
@@ -449,7 +460,7 @@ export class FileService {
     const dir = layout.chapterVersionsDir(root, storyId, chapterId)
     let names: string[]
     try {
-      names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.json'))
+      names = (await this.fs.readdir(dir)).filter((n) => n.endsWith('.json'))
     } catch (err) {
       if (isNotFound(err)) return []
       throw err
@@ -472,7 +483,7 @@ export class FileService {
   async readVersion(storyId: string, chapterId: string, versionId: string): Promise<Chapter> {
     const root = await this.getLibraryRoot()
     const path = join(layout.chapterVersionsDir(root, storyId, chapterId), `${versionId}.json`)
-    if (!(await exists(path))) {
+    if (!(await exists(this.fs, path))) {
       throw new AppError('NOT_FOUND', `version "${versionId}" not found`)
     }
     return this.readChapterFile(path)
@@ -506,12 +517,12 @@ export class FileService {
     await this.readStoryAt(root, storyId) // ensures the story exists
     const path = layout.notesFile(root, storyId)
     try {
-      const raw = await fsp.readFile(path, 'utf8')
+      const raw = await this.fs.readFile(path)
       return { ...emptyNotes(), ...(JSON.parse(raw) as Partial<Notes>) }
     } catch (err) {
       if (isNotFound(err)) {
         const notes = emptyNotes()
-        await atomicWriteFile(path, pretty(notes))
+        await atomicWriteFile(this.fs, path, pretty(notes))
         return notes
       }
       throw new AppError('READ_FAILED', `failed to read notes for "${storyId}"`, { cause: err })
@@ -522,7 +533,7 @@ export class FileService {
     const root = await this.getLibraryRoot()
     await this.readStoryAt(root, storyId)
     const next: Notes = { ...notes, schemaVersion: NOTES_SCHEMA_VERSION }
-    await atomicWriteFile(layout.notesFile(root, storyId), pretty(next))
+    await atomicWriteFile(this.fs, layout.notesFile(root, storyId), pretty(next))
   }
 
   // ── Startup scan / recovery ─────────────────────────────────────────────────
@@ -589,20 +600,35 @@ export class FileService {
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   private async listStoryIds(root: string): Promise<string[]> {
+    const storiesDir = layout.storiesDir(root)
+    let names: string[]
     try {
-      const entries = await fsp.readdir(layout.storiesDir(root), { withFileTypes: true })
-      return entries.filter((e) => e.isDirectory()).map((e) => e.name)
+      names = await this.fs.readdir(storiesDir)
     } catch (err) {
       if (isNotFound(err)) return []
       throw err
     }
+    // The FsPort's readdir returns names only (no dirent types), so stat each entry
+    // and keep only directories — behaviour-identical to the previous
+    // `readdir(..., { withFileTypes: true }).filter(isDirectory)`. A racing removal
+    // between readdir and stat is tolerated (skip the vanished entry).
+    const ids: string[] = []
+    for (const name of names) {
+      try {
+        const s = await this.fs.stat(join(storiesDir, name))
+        if (s.isDirectory) ids.push(name)
+      } catch {
+        // entry disappeared or is unreadable; skip it
+      }
+    }
+    return ids
   }
 
   private async readStoryAt(root: string, id: string): Promise<Story> {
     const path = layout.storyMeta(root, id)
     let raw: string
     try {
-      raw = await fsp.readFile(path, 'utf8')
+      raw = await this.fs.readFile(path)
     } catch (err) {
       if (isNotFound(err)) throw new AppError('NOT_FOUND', `story "${id}" not found`)
       throw new AppError('READ_FAILED', `failed to read story "${id}"`, { cause: err })
@@ -615,7 +641,7 @@ export class FileService {
   }
 
   private async writeStory(root: string, story: Story): Promise<void> {
-    await atomicWriteFile(layout.storyMeta(root, story.id), pretty(story))
+    await atomicWriteFile(this.fs, layout.storyMeta(root, story.id), pretty(story))
   }
 
   /**
@@ -635,7 +661,7 @@ export class FileService {
     const dir = layout.chaptersDir(root, storyId)
     let names: string[]
     try {
-      names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.json'))
+      names = (await this.fs.readdir(dir)).filter((n) => n.endsWith('.json'))
     } catch (err) {
       if (isNotFound(err)) return null
       throw err
@@ -656,7 +682,7 @@ export class FileService {
   ): Promise<{ path: string; chapter: Chapter }[]> {
     let names: string[]
     try {
-      names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.json'))
+      names = (await this.fs.readdir(dir)).filter((n) => n.endsWith('.json'))
     } catch (err) {
       if (isNotFound(err)) return []
       throw err
@@ -673,7 +699,7 @@ export class FileService {
   private async readChapterFile(path: string): Promise<Chapter> {
     let raw: string
     try {
-      raw = await fsp.readFile(path, 'utf8')
+      raw = await this.fs.readFile(path)
     } catch (err) {
       throw new AppError('READ_FAILED', `failed to read chapter at ${path}`, { cause: err })
     }
@@ -715,7 +741,7 @@ export class FileService {
   ): Promise<string> {
     const versionId = isoSafeTimestamp(stamp)
     const dir = layout.chapterVersionsDir(root, storyId, chapter.id)
-    await atomicWriteFile(join(dir, `${versionId}.json`), pretty(chapter))
+    await atomicWriteFile(this.fs, join(dir, `${versionId}.json`), pretty(chapter))
     return versionId
   }
 
@@ -724,7 +750,7 @@ export class FileService {
     const dir = layout.chapterVersionsDir(root, storyId, chapterId)
     let names: string[]
     try {
-      names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.json'))
+      names = (await this.fs.readdir(dir)).filter((n) => n.endsWith('.json'))
     } catch (err) {
       if (isNotFound(err)) return
       throw err
@@ -732,7 +758,7 @@ export class FileService {
     if (names.length <= maxVersionsPerChapter) return
     names.sort() // ascending = oldest first
     const toDelete = names.slice(0, names.length - maxVersionsPerChapter)
-    await Promise.all(toDelete.map((n) => fsp.rm(join(dir, n), { force: true })))
+    await Promise.all(toDelete.map((n) => this.fs.rm(join(dir, n), { force: true })))
   }
 
   private async newestVersionId(
@@ -742,7 +768,7 @@ export class FileService {
   ): Promise<string | null> {
     const dir = layout.chapterVersionsDir(root, storyId, chapterId)
     try {
-      const names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.json')).sort()
+      const names = (await this.fs.readdir(dir)).filter((n) => n.endsWith('.json')).sort()
       const newest = names[names.length - 1]
       return newest ? newest.replace(/\.json$/, '') : null
     } catch (err) {
@@ -791,15 +817,19 @@ const pretty = (value: unknown): string => JSON.stringify(value, null, 2)
 const isNotFound = (err: unknown): boolean =>
   typeof err === 'object' && err !== null && (err as { code?: string }).code === 'ENOENT'
 
-const exists = async (path: string): Promise<boolean> => {
+const exists = async (fs: FsPort, path: string): Promise<boolean> => {
   try {
-    await fsp.stat(path)
+    await fs.stat(path)
     return true
   } catch {
     return false
   }
 }
 
-const assertExists = async (path: string, makeError: () => AppError): Promise<void> => {
-  if (!(await exists(path))) throw makeError()
+const assertExists = async (
+  fs: FsPort,
+  path: string,
+  makeError: () => AppError
+): Promise<void> => {
+  if (!(await exists(fs, path))) throw makeError()
 }

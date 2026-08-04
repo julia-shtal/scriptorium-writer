@@ -6,7 +6,7 @@
  */
 import type { Chapter, ExportFormat } from '@shared/types'
 import { chapterToDocxBlocks, blocksToDocxBuffer, type DocxBlock } from './docx-export'
-import { serializeChapterToMarkdown } from './markdown'
+import { serializeChapterToMarkdown } from '@data/markdown'
 
 /** Build the export bytes for a single chapter, per-chapter export has no heading. */
 export async function buildChapterExportBuffer(

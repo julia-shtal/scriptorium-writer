@@ -9,8 +9,7 @@
  * filenames are stripped.
  */
 
-import { join } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { joinPath as join, randomHex } from './path-utils'
 
 /**
  * Turn arbitrary text into a filesystem-safe, legible slug. Keeps Unicode letters
@@ -66,9 +65,9 @@ export function makeUniqueStoryId(title: string, existingIds: readonly string[])
  */
 export function makeChapterId(title: string, existingIds: readonly string[]): string {
   const base = baseId(title, 'chapter')
-  let id = `${base}-${randomBytes(3).toString('hex')}`
+  let id = `${base}-${randomHex(3)}`
   while (existingIds.includes(id)) {
-    id = `${base}-${randomBytes(3).toString('hex')}`
+    id = `${base}-${randomHex(3)}`
   }
   return id
 }

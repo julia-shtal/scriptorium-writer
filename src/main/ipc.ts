@@ -13,7 +13,7 @@
 
 import type { Api, ExportFormat } from '@shared/types'
 import { encodeErrorForIpc, toAppError } from '@shared/errors'
-import type { FileService } from './file-service'
+import type { FileService } from '@data/file-service'
 
 /** Minimal shape of `ipcMain` we depend on. */
 export interface IpcRegistrar {

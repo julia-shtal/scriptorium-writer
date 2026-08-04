@@ -3,6 +3,9 @@ import * as fsp from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { atomicWriteFile } from './atomic-write'
+import { NodeFsPort } from '../platform/node/fs-port'
+
+const fs = new NodeFsPort()
 
 let dir: string
 
@@ -20,7 +23,7 @@ const listTemps = async (): Promise<string[]> =>
 describe('atomicWriteFile', () => {
   it('writes the target file', async () => {
     const target = join(dir, 'data.json')
-    await atomicWriteFile(target, '{"ok":true}')
+    await atomicWriteFile(fs, target, '{"ok":true}')
     expect(await fsp.readFile(target, 'utf8')).toBe('{"ok":true}')
   })
 
@@ -28,14 +31,14 @@ describe('atomicWriteFile', () => {
     const target = join(dir, 'export.docx')
     // Bytes that are not valid UTF-8: a NUL, 0xff, then "PK" (the .docx/zip magic).
     const bytes = Buffer.from([0x00, 0xff, 0x50, 0x4b])
-    await atomicWriteFile(target, bytes)
+    await atomicWriteFile(fs, target, bytes)
     const readBack = await fsp.readFile(target) // no encoding → raw Buffer
     expect(Buffer.compare(readBack, bytes)).toBe(0)
   })
 
   it('leaves the original file intact if interrupted before the rename', async () => {
     const target = join(dir, 'data.json')
-    await atomicWriteFile(target, 'GOOD')
+    await atomicWriteFile(fs, target, 'GOOD')
 
     // Simulate a crash at the rename step: the tmp file was written and fsynced,
     // but the atomic swap never happens.
@@ -43,7 +46,7 @@ describe('atomicWriteFile', () => {
       throw new Error('simulated crash before rename')
     }
     await expect(
-      atomicWriteFile(target, 'BAD', { rename: boom })
+      atomicWriteFile(fs, target, 'BAD', { rename: boom })
     ).rejects.toThrow('simulated crash before rename')
 
     // The original good data must survive untouched...
@@ -54,8 +57,8 @@ describe('atomicWriteFile', () => {
 
   it('does not leave temp files behind on success', async () => {
     const target = join(dir, 'data.json')
-    await atomicWriteFile(target, 'a')
-    await atomicWriteFile(target, 'b')
+    await atomicWriteFile(fs, target, 'a')
+    await atomicWriteFile(fs, target, 'b')
     expect(await fsp.readFile(target, 'utf8')).toBe('b')
     expect(await listTemps()).toEqual([])
   })
@@ -76,7 +79,7 @@ describe('atomicWriteFile', () => {
       if (attempts < 3) throw codeError('EPERM')
       await fsp.rename(from, to)
     }
-    await atomicWriteFile(target, 'RESILIENT', { rename: flaky, sleep: () => Promise.resolve() })
+    await atomicWriteFile(fs, target, 'RESILIENT', { rename: flaky, sleep: () => Promise.resolve() })
     expect(attempts).toBe(3)
     expect(await fsp.readFile(target, 'utf8')).toBe('RESILIENT')
     expect(await listTemps()).toEqual([])
@@ -90,7 +93,7 @@ describe('atomicWriteFile', () => {
       throw codeError('EBUSY')
     }
     await expect(
-      atomicWriteFile(target, 'x', { rename: alwaysBusy, sleep: () => Promise.resolve() })
+      atomicWriteFile(fs, target, 'x', { rename: alwaysBusy, sleep: () => Promise.resolve() })
     ).rejects.toMatchObject({ code: 'EBUSY' })
     expect(attempts).toBeGreaterThan(1) // it retried, not one-and-done
     expect(await listTemps()).toEqual([])
@@ -104,7 +107,7 @@ describe('atomicWriteFile', () => {
       throw codeError('ENOSPC')
     }
     await expect(
-      atomicWriteFile(target, 'x', { rename: noSpace, sleep: () => Promise.resolve() })
+      atomicWriteFile(fs, target, 'x', { rename: noSpace, sleep: () => Promise.resolve() })
     ).rejects.toMatchObject({ code: 'ENOSPC' })
     expect(attempts).toBe(1)
     expect(await listTemps()).toEqual([])

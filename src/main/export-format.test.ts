@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { buildChapterExportBuffer, buildStoryExportBuffer } from './export-format'
-import { serializeChapterToMarkdown } from './markdown'
+import { serializeChapterToMarkdown } from '@data/markdown'
 import type { Chapter, ProseMirrorJSON } from '@shared/types'
 
 const doc = (content: unknown[]): ProseMirrorJSON => ({ type: 'doc', content })

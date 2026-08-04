@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { registerIpcHandlers, IPC_CHANNELS } from './ipc'
 import { AppError, decodeIpcError } from '@shared/errors'
-import type { FileService } from './file-service'
+import type { FileService } from '@data/file-service'
 
 type Listener = (event: unknown, ...args: unknown[]) => unknown
 

@@ -1,6 +1,6 @@
 /**
  * Markdown → ProseMirror JSON: the inverse of the M7 serializer in
- * `src/main/markdown.ts`, for M14 import. Pure (no DOM/Node), so it unit-tests directly
+ * `src/data/markdown.ts`, for M14 import. Pure (no DOM/Node), so it unit-tests directly
  * and can run in the renderer. The `[^n]` footnote convention is shared with the
  * serializer via `@shared/footnote-markdown` (do not re-derive it here).
  *
