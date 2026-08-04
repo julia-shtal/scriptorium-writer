@@ -17,6 +17,7 @@ export type AppErrorCode =
   | 'READ_FAILED' // unexpected read failure
   | 'WRITE_FAILED' // unexpected write failure
   | 'EXPORT_FAILED' // library archive export failed (disk full / permission / unwritable path)
+  | 'UNSUPPORTED' // operation has no implementation on this platform (e.g. no OS file explorer in a browser)
   | 'UNKNOWN' // anything not otherwise classified
 
 export interface SerializedAppError {

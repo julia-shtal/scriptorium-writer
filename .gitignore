@@ -6,6 +6,7 @@ node_modules/
 # Build output
 out/
 dist/
+dist-web/
 release/
 
 # electron-vite / vite caches

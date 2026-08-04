@@ -1,3 +1,4 @@
+// Electron renderer entry (window.api injected by preload). Web entry is main.web.tsx.
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import '@fontsource/pt-serif/400.css'

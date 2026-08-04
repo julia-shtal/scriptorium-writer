@@ -14,9 +14,10 @@
  * flows through an injected {@link FsPort}, so it can be unit-tested against real temp
  * directories and run on any platform. The main process supplies that port
  * (`NodeFsPort`), `userDataPath`, and the default library path at construction time.
- * One exception remains at the module-graph level: `exportLibraryArchive` still imports
- * `zipDirectory` from `../main/library-archive` (Node-only, `archiver`), which MP2
- * deliberately left in `src/main` — see the TODO at that import.
+ * One exception remains: `exportLibraryArchive` uses `zipDirectory` from
+ * `../main/library-archive` (Node-only, `archiver`), which MP2 deliberately left in
+ * `src/main`. It is pulled in with a dynamic `import()` (not a static one) so it stays
+ * out of the browser bundle's static graph — see the note at that call site.
  */
 
 import type { FsPort } from './fs-port'
@@ -46,8 +47,10 @@ import { atomicWriteFile } from './atomic-write'
 import { serializeChapterToMarkdown } from './markdown'
 // TODO(MP6): the remaining Node coupling in the data layer — `library-archive` uses
 // `node:fs` + `archiver` and stays in `src/main` for now. Hoist zip/export behind a
-// port so this module graph is fully Node-free.
-import { zipDirectory } from '../main/library-archive'
+// port so this module graph is fully Node-free. Until then it is loaded with a dynamic
+// `import()` (in `exportLibraryArchive` below) rather than a static one, so it stays out
+// of the browser bundle's static graph — the MP3 web build tree-shakes it away and never
+// pulls `node:fs` into the browser (web maps `exportLibrary` to UNSUPPORTED anyway).
 import { countWords } from '@shared/word-count'
 import {
   chapterFileStem,
@@ -589,6 +592,7 @@ export class FileService {
   async exportLibraryArchive(destPath: string): Promise<void> {
     const root = await this.getLibraryRoot()
     try {
+      const { zipDirectory } = await import('../main/library-archive')
       await zipDirectory(root, destPath)
     } catch (err) {
       throw new AppError('EXPORT_FAILED', `failed to export library to ${destPath}`, {
