@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { FileService } from './file-service'
+import { NodeFsPort } from '../platform/node/fs-port'
 import { layout } from './paths'
 import { isAppError } from '@shared/errors'
 import type { ProseMirrorJSON } from '@shared/types'
@@ -16,7 +17,7 @@ async function makeService(): Promise<{ svc: FileService; lib: string; userData:
   const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
   const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
   dirsToClean.push(userData, lib)
-  const svc = new FileService({ userDataPath: userData, defaultLibraryPath: lib })
+  const svc = new FileService({ fs: new NodeFsPort(), userDataPath: userData, defaultLibraryPath: lib })
   await svc.ensureLibrary()
   return { svc, lib, userData }
 }
@@ -455,7 +456,7 @@ describe('settings', () => {
       JSON.stringify({ editorFontSizePx: 19 }),
       'utf8'
     )
-    const svc = new FileService({ userDataPath: userData, defaultLibraryPath: lib })
+    const svc = new FileService({ fs: new NodeFsPort(), userDataPath: userData, defaultLibraryPath: lib })
 
     const settings = await svc.readSettings()
     expect(settings.language).toBe('ru')
@@ -468,6 +469,7 @@ describe('settings', () => {
     const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
     dirsToClean.push(userData, lib)
     const svc = new FileService({
+      fs: new NodeFsPort(),
       userDataPath: userData,
       defaultLibraryPath: lib,
       firstRunLanguage: 'en'
@@ -484,7 +486,7 @@ describe('settings', () => {
     const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
     const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
     dirsToClean.push(userData, lib)
-    const svc = new FileService({ userDataPath: userData, defaultLibraryPath: lib })
+    const svc = new FileService({ fs: new NodeFsPort(), userDataPath: userData, defaultLibraryPath: lib })
 
     expect((await svc.readSettings()).language).toBe('ru')
   })
@@ -501,6 +503,7 @@ describe('settings', () => {
       'utf8'
     )
     const svc = new FileService({
+      fs: new NodeFsPort(),
       userDataPath: userData,
       defaultLibraryPath: lib,
       firstRunLanguage: 'en'

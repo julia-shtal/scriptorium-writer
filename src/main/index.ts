@@ -4,14 +4,19 @@ import { app, shell, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateDownloadedInfo, ExportFileResult, ExportFormat } from '@shared/types'
-import { FileService } from './file-service'
+import { FileService } from '@data/file-service'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
 import { initAutoUpdate } from './auto-update'
 import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
 import { convertDocxToHtml } from './docx-import'
 import { buildChapterExportBuffer, buildStoryExportBuffer } from './export-format'
-import { atomicWriteFile } from './atomic-write'
+import { atomicWriteFile } from '@data/atomic-write'
+import { NodeFsPort } from '../platform/node/fs-port'
+
+// The single platform filesystem port for the Electron/Node target. Shared by the
+// FileService and the export atomic-write path so both write through one adapter.
+const fsPort = new NodeFsPort()
 
 // Offline spellcheck dictionaries (SPEC §7, M4): dev serves them straight from the repo
 // `resources/` dir; packaged builds get them from electron-builder's copy under
@@ -56,7 +61,7 @@ async function saveExport(
   if (result.canceled || !result.filePath) return { canceled: true }
   // Atomic write: tmp + rename in the destination dir, so a failed write never leaves a
   // half-written file and never touches the library (export is read-only against canon).
-  await atomicWriteFile(result.filePath, buffer)
+  await atomicWriteFile(fsPort, result.filePath, buffer)
   return { canceled: false, path: result.filePath }
 }
 
@@ -174,6 +179,7 @@ app.whenReady().then(async () => {
   // All disk I/O lives in the main-process FileService. It is Electron-free by
   // design (unit-tested against temp dirs); the app supplies the machine paths here.
   const fileService = new FileService({
+    fs: fsPort,
     userDataPath: app.getPath('userData'),
     defaultLibraryPath: join(app.getPath('documents'), 'Scriptorium-Writer'),
     // First-run only: default the UI language from the OS locale (English → 'en',

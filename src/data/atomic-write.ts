@@ -8,9 +8,8 @@
  * FileService go through this helper.
  */
 
-import * as fsp from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import type { FsPort } from './fs-port'
+import { dirnamePath, joinPath, randomHex } from './path-utils'
 
 /** Injectable seams so the rename path (crash + Windows-lock retries) is testable. */
 export interface AtomicWriteDeps {
@@ -33,36 +32,40 @@ const MAX_RENAME_ATTEMPTS = 10
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Write `data` to `target` atomically (tmp write + fsync + rename), retrying a
- * transiently-locked rename before giving up (see {@link TRANSIENT_RENAME_CODES}). */
+/**
+ * Write `data` to `target` atomically (tmp write + fsync + rename), retrying a
+ * transiently-locked rename before giving up (see {@link TRANSIENT_RENAME_CODES}).
+ *
+ * The filesystem is injected as an {@link FsPort} so this helper stays
+ * platform-neutral. `fs.writeFile` is the non-atomic primitive; atomicity comes
+ * from writing a same-directory temp then renaming over the target. The fsync
+ * step uses the port's optional `sync`: on platforms that omit it (OPFS/Capacitor)
+ * the write is still atomic (tmp + rename) but not fsync-durable across power
+ * loss — an accepted reduction, not an oversight.
+ */
 export async function atomicWriteFile(
+  fs: FsPort,
   target: string,
   data: string | Uint8Array,
   deps: AtomicWriteDeps = {}
 ): Promise<void> {
-  const rename = deps.rename ?? fsp.rename
+  const rename = deps.rename ?? fs.rename.bind(fs)
   const sleep = deps.sleep ?? defaultSleep
-  const dir = dirname(target)
-  await fsp.mkdir(dir, { recursive: true })
+  const dir = dirnamePath(target)
+  await fs.mkdir(dir, { recursive: true })
 
-  const tmp = join(dir, `.${randomBytes(8).toString('hex')}.tmp`)
-  let handle: fsp.FileHandle | undefined
-  try {
-    handle = await fsp.open(tmp, 'w')
-    // Strings are UTF-8 text (JSON/Markdown canon); binary bytes (e.g. a generated
-    // .docx) are written verbatim — no encoding, or Node would re-encode them as UTF-8.
-    await handle.writeFile(data, typeof data === 'string' ? { encoding: 'utf8' } : undefined)
-    await handle.sync() // fsync: flush to disk before the rename
-  } finally {
-    await handle?.close()
-  }
+  const tmp = joinPath(dir, `.${randomHex(8)}.tmp`)
+  // Strings are UTF-8 text (JSON/Markdown canon); binary bytes (e.g. a generated
+  // .docx) are written verbatim — the port handles the string/bytes distinction.
+  await fs.writeFile(tmp, data)
+  await fs.sync?.(tmp) // fsync (when the platform supports it): flush before rename
 
   try {
     await renameWithRetry(rename, sleep, tmp, target)
   } catch (err) {
     // Interrupted at/before the swap: the original target is untouched. Remove the
     // orphaned temp so a failed write never litters the library folder.
-    await fsp.rm(tmp, { force: true })
+    await fs.rm(tmp, { force: true })
     throw err
   }
 }

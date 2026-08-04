@@ -37,7 +37,8 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     resolve: {
       alias: {
-        '@shared': resolve('src/shared')
+        '@shared': resolve('src/shared'),
+        '@data': resolve('src/data')
       }
     },
     build: {
@@ -68,7 +69,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@shared': resolve('src/shared'),
-        '@renderer': resolve('src/renderer')
+        '@renderer': resolve('src/renderer'),
+        '@data': resolve('src/data')
       }
     },
     build: {
