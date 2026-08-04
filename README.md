@@ -207,7 +207,9 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Launch the app in development with HMR (renderer) and DevTools. |
+| `npm run dev:web` | Launch the browser build (MP3) on a LAN-reachable dev server (see below). |
 | `npm run build` | Typecheck, then build main / preload / renderer into `out/`. |
+| `npm run build:web` | Typecheck, then build the browser bundle into `dist-web/`. |
 | `npm run build:win` | Full build + package a Windows **NSIS** installer into `release/`. |
 | `npm run start` | Preview the production build (`electron-vite preview`). |
 | `npm run typecheck` | Type-check the node (main/preload/shared) and web (renderer) projects. |
@@ -215,6 +217,21 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 | `npm run test` | Run the Vitest unit suite (data layer) once. |
 | `npm run test:watch` | Run Vitest in watch mode. |
 | `npm run format` | Prettier-format `src`. |
+
+### Web build (MP3)
+
+The same React renderer also builds as a plain browser app — a second Vite target
+(`vite.web.config.ts`) that reuses `src/renderer` with a browser composition root
+(`main.web.tsx` → `createWebPlatform()`), no Electron, no preload.
+
+- `npm run dev:web` — serves the web build at the root URL (`http://localhost:5173/`),
+  with `--host` so a tablet on the same LAN can reach it. Storage is **in-memory only**:
+  your stories do **not** survive a page reload. That is expected for MP3; persistent
+  OPFS-backed storage lands in MP4.
+- `npm run build:web` — typechecks, then bundles the browser build into `dist-web/`.
+
+The Electron build is unchanged and still owns `src/renderer/index.html`
+(→ `main.electron.tsx`).
 
 ### Architecture
 

@@ -4,7 +4,8 @@
     "src/renderer/**/*",
     "src/preload/index.d.ts",
     "src/shared/**/*",
-    "src/data/**/*"
+    "src/data/**/*",
+    "src/platform/web/**/*"
   ],
   "compilerOptions": {
     "composite": true,
