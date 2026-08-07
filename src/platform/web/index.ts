@@ -1,14 +1,13 @@
 /**
- * Web platform composition root (MP3).
+ * Web platform composition root (MP3, storage upgraded to OPFS in MP4).
  *
  * This is the browser-side analogue of the Electron main-process wiring: it maps the
  * shared {@link Api} surface directly onto {@link FileService} calls — the same 1:1
  * mapping the IPC layer (`src/main/ipc.ts`) performs, minus the IPC hop, since in the
  * web build the renderer and the data layer run in the same JS context.
  *
- * Storage here is in-memory scaffolding: `createWebPlatform` boots a `FileService`
- * over {@link MemoryFsPort}, so data does NOT survive a page reload. That port is
- * swapped for a persistent OPFS-backed one in MP4 (see TODO below).
+ * Storage is OPFS-backed (`OpfsFsPort`): `createWebPlatform` boots a `FileService`
+ * over the Origin Private File System, so data PERSISTS across page reloads.
  *
  * Browser code: this module must never import a `node:` built-in.
  */
@@ -17,7 +16,7 @@ import type { Api } from '@shared/types'
 import type { Platform } from '@renderer/platform'
 import { AppError } from '@shared/errors'
 import { FileService } from '@data/file-service'
-import { MemoryFsPort } from './memory-fs-port'
+import { OpfsFsPort } from './opfs-fs-port'
 
 /**
  * Build the full {@link Api} surface backed directly by a {@link FileService}. The
@@ -99,16 +98,42 @@ export function makeApiFromService(service: FileService): Api {
 }
 
 /**
- * Boot the web {@link Platform}: in-memory filesystem → FileService → Api. No
+ * Best-effort request for persistent storage so the browser is less likely to evict
+ * OPFS data under disk pressure. Not available on every platform/browser
+ * (`navigator.storage?.persist` may be undefined), so this is guarded and never
+ * throws. The outcome is logged and surfaced on the returned {@link Platform} so a
+ * later milestone (MP9) can warn the user when persistence was not granted.
+ */
+async function requestPersistentStorage(): Promise<boolean | undefined> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.persist) return undefined
+  try {
+    const granted = await navigator.storage.persist()
+    if (granted) {
+      console.log('[web platform] persistent storage granted')
+    } else {
+      console.warn(
+        '[web platform] persistent storage NOT granted — OPFS data may be evicted under disk pressure'
+      )
+    }
+    return granted
+  } catch (err) {
+    console.warn('[web platform] navigator.storage.persist() failed', err)
+    return undefined
+  }
+}
+
+/**
+ * Boot the web {@link Platform}: OPFS-backed filesystem → FileService → Api. No
  * `lifecycle` is provided — the browser has no host quit/update lifecycle to bridge.
  */
 export async function createWebPlatform(): Promise<Platform> {
-  const fs = new MemoryFsPort() // TODO(MP4): swap for OpfsFsPort
+  const storagePersisted = await requestPersistentStorage()
+  const fs = new OpfsFsPort()
   const service = new FileService({
     fs,
     userDataPath: '/userdata',
     defaultLibraryPath: '/library'
   })
   await service.ensureLibrary()
-  return { api: makeApiFromService(service) } // no `lifecycle` on web
+  return { api: makeApiFromService(service), storagePersisted } // no `lifecycle` on web
 }
