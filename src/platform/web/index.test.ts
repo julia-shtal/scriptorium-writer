@@ -1,21 +1,33 @@
 import { describe, it, expect } from 'vitest'
 import type { ProseMirrorJSON } from '@shared/types'
-import { createWebPlatform } from './index'
+import { FileService } from '@data/file-service'
+import { MemoryFsPort } from './memory-fs-port'
+import { makeApiFromService } from './index'
 
 const docWith = (text: string): ProseMirrorJSON => ({
   type: 'doc',
   content: [{ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] }]
 })
 
-describe('createWebPlatform', () => {
-  it('resolves to a Platform with an api and no lifecycle', async () => {
-    const platform = await createWebPlatform()
-    expect(platform.api).toBeDefined()
-    expect(platform.lifecycle).toBeUndefined()
+/**
+ * Node-only coverage for {@link makeApiFromService}: the pure Api ↔ FileService
+ * mapping, exercised over the in-memory port so this suite never needs a browser.
+ * `createWebPlatform` itself (which now boots OpfsFsPort, requiring `navigator.storage`)
+ * is covered separately in `create-web-platform.browser.test.ts`.
+ */
+async function makeTestApi() {
+  const service = new FileService({
+    fs: new MemoryFsPort(),
+    userDataPath: '/userdata',
+    defaultLibraryPath: '/library'
   })
+  await service.ensureLibrary()
+  return makeApiFromService(service)
+}
 
+describe('makeApiFromService', () => {
   it('round-trips a chapter save/read within the session', async () => {
-    const { api } = await createWebPlatform()
+    const api = await makeTestApi()
 
     expect(await api.ping()).toBe('pong')
 
@@ -37,38 +49,38 @@ describe('createWebPlatform', () => {
 
   describe('unsupported methods reject with an UNSUPPORTED AppError', () => {
     it('revealInFolder', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.revealInFolder('/anywhere')).rejects.toMatchObject({
         code: 'UNSUPPORTED'
       })
     })
 
     it('applySpellLanguages', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.applySpellLanguages(['en'])).rejects.toMatchObject({
         code: 'UNSUPPORTED'
       })
     })
 
     it('exportLibrary', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.exportLibrary()).rejects.toMatchObject({ code: 'UNSUPPORTED' })
     })
 
     it('readImportFile', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.readImportFile()).rejects.toMatchObject({ code: 'UNSUPPORTED' })
     })
 
     it('exportChapter', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.exportChapter('s', 'c', 'md')).rejects.toMatchObject({
         code: 'UNSUPPORTED'
       })
     })
 
     it('exportStory', async () => {
-      const { api } = await createWebPlatform()
+      const api = await makeTestApi()
       await expect(api.exportStory('s', 'docx')).rejects.toMatchObject({
         code: 'UNSUPPORTED'
       })

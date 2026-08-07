@@ -214,8 +214,9 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 | `npm run start` | Preview the production build (`electron-vite preview`). |
 | `npm run typecheck` | Type-check the node (main/preload/shared) and web (renderer) projects. |
 | `npm run lint` | ESLint over `src` (`.ts`/`.tsx`). |
-| `npm run test` | Run the Vitest unit suite (data layer) once. |
+| `npm run test` | Run the Vitest unit suite (data layer, Node env) once. |
 | `npm run test:watch` | Run Vitest in watch mode. |
+| `npm run test:browser` | Run the browser-only suite (`*.browser.test.ts`, e.g. the OPFS `FsPort` contract) in real Chromium via Vitest browser mode. |
 | `npm run format` | Prettier-format `src`. |
 
 ### Web build (MP3)
@@ -226,9 +227,19 @@ The same React renderer also builds as a plain browser app — a second Vite tar
 
 - `npm run dev:web` — serves the web build at the root URL (`http://localhost:5173/`),
   with `--host` so a tablet on the same LAN can reach it. Storage is **in-memory only**:
-  your stories do **not** survive a page reload. That is expected for MP3; persistent
-  OPFS-backed storage lands in MP4.
+  your stories do **not** survive a page reload. That is expected until the OPFS port is
+  wired into the web composition root (MP4 Task 3).
 - `npm run build:web` — typechecks, then bundles the browser build into `dist-web/`.
+
+The persistent browser `FsPort` — `OpfsFsPort` (Origin Private File System) — is
+implemented in `src/platform/web/` and proven against the shared `FsPort` contract in
+real Chromium. It is not yet swapped into `createWebPlatform()`; that swap is a
+follow-up. Because the reliable OPFS write path (`createSyncAccessHandle`) is
+worker-only, writes are delegated to `opfs-worker.ts` (with per-path serialization so
+overlapping saves to the same file never collide); reads/dir-ops run on the main
+thread. OPFS has no separate fsync barrier, so each `writeFile` `flush()`es before
+close — durability lives inside the write, which keeps `atomicWriteFile`'s tmp+rename
+atomic.
 
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
@@ -245,9 +256,11 @@ security boundary is strict and must not be weakened:
   through an injected `FsPort` (`src/data/fs-port.ts`) — no direct Node imports, with one
   remaining exception: `exportLibraryArchive` still reaches into `src/main/library-archive`
   (Node + `archiver`), to be hoisted behind a port in a later milestone.
-- **platform** (`src/platform/node/`) — per-platform `FsPort` implementations. Today:
-  `NodeFsPort`, a thin adapter over `node:fs/promises`. Browser (OPFS) / Android
-  (Capacitor) ports plug in here later without touching the data layer.
+- **platform** (`src/platform/node/`, `src/platform/web/`) — per-platform `FsPort`
+  implementations. `NodeFsPort` (a thin adapter over `node:fs/promises`) for
+  Electron; `OpfsFsPort` (+ `opfs-worker.ts`) over the browser Origin Private File
+  System, plus `MemoryFsPort` scaffolding. Android (Capacitor) plugs in here later
+  without touching the data layer.
 - **preload** (`src/preload/`) — a typed `contextBridge` `window.api` surface; thin
   wrappers over `ipcRenderer.invoke`.
 - **renderer** (`src/renderer/`) — React UI. **Never imports `fs`, `path`, or any Node
@@ -301,6 +314,7 @@ src/
   main/                   # Electron wiring: IPC, spellcheck, docx/zip, auto-update, library-archive
   data/                   # Platform-neutral data layer: FileService, atomic-write, snapshots, markdown, paths (injected FsPort — no Node imports)
   platform/node/          # NodeFsPort — the Node/Electron FsPort implementation (only place in the data path that touches node:fs)
+  platform/web/           # OpfsFsPort (+ opfs-worker) over OPFS, and MemoryFsPort scaffolding — browser FsPort implementations (no node: imports)
   preload/                # contextBridge → window.api (typed, decodes AppError)
   renderer/
     theme/book.css        # book theme tokens + page-stack texture

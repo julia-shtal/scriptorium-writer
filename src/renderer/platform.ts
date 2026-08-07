@@ -4,6 +4,9 @@ export interface Platform {
   api: Api
   /** Absent on platforms with no host lifecycle (web/PWA). Callers must null-check. */
   lifecycle?: LifecycleApi
+  /** Whether the browser granted persistent storage (navigator.storage.persist()).
+   *  undefined on platforms without OPFS storage pressure (Electron). MP9 surfaces this. */
+  storagePersisted?: boolean
 }
 
 let current: Platform | null = null
