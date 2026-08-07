@@ -34,11 +34,12 @@ describe('createWebPlatform (OPFS)', () => {
   beforeEach(wipeFixedDirs)
   afterEach(wipeFixedDirs)
 
-  it('resolves to a Platform with an api, no lifecycle, and a boolean storagePersisted', async () => {
+  it('resolves to a Platform with an api, no lifecycle, a boolean storagePersisted, and web capabilities', async () => {
     const platform = await createWebPlatform()
     expect(platform.api).toBeDefined()
     expect(platform.lifecycle).toBeUndefined()
     expect(typeof platform.storagePersisted).toBe('boolean')
+    expect(platform.capabilities?.managedSpellcheck).toBe(false)
   })
 
   it('persists a chapter across independent createWebPlatform() calls (simulated reload)', async () => {

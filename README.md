@@ -226,23 +226,25 @@ The same React renderer also builds as a plain browser app — a second Vite tar
 (`main.web.tsx` → `createWebPlatform()`), no Electron, no preload.
 
 - `npm run dev:web` — serves the web build at the root URL (`http://localhost:5173/`),
-  with `--host` so a tablet on the same LAN can reach it. Storage is **in-memory only**:
-  your stories do **not** survive a page reload. That is expected until the OPFS port is
-  wired into the web composition root (MP4 Task 3).
+  with `--host` so a tablet on the same LAN can reach it. Storage is **OPFS-backed**
+  (Origin Private File System), so your stories **persist across page reloads**.
 - `npm run build:web` — typechecks, then bundles the browser build into `dist-web/`.
 
 The persistent browser `FsPort` — `OpfsFsPort` (Origin Private File System) — is
-implemented in `src/platform/web/` and proven against the shared `FsPort` contract in
-real Chromium. It is not yet swapped into `createWebPlatform()`; that swap is a
-follow-up. Because the reliable OPFS write path (`createSyncAccessHandle`) is
-worker-only, writes are delegated to `opfs-worker.ts` (with per-path serialization so
-overlapping saves to the same file never collide); reads/dir-ops run on the main
-thread. OPFS has no separate fsync barrier, so each `writeFile` `flush()`es before
-close — durability lives inside the write, which keeps `atomicWriteFile`'s tmp+rename
-atomic.
+implemented in `src/platform/web/`, proven against the shared `FsPort` contract in
+real Chromium, and wired into `createWebPlatform()` (MP4). Because the reliable OPFS
+write path (`createSyncAccessHandle`) is worker-only, writes are delegated to
+`opfs-worker.ts` (with per-path serialization so overlapping saves to the same file
+never collide); reads/dir-ops run on the main thread. OPFS has no separate fsync
+barrier, so each `writeFile` `flush()`es before close — durability lives inside the
+write, which keeps `atomicWriteFile`'s tmp+rename atomic.
 
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
+
+Spellcheck in the web build is provided by the device's own system (e.g. the
+Android keyboard), not by the app's bundled dictionaries — the desktop build is
+unaffected and still checks offline with the bundled Hunspell dictionaries.
 
 ### Architecture
 
