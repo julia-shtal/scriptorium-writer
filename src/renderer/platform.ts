@@ -7,6 +7,11 @@ export interface Platform {
   /** Whether the browser granted persistent storage (navigator.storage.persist()).
    *  undefined on platforms without OPFS storage pressure (Electron). MP9 surfaces this. */
   storagePersisted?: boolean
+  /** Static, per-platform capability flags read by the UI to adapt behaviour
+   *  without user-agent sniffing. Optional (like storagePersisted) so the
+   *  fakePlatform test helper — which builds a bare { api } — keeps compiling;
+   *  both real factories still set it. */
+  capabilities?: { managedSpellcheck: boolean }
 }
 
 let current: Platform | null = null

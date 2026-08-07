@@ -50,6 +50,8 @@ export const ru = {
     languageEn: 'English',
     autosaveSec: 'Автосохранение, сек',
     spellLanguages: 'Языки проверки',
+    webSpellcheckNote:
+      'На планшете проверка орфографии выполняется системой устройства — набор языков зависит от клавиатуры и настроек Android, а не от приложения.',
     font: 'Шрифт',
     fontSizePx: 'Размер шрифта, px',
     minimalFooter: 'Минимальная нижняя панель',
@@ -340,6 +342,8 @@ export const en: Dictionary = {
     languageEn: 'English',
     autosaveSec: 'Autosave, sec',
     spellLanguages: 'Spellcheck languages',
+    webSpellcheckNote:
+      "On tablets, spellcheck is handled by the device's own system — the available languages depend on your keyboard and Android settings, not on the app.",
     font: 'Font',
     fontSizePx: 'Font size, px',
     minimalFooter: 'Minimal footer',

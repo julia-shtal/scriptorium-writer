@@ -58,11 +58,11 @@ export function makeApiFromService(service: FileService): Api {
     readSettings: () => service.readSettings(),
     saveSettings: (settings) => service.saveSettings(settings),
     applySpellLanguages: async (_langs) => {
-      // TODO(MP5): web spellcheck — no live browser spellchecker session to configure yet.
-      throw new AppError(
-        'UNSUPPORTED',
-        'Spellcheck language switching is not available in the web build.'
-      )
+      // Web has no app-managed spellchecker to (re)configure — the device's native
+      // checker decides which languages it offers. Intentionally a resolved no-op,
+      // NOT an UNSUPPORTED throw: Settings calls this on every language toggle and
+      // must not error. The spellLanguages setting still persists (readSettings/
+      // saveSettings), so the same library opened on desktop keeps the user's choice.
     },
 
     // recovery
@@ -135,5 +135,10 @@ export async function createWebPlatform(): Promise<Platform> {
     defaultLibraryPath: '/library'
   })
   await service.ensureLibrary()
-  return { api: makeApiFromService(service), storagePersisted } // no `lifecycle` on web
+  // No app-managed spellchecker on web — the device's native checker decides (MP5).
+  return {
+    api: makeApiFromService(service),
+    storagePersisted,
+    capabilities: { managedSpellcheck: false }
+  } // no `lifecycle` on web
 }

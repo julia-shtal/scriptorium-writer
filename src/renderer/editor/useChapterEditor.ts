@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useEditor, type Editor } from '@tiptap/react'
 import { bookExtensions } from './extensions/bookExtensions'
 import { useEditorStore } from '@renderer/store/editorStore'
+import { useSettingsStore } from '@renderer/store/settingsStore'
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }
 
@@ -20,12 +21,14 @@ export function useChapterEditor(): Editor | null {
   const applyDocUpdate = useEditorStore((s) => s.applyDocUpdate)
   const setSelection = useEditorStore((s) => s.setSelection)
   const chapterId = useEditorStore((s) => s.chapterId)
+  // `settings` can be null before bootstrap loads it, so read optionally.
+  const spellLanguages = useSettingsStore((s) => s.settings?.spellLanguages)
 
   const editor = useEditor({
     extensions: bookExtensions,
     content: useEditorStore.getState().doc ?? EMPTY_DOC,
     editorProps: {
-      attributes: { class: 'editor-surface', spellcheck: 'true' }
+      attributes: { class: 'editor-surface' }
     },
     onUpdate: ({ editor }) => applyDocUpdate(editor.getJSON(), selectionText(editor)),
     onSelectionUpdate: ({ editor }) => setSelection(selectionText(editor))
@@ -40,6 +43,18 @@ export function useChapterEditor(): Editor | null {
     // in v2). false so re-seeding the loaded doc doesn't re-mark the chapter dirty.
     if (doc) editor.commands.setContent(doc, { emitUpdate: false })
   }, [editor, chapterId])
+
+  // Spellcheck is the device's native checker on web and Chromium's configured
+  // checker on desktop; either way, only turn the attribute on when the user has
+  // at least one spellcheck language selected. Reactive so a Settings toggle
+  // applies to the open chapter without reopening it (mirrors the indent-on
+  // toggle in Editor.tsx). Desktop: with the default seeded language this stays
+  // 'true' — visually identical to the previous static attribute.
+  useEffect(() => {
+    if (!editor) return
+    const enabled = (spellLanguages?.length ?? 0) > 0
+    editor.view.dom.setAttribute('spellcheck', String(enabled))
+  }, [editor, spellLanguages])
 
   return editor
 }

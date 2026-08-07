@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { isAppError } from '@shared/errors'
-import { api } from '@renderer/platform'
+import { api, getPlatform } from '@renderer/platform'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
 const LANGS: { code: string; label: string }[] = [
@@ -61,6 +61,9 @@ export function SettingsView(): JSX.Element {
                    onChange={() => toggleLang(l.code)} /> {l.label}
           </label>
         ))}
+        {getPlatform().capabilities?.managedSpellcheck === false && (
+          <p className="settings-note">{t.settings.webSpellcheckNote}</p>
+        )}
       </fieldset>
 
       <label className="settings-field">{t.settings.font}
