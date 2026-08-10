@@ -267,6 +267,12 @@ The web build is an installable, offline-capable PWA:
 - **Icons:** `npm run gen:icon` emits the desktop `.ico` and the PWA PNGs (192, 512, and a
   512 maskable) into `src/renderer/public/icons/` from one source of truth.
 
+On touch devices the web build adapts without changing the desktop UI: hover-only
+controls become visible, tap targets grow to ~44px, and the editor column uses dynamic
+viewport height (`dvh` + `interactive-widget=resizes-content`) so the soft keyboard never
+covers the Find & Replace or cleanup bars. These are gated on `(pointer: coarse)`, so the
+desktop layout is unchanged.
+
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
 
