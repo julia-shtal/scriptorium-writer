@@ -54,30 +54,6 @@ describe('makeApiFromService', () => {
         code: 'UNSUPPORTED'
       })
     })
-
-    it('exportLibrary', async () => {
-      const api = await makeTestApi()
-      await expect(api.exportLibrary()).rejects.toMatchObject({ code: 'UNSUPPORTED' })
-    })
-
-    it('readImportFile', async () => {
-      const api = await makeTestApi()
-      await expect(api.readImportFile()).rejects.toMatchObject({ code: 'UNSUPPORTED' })
-    })
-
-    it('exportChapter', async () => {
-      const api = await makeTestApi()
-      await expect(api.exportChapter('s', 'c', 'md')).rejects.toMatchObject({
-        code: 'UNSUPPORTED'
-      })
-    })
-
-    it('exportStory', async () => {
-      const api = await makeTestApi()
-      await expect(api.exportStory('s', 'docx')).rejects.toMatchObject({
-        code: 'UNSUPPORTED'
-      })
-    })
   })
 
   it('applySpellLanguages resolves as a no-op (web has no app-managed checker)', async () => {

@@ -601,6 +601,32 @@ export class FileService {
     }
   }
 
+  /**
+   * Walk the entire library tree through the injected {@link FsPort} and return every
+   * file as `{ path, data }`, where `path` is forward-slash separated and relative to
+   * the library root (reproducing the on-disk layout, `.trash/` included). Reused by
+   * the web `.zip` export (fflate) and, later, Capacitor (MC2) — the walk stays in the
+   * tested data layer rather than in any single platform. Reads only; never mutates.
+   */
+  async readLibraryEntries(): Promise<{ path: string; data: Uint8Array }[]> {
+    const root = await this.getLibraryRoot()
+    const out: { path: string; data: Uint8Array }[] = []
+
+    const walk = async (absDir: string, relDir: string): Promise<void> => {
+      const names = await this.fs.readdir(absDir)
+      for (const name of names) {
+        const abs = join(absDir, name)
+        const rel = relDir ? `${relDir}/${name}` : name
+        const st = await this.fs.stat(abs)
+        if (st.isDirectory) await walk(abs, rel)
+        else out.push({ path: rel, data: await this.fs.readFileBytes(abs) })
+      }
+    }
+
+    await walk(root, '')
+    return out
+  }
+
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   private async listStoryIds(root: string): Promise<string[]> {

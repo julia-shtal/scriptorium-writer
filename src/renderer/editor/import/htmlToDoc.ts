@@ -9,6 +9,12 @@
  *
  * The split/flatten helpers are pure string transforms (node-testable). `htmlToDoc`
  * itself calls `generateJSON`, which needs a DOM and therefore only runs in the renderer.
+ *
+ * SECURITY BOUNDARY (MP6): `mammoth` output is untrusted. `generateJSON` against
+ * `bookExtensions` is the sanitiser — it keeps only schema-modelled nodes/marks and
+ * discards everything else (scripts, event handlers, unknown tags). This holds only as
+ * long as the schema carries no URL/HTML-bearing attribute; see the matching note in
+ * bookExtensions.ts before adding one. Covered by htmlToDoc.browser.test.ts.
  */
 import { generateJSON } from '@tiptap/core'
 import type { ProseMirrorJSON } from '@shared/types'

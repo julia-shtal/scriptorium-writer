@@ -1,13 +1,13 @@
 /**
- * ProseMirror JSON → .docx for M14 export. Two layers keep the doc-walking logic pure and
- * testable and isolate the docx.js API:
+ * ProseMirror JSON → .docx bytes (M14, moved to src/data in MP6 so the web build
+ * reuses it). Two layers keep the doc-walking logic pure and isolate docx.js:
  *   1. `chapterToDocxBlocks` walks the canon into a small intermediate representation
  *      (`DocxBlock[]`) — same node set as `markdown.ts`, no docx.js involved.
- *   2. `blocksToDocxBuffer` maps that representation onto docx.js and packs a Buffer.
+ *   2. `blocksToDocxBytes` maps that representation onto docx.js and packs bytes.
  *
- * Marks → run flags, `sceneDivider` → a centered divider paragraph, `footnote` nodes →
- * native docx footnotes, `hardBreak` → a line break. Whole-story export sets a Heading-1
- * per chapter; per-chapter export omits it. Pure of `fs`; the caller writes the bytes.
+ * Platform-neutral: returns a `Uint8Array` (not a Node `Buffer`) via `Packer.toBase64String`
+ * — the one Packer method available in both the Node and browser docx builds — so the
+ * Electron and web paths call the same function. Pure of `fs`; the caller writes the bytes.
  */
 import {
   Document,
@@ -110,11 +110,22 @@ function blocksToParagraphs(
   return paras
 }
 
-/** Build the final .docx bytes from one or more chapters' block lists. */
-export async function blocksToDocxBuffer(blockLists: DocxBlock[][]): Promise<Buffer> {
+/** Decode a base64 string to raw bytes. `atob` is global in both Node (>=16) and browsers. */
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+/** Build the final .docx bytes from one or more chapters' block lists. Platform-neutral. */
+export async function blocksToDocxBytes(blockLists: DocxBlock[][]): Promise<Uint8Array> {
   const footnotes: Record<number, { children: Paragraph[] }> = {}
   const nextId = { n: 0 }
   const children = blockLists.flatMap((blocks) => blocksToParagraphs(blocks, footnotes, nextId))
   const doc = new Document({ footnotes, sections: [{ children }] })
-  return Packer.toBuffer(doc)
+  // toBase64String is the only Packer serializer present in BOTH the Node and browser
+  // builds (toBuffer is Node-only, toBlob browser-only); decode it to bytes here.
+  const base64 = await Packer.toBase64String(doc)
+  return base64ToBytes(base64)
 }

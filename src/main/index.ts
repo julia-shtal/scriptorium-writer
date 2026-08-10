@@ -9,8 +9,8 @@ import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
 import { initAutoUpdate } from './auto-update'
 import { configureSpellcheck, registerSpellcheckContextMenu } from './spellcheck'
-import { convertDocxToHtml } from './docx-import'
-import { buildChapterExportBuffer, buildStoryExportBuffer } from './export-format'
+import { convertDocxToHtml } from '@data/docx-import'
+import { buildChapterExportBytes, buildStoryExportBytes } from '@data/export-format'
 import { atomicWriteFile } from '@data/atomic-write'
 import { NodeFsPort } from '../platform/node/fs-port'
 
@@ -37,7 +37,7 @@ function iconPath(): string {
 
 /** Show a save dialog for a generated export and write the bytes atomically (M14/M14.1). */
 async function saveExport(
-  buffer: Buffer,
+  data: Uint8Array,
   suggestedName: string,
   format: ExportFormat
 ): Promise<ExportFileResult> {
@@ -61,7 +61,7 @@ async function saveExport(
   if (result.canceled || !result.filePath) return { canceled: true }
   // Atomic write: tmp + rename in the destination dir, so a failed write never leaves a
   // half-written file and never touches the library (export is read-only against canon).
-  await atomicWriteFile(fsPort, result.filePath, buffer)
+  await atomicWriteFile(fsPort, result.filePath, data)
   return { canceled: false, path: result.filePath }
 }
 
@@ -230,21 +230,25 @@ app.whenReady().then(async () => {
           return { canceled: false, kind: 'md', text }
         }
         const buffer = await readFile(path)
-        const { html, warnings } = await convertDocxToHtml(buffer)
+        const arrayBuffer = buffer.buffer.slice(
+          buffer.byteOffset,
+          buffer.byteOffset + buffer.byteLength
+        )
+        const { html, warnings } = await convertDocxToHtml(arrayBuffer)
         return { canceled: false, kind: 'docx', html, warnings }
       },
       exportChapter: async (storyId, chapterId, format) => {
         const chapter = await fileService.readChapter(storyId, chapterId)
-        const buffer = await buildChapterExportBuffer(chapter, format)
-        return saveExport(buffer, chapter.title || 'chapter', format)
+        const bytes = await buildChapterExportBytes(chapter, format)
+        return saveExport(bytes, chapter.title || 'chapter', format)
       },
       exportStory: async (storyId, format) => {
         const story = await fileService.readStory(storyId)
         const chapters = await Promise.all(
           story.chapterOrder.map((id) => fileService.readChapter(storyId, id))
         )
-        const buffer = await buildStoryExportBuffer(chapters, story.chapterOrder, format)
-        return saveExport(buffer, story.title || 'story', format)
+        const bytes = await buildStoryExportBytes(chapters, story.chapterOrder, format)
+        return saveExport(bytes, story.title || 'story', format)
       }
     }
   )

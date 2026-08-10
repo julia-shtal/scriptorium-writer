@@ -239,6 +239,12 @@ never collide); reads/dir-ops run on the main thread. OPFS has no separate fsync
 barrier, so each `writeFile` `flush()`es before close — durability lives inside the
 write, which keeps `atomicWriteFile`'s tmp+rename atomic.
 
+Import/export work in the web build too: import reads a `.md`/`.docx` via a file
+picker, chapter/story/library export download files to the browser's Downloads folder
+(library export is a `.zip` built with `fflate`; desktop still uses `archiver`). The
+`.docx` importer sanitises Word's HTML by parsing it against the editor schema — the
+same boundary on every platform.
+
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
 
