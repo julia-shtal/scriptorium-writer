@@ -1,5 +1,5 @@
 // Plain-Vite config for the MP3 web build target — a second build of the same React
-// renderer, running in a browser instead of Electron.
+// renderer, running in a browser instead of Electron. PWA shell added in MP7.
 //
 // Entry/html split: the Electron target owns src/renderer/index.html (→ main.electron.tsx,
 // window.api injected by preload); the web target uses src/renderer/index.web.html
@@ -8,11 +8,14 @@
 // composition root a distinct entry, so nothing platform-specific leaks across.
 //
 // This mirrors the `renderer` section of electron.vite.config.ts but is plain Vite, not
-// electron-vite: no externalizeDepsPlugin (the browser bundle must include its deps) and
-// no injectProdCsp (that policy is file://-specific — a web CSP lands in MP7).
+// electron-vite: no externalizeDepsPlugin (the browser bundle must include its deps).
 import { resolve } from 'path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
+import mkcert from 'vite-plugin-mkcert'
+import { manifest } from './src/renderer/pwa/manifest'
+import { WEB_CSP } from './src/renderer/pwa/csp'
 
 // The Electron target owns src/renderer/index.html (→ main.electron.tsx); the web
 // target uses index.web.html (→ main.web.tsx). In dev, route '/' to the web html so
@@ -25,6 +28,22 @@ function serveWebIndex(): Plugin {
         if (req.url === '/' || req.url === '/index.html') req.url = '/index.web.html'
         next()
       })
+    }
+  }
+}
+
+// Inject the web CSP meta into index.web.html for production builds only. Dev is skipped
+// (like the Electron target) because Vite serves an inline react-refresh preamble that a
+// strict `script-src 'self'` would block, leaving a blank dev page.
+function injectWebCsp(): Plugin {
+  return {
+    name: 'scriptorium-writer:inject-web-csp',
+    transformIndexHtml(html, ctx): string {
+      if (ctx.server) return html // dev only has ctx.server
+      return html.replace(
+        '</head>',
+        `  <meta http-equiv="Content-Security-Policy" content="${WEB_CSP}" />\n  </head>`
+      )
     }
   }
 }
@@ -54,6 +73,25 @@ export default defineConfig({
       external: [/^node:/, 'fs', 'path', 'os', 'crypto', 'stream', 'zlib', 'events', 'util']
     }
   },
-  plugins: [react(), serveWebIndex()]
-  // TODO(MP7): web CSP — omitted; electron's injectProdCsp() is file://-specific.
+  plugins: [
+    react(),
+    serveWebIndex(),
+    injectWebCsp(),
+    mkcert(), // dev HTTPS so the tablet can register a service worker + persist OPFS
+    VitePWA({
+      registerType: 'prompt', // never reload mid-sentence; the user chooses when
+      injectRegister: null, // we register manually in main.web.tsx via virtual:pwa-register
+      manifest,
+      includeAssets: ['icons/*.png'],
+      workbox: {
+        // Precache the whole shell. The app makes ZERO network requests after load
+        // (all storage is OPFS), so there is intentionally NO runtimeCaching — do not
+        // add a network-first strategy for requests that never happen.
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}']
+      },
+      // Serve an installable PWA straight from `dev:web` (over mkcert HTTPS) so the tablet
+      // can install without a separate preview server.
+      devOptions: { enabled: true, type: 'module' }
+    })
+  ]
 })

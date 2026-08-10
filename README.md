@@ -245,6 +245,28 @@ picker, chapter/story/library export download files to the browser's Downloads f
 `.docx` importer sanitises Word's HTML by parsing it against the editor schema — the
 same boundary on every platform.
 
+#### PWA (MP7)
+
+The web build is an installable, offline-capable PWA:
+
+- **Install:** open the served URL in Chrome and choose "Установить приложение" /
+  add-to-home-screen. It launches standalone (no browser chrome) with the book icon and
+  the leather-frame splash colour (`--book-frame`).
+- **Offline:** a service worker (`vite-plugin-pwa`, Workbox `generateSW`) precaches the
+  app shell (JS/CSS/bundled fonts/icons). After the first load the app opens with no
+  network — the library lives in OPFS. There is intentionally **no** runtime network
+  caching, because the app makes no network requests after load.
+- **Updates:** `registerType: 'prompt'` — a new deploy shows a dismissible "Доступна
+  новая версия" strip (`WebUpdateNotice`) instead of reloading unprompted; the user taps
+  "Обновить" when ready. This is separate from the desktop `UpdateNotice`, sharing only
+  the visual style.
+- **Dev over HTTPS:** `npm run dev:web` uses `vite-plugin-mkcert` to serve HTTPS, required
+  for service-worker registration and OPFS persistence when testing from a tablet on the
+  LAN. The first time, install the mkcert local CA on the tablet (or tap through the
+  certificate warning).
+- **Icons:** `npm run gen:icon` emits the desktop `.ico` and the PWA PNGs (192, 512, and a
+  512 maskable) into `src/renderer/public/icons/` from one source of truth.
+
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
 

@@ -16,6 +16,7 @@ const PARCHMENT = [0xef, 0xe2, 0xc4, 0xff] // warm page
 const INK = [0x4a, 0x33, 0x22, 0xff]       // deep brown cover/spine
 const PAGE = [0xfb, 0xf4, 0xe4, 0xff]      // cream pages
 const ACCENT = [0x8a, 0x5a, 0x2b, 0xff]    // accent line
+const FRAME = [0x3a, 0x2a, 0x1d, 0xff]     // --book-frame: dark leather (PWA bg/theme)
 
 // --- tiny raster helpers (operate on a size*size RGBA Uint8Array) ---
 function makeCanvas(n) {
@@ -64,6 +65,26 @@ function drawIcon(n) {
   for (const yy of [0.40, 0.50, 0.60]) {
     fillRect(buf, n, s(0.31), s(yy), s(0.46), s(yy) + Math.max(1, s(0.015)), line)
     fillRect(buf, n, s(0.54), s(yy), s(0.69), s(yy) + Math.max(1, s(0.015)), line)
+  }
+  return buf
+}
+
+/**
+ * Maskable variant: solid frame background edge-to-edge with the book art inset into
+ * the centre 80% safe zone. Android crops maskable icons to a circle/squircle, so the
+ * art must not reach the edges and the background must be opaque.
+ */
+function drawMaskableIcon(n) {
+  const buf = makeCanvas(n)
+  fillRect(buf, n, 0, 0, n, n, FRAME) // opaque background, no transparency
+  const inner = Math.round(n * 0.8)
+  const art = drawIcon(inner) // inner x inner RGBA with the book on a transparent margin
+  const off = Math.round((n - inner) / 2)
+  for (let y = 0; y < inner; y++) {
+    for (let x = 0; x < inner; x++) {
+      const i = (y * inner + x) * 4
+      blend(buf, n, x + off, y + off, [art[i], art[i + 1], art[i + 2], art[i + 3]])
+    }
   }
   return buf
 }
@@ -140,3 +161,15 @@ const pngs = SIZES.map((size) => ({ size, data: encodePng(drawIcon(size), size) 
 mkdirSync(dirname(OUT), { recursive: true })
 writeFileSync(OUT, buildIco(pngs))
 console.log(`Wrote ${OUT} (${SIZES.length} sizes: ${SIZES.join(', ')})`)
+
+// PWA icons (MP7): same vector art as the .ico, one source of truth. 192/512 are
+// full-bleed "any"; the maskable 512 has a solid frame background + inset art.
+const PWA_DIR = join(HERE, '..', 'src', 'renderer', 'public', 'icons')
+mkdirSync(PWA_DIR, { recursive: true })
+const pwaTargets = [
+  { file: 'icon-192.png', bytes: encodePng(drawIcon(192), 192) },
+  { file: 'icon-512.png', bytes: encodePng(drawIcon(512), 512) },
+  { file: 'icon-maskable-512.png', bytes: encodePng(drawMaskableIcon(512), 512) }
+]
+for (const { file, bytes } of pwaTargets) writeFileSync(join(PWA_DIR, file), bytes)
+console.log(`Wrote ${pwaTargets.length} PWA icons to ${PWA_DIR}`)

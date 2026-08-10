@@ -9,6 +9,7 @@ import '@fontsource/pt-sans/400.css'
 import '@fontsource/pt-sans/700.css'
 import './theme/book.css'
 import App from './app'
+import { WebUpdateNotice } from './components/WebUpdateNotice'
 import { setPlatform } from './platform'
 import { createWebPlatform } from '../platform/web'
 
@@ -23,6 +24,7 @@ createWebPlatform()
     createRoot(container).render(
       <React.StrictMode>
         <App />
+        <WebUpdateNotice />
       </React.StrictMode>
     )
   })
