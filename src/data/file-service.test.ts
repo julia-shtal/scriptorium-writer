@@ -548,3 +548,27 @@ describe('exportLibraryArchive (M13)', () => {
     expect(stories.some((s) => s.title === 'Two')).toBe(true)
   })
 })
+
+describe('readLibraryEntries (MP6 web zip walker)', () => {
+  it('returns every library file as a forward-slash relative path + bytes', async () => {
+    const { svc } = await makeService()
+    const story = await svc.createStory({ title: 'One' })
+    const ch = await svc.createChapter(story.id, 'Ch')
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Ch', doc: docWith('hello world') })
+
+    const entries = await svc.readLibraryEntries()
+    const paths = entries.map((e) => e.path)
+
+    // Relative to the library root, forward-slash separated, no leading slash.
+    expect(paths.every((p) => !p.startsWith('/') && !p.includes('\\'))).toBe(true)
+    // The story meta and the chapter canon are present.
+    expect(paths.some((p) => p.startsWith('stories/') && p.endsWith('story.json'))).toBe(true)
+    expect(
+      paths.some((p) => p.startsWith('stories/') && p.includes('/chapters/') && p.endsWith('.json'))
+    ).toBe(true)
+
+    // Bytes are real: the chapter canon decodes to JSON containing the text.
+    const canon = entries.find((e) => e.path.includes('chapters/') && e.path.endsWith('.json'))!
+    expect(new TextDecoder().decode(canon.data)).toContain('hello world')
+  })
+})

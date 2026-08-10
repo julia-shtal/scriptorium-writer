@@ -2,7 +2,7 @@
  * The hardBreak case casts the returned block to `any` to reach into `.runs` without
  * narrowing the DocxBlock union; the test asserts the run shape at runtime. */
 import { describe, it, expect } from 'vitest'
-import { chapterToDocxBlocks } from './docx-export'
+import { chapterToDocxBlocks, blocksToDocxBytes } from './docx-export'
 import type { ProseMirrorJSON } from '@shared/types'
 
 const doc = (content: unknown[]): ProseMirrorJSON => ({ type: 'doc', content })
@@ -73,5 +73,18 @@ describe('chapterToDocxBlocks', () => {
       { break: true },
       { text: 'b', bold: false, italics: false, strike: false }
     ])
+  })
+})
+
+describe('blocksToDocxBytes', () => {
+  it('packs a valid .docx (zip signature "PK") as a Uint8Array', async () => {
+    const blocks = chapterToDocxBlocks('T', doc([{ type: 'paragraph', content: [{ type: 'text', text: 'hi' }] }]), {
+      withHeading: false
+    })
+    const bytes = await blocksToDocxBytes([blocks])
+    expect(bytes).toBeInstanceOf(Uint8Array)
+    expect(bytes.length).toBeGreaterThan(0)
+    // .docx is a zip; every zip starts with the local-file-header magic "PK\x03\x04".
+    expect([bytes[0], bytes[1]]).toEqual([0x50, 0x4b])
   })
 })

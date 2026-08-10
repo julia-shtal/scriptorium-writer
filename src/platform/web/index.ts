@@ -12,11 +12,20 @@
  * Browser code: this module must never import a `node:` built-in.
  */
 
-import type { Api } from '@shared/types'
+import { zip } from 'fflate'
+import type { Api, ImportFileResult, ExportFileResult, ExportLibraryResult } from '@shared/types'
 import type { Platform } from '@renderer/platform'
 import { AppError } from '@shared/errors'
 import { FileService } from '@data/file-service'
+import { buildChapterExportBytes, buildStoryExportBytes } from '@data/export-format'
 import { OpfsFsPort } from './opfs-fs-port'
+import { pickImportFile } from './import-file'
+import { triggerDownload, MIME } from './download'
+
+/** Strip characters illegal in filenames; mirrors the desktop saveExport sanitizer. */
+function safeName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
+}
 
 /**
  * Build the full {@link Api} surface backed directly by a {@link FileService}. The
@@ -75,23 +84,39 @@ export function makeApiFromService(service: FileService): Api {
         'Revealing a folder in the OS file explorer is not available in a browser.'
       )
     },
-    exportLibrary: async () => {
-      // TODO(MP6): web import/export
-      throw new AppError('UNSUPPORTED', 'Library export is not available in the web build.')
+    exportLibrary: async (): Promise<ExportLibraryResult> => {
+      const entries = await service.readLibraryEntries()
+      const tree: Record<string, Uint8Array> = {}
+      for (const e of entries) tree[e.path] = e.data
+      const bytes = await new Promise<Uint8Array>((resolve, reject) => {
+        // Async (non-blocking) zip; level 6 matches the desktop archiver setting.
+        zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
+      })
+      const filename = `library-${new Date().toISOString().slice(0, 10)}.zip`
+      triggerDownload(bytes, filename, MIME.zip)
+      // Web has no OS path and no cancel signal: `path` is the download filename, never canceled.
+      return { canceled: false, path: filename }
     },
 
     // import / export
-    readImportFile: async () => {
-      // TODO(MP6): web import/export
-      throw new AppError('UNSUPPORTED', 'File import is not available in the web build.')
+    readImportFile: (): Promise<ImportFileResult> => pickImportFile(),
+    exportChapter: async (storyId, chapterId, format): Promise<ExportFileResult> => {
+      const chapter = await service.readChapter(storyId, chapterId)
+      const bytes = await buildChapterExportBytes(chapter, format)
+      const filename = `${safeName(chapter.title) || 'chapter'}.${format}`
+      triggerDownload(bytes, filename, MIME[format])
+      // `path` is the download filename (not a filesystem path); never canceled on web.
+      return { canceled: false, path: filename }
     },
-    exportChapter: async (_storyId, _chapterId, _format) => {
-      // TODO(MP6): web import/export
-      throw new AppError('UNSUPPORTED', 'Chapter export is not available in the web build.')
-    },
-    exportStory: async (_storyId, _format) => {
-      // TODO(MP6): web import/export
-      throw new AppError('UNSUPPORTED', 'Story export is not available in the web build.')
+    exportStory: async (storyId, format): Promise<ExportFileResult> => {
+      const story = await service.readStory(storyId)
+      const chapters = await Promise.all(
+        story.chapterOrder.map((id) => service.readChapter(storyId, id))
+      )
+      const bytes = await buildStoryExportBytes(chapters, story.chapterOrder, format)
+      const filename = `${safeName(story.title) || 'story'}.${format}`
+      triggerDownload(bytes, filename, MIME[format])
+      return { canceled: false, path: filename }
     }
   }
   return api

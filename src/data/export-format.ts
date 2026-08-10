@@ -1,23 +1,26 @@
 /**
- * Pure buffer-building helpers behind the chapter/story export IPC handlers (M14.1
- * task 1). Kept out of `index.ts` so the format-selection logic (docx vs md) is
- * unit-testable without spinning up Electron; `index.ts` only wires the save dialog
- * and the atomic write.
+ * Pure export-byte builders behind the chapter/story export handlers (M14.1; moved to
+ * src/data in MP6 so both the Electron and web platforms share them). Format-selection
+ * (docx vs md) lives here, decoupled from any dialog/download transport. Returns
+ * `Uint8Array` (not Node `Buffer`) so it runs in the browser: Markdown is UTF-8 encoded
+ * with `TextEncoder`; docx bytes come from `blocksToDocxBytes`.
  */
 import type { Chapter, ExportFormat } from '@shared/types'
-import { chapterToDocxBlocks, blocksToDocxBuffer, type DocxBlock } from './docx-export'
-import { serializeChapterToMarkdown } from '@data/markdown'
+import { chapterToDocxBlocks, blocksToDocxBytes, type DocxBlock } from './docx-export'
+import { serializeChapterToMarkdown } from './markdown'
 
-/** Build the export bytes for a single chapter, per-chapter export has no heading. */
-export async function buildChapterExportBuffer(
+const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s)
+
+/** Build the export bytes for a single chapter; per-chapter export has no heading. */
+export async function buildChapterExportBytes(
   chapter: Chapter,
   format: ExportFormat
-): Promise<Buffer> {
+): Promise<Uint8Array> {
   if (format === 'docx') {
     const blocks = chapterToDocxBlocks(chapter.title, chapter.doc, { withHeading: false })
-    return blocksToDocxBuffer([blocks])
+    return blocksToDocxBytes([blocks])
   }
-  return Buffer.from(serializeChapterToMarkdown(chapter.title, chapter.doc), 'utf8')
+  return utf8(serializeChapterToMarkdown(chapter.title, chapter.doc))
 }
 
 /**
@@ -26,11 +29,11 @@ export async function buildChapterExportBuffer(
  * each chapter gets a Heading-1; for `.md` each chapter's backup is joined with a
  * blank line.
  */
-export async function buildStoryExportBuffer(
+export async function buildStoryExportBytes(
   chapters: Chapter[],
   chapterOrder: string[],
   format: ExportFormat
-): Promise<Buffer> {
+): Promise<Uint8Array> {
   const byId = new Map(chapters.map((c) => [c.id, c]))
   const ordered = chapterOrder.map((id) => byId.get(id)).filter((c): c is Chapter => !!c)
 
@@ -48,11 +51,11 @@ export async function buildStoryExportBuffer(
     const blockLists: DocxBlock[][] = ordered.map((chapter) =>
       chapterToDocxBlocks(chapter.title, chapter.doc, { withHeading: true })
     )
-    return blocksToDocxBuffer(blockLists)
+    return blocksToDocxBytes(blockLists)
   }
 
   const joined = ordered
     .map((chapter) => serializeChapterToMarkdown(chapter.title, chapter.doc))
     .join('\n\n')
-  return Buffer.from(joined, 'utf8')
+  return utf8(joined)
 }
