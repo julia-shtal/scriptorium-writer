@@ -279,6 +279,13 @@ export const ru = {
     restart: 'Перезапустить',
     later: 'Позже'
   },
+  // Web/PWA service-worker update prompt (WebUpdateNotice.tsx). No version number: the
+  // browser only signals that a newer build is waiting.
+  webUpdate: {
+    ready: 'Доступна новая версия',
+    update: 'Обновить',
+    later: 'Позже'
+  },
   // Renderer-surfaced error messages (extended by later M26 tasks).
   errors: {
     exportLibraryFailedDisk:
@@ -521,6 +528,11 @@ export const en: Dictionary = {
   updateNotice: {
     ready: 'Update downloaded (version {version}). Restart to install.',
     restart: 'Restart',
+    later: 'Later'
+  },
+  webUpdate: {
+    ready: 'A new version is available',
+    update: 'Update',
     later: 'Later'
   },
   errors: {
