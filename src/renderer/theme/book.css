@@ -34,7 +34,7 @@ body {
   grid-template-columns: 190px 1fr;
   border-radius: 6px;
   position: relative;
-  min-height: calc(100vh - 40px);
+  min-height: calc(100dvh - 40px);
   color: var(--ink);
 }
 /* Collapsed: a slim rail (holding the re-expand control) + the full-width page.
@@ -119,7 +119,7 @@ body {
 /* Editor view only: contain scrolling to .editor-surface so the Toolbar and
    .chapter-head stay put while typing near the bottom of a long chapter. */
 .page--editor {
-  height: calc(100vh - 40px); /* mirrors .book-grid's min-height; 40px = .book-frame padding (20px × 2) */
+  height: calc(100dvh - 40px); /* mirrors .book-grid; 40px = .book-frame padding (20px × 2). dvh (not vh) so the soft keyboard shrinks the column and the bottom bars stay visible (MP8). */
   /* Contain vertical overflow only (so .editor-surface is the sole scroller, not
      .page/body). Must NOT clip horizontally, or the decorative page-stack edges
      (.page::before / .page::after at right/left: -8px, outside the box) vanish. */
@@ -192,6 +192,9 @@ body {
   margin-left: 6px; font-family: var(--font-sans); font-size: 12.5px;
   color: var(--muted); align-self: center;
 }
+/* Minimum comfortable touch size (MP8) — the invisible hit-area floor applied under
+   (pointer: coarse). Shared token so the size lives in one place. */
+:root { --touch-target: 44px; }
 .action-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 9px 34px; border-top: 1px solid var(--rule);
@@ -894,6 +897,11 @@ body {
 .chapters-export:hover {
   color: var(--accent);
 }
+/* Touch/coarse pointer has no hover: the per-row export icon (revealed on hover for
+   mouse) must be permanently visible so it is reachable (MP8). */
+@media (hover: none), (pointer: coarse) {
+  .chapters-export { opacity: 1; }
+}
 .chapters-words {
   color: var(--muted);
   font-family: var(--font-sans);
@@ -1221,3 +1229,64 @@ fieldset.settings-field {
 .search-result-count { opacity: 0.6; }
 .search-snippet { margin-top: 4px; opacity: 0.85; }
 .search-snippet mark { background: var(--accent); color: var(--page-bg); padding: 0 2px; border-radius: 2px; }
+
+/* ── Touch targets (MP8) ───────────────────────────────────────────
+   Coarse pointer only, so the desktop look is untouched. Grow ONLY the invisible hit area
+   to --touch-target — never the icon, control size, spacing, or layout (the ticket: "add
+   padding around existing icons ... the visual weight should not change, only its hit
+   areas"). Technique: a centred, transparent ::after overlay per control. Being absolutely
+   positioned it takes NO layout space, so nothing moves, clips, or resizes; a click on it
+   targets the control itself (it is the control's own pseudo-element). Bare <svg> icons
+   can't carry a pseudo-element, so they instead pad the hit box and pull the space back
+   with an equal negative margin — icon size and spacing stay identical. An earlier attempt
+   using min-width/height + inline-flex reshaped controls into squares (clipping the sidebar
+   labels, spreading the header icons); this overlay approach avoids that entirely. */
+@media (pointer: coarse) {
+  .toolbar-btn,
+  .export-menu-trigger,
+  .action-bar-btn,
+  .sidebar-expand,
+  .nav-item,
+  .chapters-open,
+  .chapters-export,
+  .chapters-row .linkish,
+  .library-card > .linkish,
+  .notes-section-head .linkish,
+  .notes-entry .linkish {
+    position: relative;
+  }
+  .toolbar-btn::after,
+  .export-menu-trigger::after,
+  .action-bar-btn::after,
+  .sidebar-expand::after,
+  .nav-item::after,
+  .chapters-open::after,
+  .chapters-export::after,
+  .chapters-row .linkish::after,
+  .library-card > .linkish::after,
+  .notes-section-head .linkish::after,
+  .notes-entry .linkish::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+    transform: translate(-50%, -50%);
+  }
+
+  /* Bare <svg> icon buttons (chapter-head): pad the hit box, cancel the space with an
+     equal negative margin so the icon size and the row spacing are unchanged. */
+  .chapter-head > svg {
+    padding: 13px;
+    margin: -13px;
+  }
+}
+
+/* Orientation (MP8): intentionally NO touch-specific reading-column layout. The editor
+   uses the same full-width, left-aligned page as desktop in both orientations — capping
+   or centring the measure on the tablet produced heading/body misalignment and a
+   too-short line that read as "bigger" text. Desktop parity is the goal here; both
+   orientations simply inherit the desktop editor layout. */

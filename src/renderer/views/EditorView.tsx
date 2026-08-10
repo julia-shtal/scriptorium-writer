@@ -9,6 +9,7 @@ import { WandActionBar } from '@renderer/editor/cleanup/WandActionBar'
 import { useWand } from '@renderer/editor/cleanup/useWand'
 import { FindReplaceBar } from '@renderer/editor/find/FindReplaceBar'
 import { useFind } from '@renderer/editor/find/useFind'
+import { useKeyboardCaretScroll } from '@renderer/editor/useKeyboardCaretScroll'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { useSettingsStore } from '@renderer/store/settingsStore'
@@ -20,6 +21,7 @@ export function EditorView(): JSX.Element {
   const editor = useChapterEditor()
   const wand = useWand(editor)
   const find = useFind(editor)
+  useKeyboardCaretScroll(editor)
   const storyId = useEditorStore((s) => s.storyId)
   const chapterId = useEditorStore((s) => s.chapterId)
   const title = useEditorStore((s) => s.title)
