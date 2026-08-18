@@ -4,6 +4,7 @@ import { useStoryStore } from '@renderer/store/storyStore'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { ConfirmDialog } from '@renderer/components/ConfirmDialog'
+import { BackupNudge } from '@renderer/components/BackupNudge'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
@@ -52,6 +53,7 @@ export function LibraryView(): JSX.Element {
 
   return (
     <div className="library-view">
+      <BackupNudge storyCount={rows.length} />
       <div className="library-head">
         <span className="library-title">
           <IconBooks size={18} /> {t.library.title} · {rows.length}

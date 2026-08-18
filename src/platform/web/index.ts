@@ -27,6 +27,43 @@ function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
 }
 
+/** Minimal shape of the File System Access API bits we use; typed locally so the
+ *  web tsconfig needs no extra lib. */
+interface SaveFilePickerWindow {
+  showSaveFilePicker?: (opts: {
+    suggestedName?: string
+    types?: { description: string; accept: Record<string, string[]> }[]
+  }) => Promise<{
+    createWritable: () => Promise<{ write: (data: Uint8Array) => Promise<void>; close: () => Promise<void> }>
+  }>
+}
+
+/**
+ * Write `bytes` to a user-chosen location via showSaveFilePicker when available (MP9).
+ * Returns 'saved', 'canceled' (user dismissed the picker), or 'unsupported' (no picker
+ * — caller should fall back to a download). Any non-abort error propagates.
+ */
+async function trySavePicker(bytes: Uint8Array, filename: string): Promise<'saved' | 'canceled' | 'unsupported'> {
+  const picker = (globalThis as unknown as SaveFilePickerWindow).showSaveFilePicker
+  if (typeof picker !== 'function') return 'unsupported'
+  try {
+    const handle = await picker({
+      suggestedName: filename,
+      types: [{ description: 'Zip archive', accept: { 'application/zip': ['.zip'] } }]
+    })
+    const writable = await handle.createWritable()
+    await writable.write(bytes)
+    await writable.close()
+    return 'saved'
+  } catch (err) {
+    // User cancelled the picker → not an error, just no backup this time. Shipping
+    // engines reject with a DOMException named AbortError; the broader Error check is
+    // belt-and-suspenders for any engine that throws a plain Error on cancel.
+    if (err instanceof Error && err.name === 'AbortError') return 'canceled'
+    throw err
+  }
+}
+
 /**
  * Build the full {@link Api} surface backed directly by a {@link FileService}. The
  * return type is annotated as `Api` so the compiler enforces the complete surface: if
@@ -93,8 +130,15 @@ export function makeApiFromService(service: FileService): Api {
         zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
       })
       const filename = `library-${new Date().toISOString().slice(0, 10)}.zip`
-      triggerDownload(bytes, filename, MIME.zip)
-      // Web has no OS path and no cancel signal: `path` is the download filename, never canceled.
+      const picked = await trySavePicker(bytes, filename)
+      if (picked === 'canceled') return { canceled: true }
+      if (picked === 'unsupported') {
+        // Fallback: the MP6 download path (the one Chrome for Android runs).
+        triggerDownload(bytes, filename, MIME.zip)
+      }
+      // 'saved' via the picker, or downloaded via the fallback: both are a completed
+      // export. `path` is the suggested filename, not the real save location — the File
+      // System Access API does not expose the folder the user chose.
       return { canceled: false, path: filename }
     },
 

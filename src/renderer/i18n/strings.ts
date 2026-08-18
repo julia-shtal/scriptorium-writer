@@ -60,7 +60,12 @@ export const ru = {
     reveal: 'показать',
     exportLibrary: 'Экспортировать библиотеку',
     exporting: 'Экспорт…',
-    librarySaved: 'Библиотека сохранена:'
+    librarySaved: 'Библиотека сохранена:',
+    storageHeading: 'Хранилище',
+    storagePersisted: 'Данные хранятся постоянно на этом устройстве.',
+    storageNotPersisted:
+      'Браузер может удалить данные приложения при нехватке места. Регулярно сохраняйте резервную копию библиотеки.',
+    storageUsage: 'Занято {used} из {total}'
   },
   // Library view (LibraryView.tsx)
   library: {
@@ -286,6 +291,12 @@ export const ru = {
     update: 'Обновить',
     later: 'Позже'
   },
+  // Backup nudge shown in the library view on web when a backup is overdue (MP9).
+  backup: {
+    nudgeText: 'Давно не было резервной копии. Библиотека в браузере может быть удалена — сохраните копию.',
+    nudgeAction: 'Сохранить резервную копию',
+    dismiss: 'Позже'
+  },
   // Renderer-surfaced error messages (extended by later M26 tasks).
   errors: {
     exportLibraryFailedDisk:
@@ -359,7 +370,12 @@ export const en: Dictionary = {
     reveal: 'reveal',
     exportLibrary: 'Export library',
     exporting: 'Exporting…',
-    librarySaved: 'Library saved:'
+    librarySaved: 'Library saved:',
+    storageHeading: 'Storage',
+    storagePersisted: 'Your data is stored persistently on this device.',
+    storageNotPersisted:
+      'The browser may remove app data when storage is low. Back up your library regularly.',
+    storageUsage: '{used} of {total} used'
   },
   library: {
     title: 'Library',
@@ -534,6 +550,12 @@ export const en: Dictionary = {
     ready: 'A new version is available',
     update: 'Update',
     later: 'Later'
+  },
+  // Backup nudge shown in the library view on web when a backup is overdue (MP9).
+  backup: {
+    nudgeText: 'No recent backup. Your in-browser library can be cleared — save a copy.',
+    nudgeAction: 'Save a backup',
+    dismiss: 'Later'
   },
   errors: {
     exportLibraryFailedDisk:

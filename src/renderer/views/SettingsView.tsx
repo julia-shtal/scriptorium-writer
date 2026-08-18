@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
+import { format } from '@renderer/i18n/strings'
 import { isAppError } from '@shared/errors'
 import { api, getPlatform } from '@renderer/platform'
+import { runLibraryBackup } from '@renderer/backup/run-library-backup'
+import { formatBytes } from '@renderer/backup/format-bytes'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
 const LANGS: { code: string; label: string }[] = [
@@ -16,12 +19,24 @@ export function SettingsView(): JSX.Element {
   const [exportState, setExportState] = useState<
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; path: string } | { kind: 'error'; msg: string }
   >({ kind: 'idle' })
+  const isWeb = getPlatform().capabilities?.managedSpellcheck === false
+  const storagePersisted = getPlatform().storagePersisted
+  const [usage, setUsage] = useState<{ used: number; total: number } | null>(null)
+  useEffect(() => {
+    if (!isWeb) return
+    // Guarded: navigator.storage?.estimate may be undefined; never throw into render.
+    void navigator.storage?.estimate?.().then((e) => {
+      if (typeof e.usage === 'number' && typeof e.quota === 'number') {
+        setUsage({ used: e.usage, total: e.quota })
+      }
+    }).catch(() => { /* estimate unavailable — leave usage null */ })
+  }, [isWeb])
   if (!settings) return <div style={{ padding: 34 }}>{t.settings.loading}</div>
 
   const exportLibrary = async (): Promise<void> => {
     setExportState({ kind: 'busy' })
     try {
-      const result = await api().exportLibrary()
+      const result = await runLibraryBackup()
       setExportState(result.canceled ? { kind: 'idle' } : { kind: 'done', path: result.path })
     } catch (err) {
       const msg = isAppError(err)
@@ -89,6 +104,25 @@ export function SettingsView(): JSX.Element {
         <input type="number" min={1} value={settings.maxVersionsPerChapter}
                onChange={(e) => void update({ maxVersionsPerChapter: Number(e.target.value) })} />
       </label>
+
+      {isWeb && (
+        <div className="settings-field">{t.settings.storageHeading}
+          {storagePersisted === true && (
+            <div className="settings-note">{t.settings.storagePersisted}</div>
+          )}
+          {storagePersisted === false && (
+            <div className="settings-note settings-note--error">{t.settings.storageNotPersisted}</div>
+          )}
+          {usage && (
+            <div className="settings-note">
+              {format(t.settings.storageUsage, {
+                used: formatBytes(usage.used),
+                total: formatBytes(usage.total)
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="settings-field">{t.settings.libraryFolder}
         <div className="settings-path">
