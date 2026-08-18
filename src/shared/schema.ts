@@ -9,7 +9,7 @@
 export const STORY_SCHEMA_VERSION = 1
 export const CHAPTER_SCHEMA_VERSION = 1
 export const NOTES_SCHEMA_VERSION = 1
-export const SETTINGS_SCHEMA_VERSION = 1
+export const SETTINGS_SCHEMA_VERSION = 2
 
 /** Convenience bundle for anything that wants all versions at once. */
 export const SCHEMA_VERSIONS = {

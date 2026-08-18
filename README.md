@@ -273,6 +273,17 @@ viewport height (`dvh` + `interactive-widget=resizes-content`) so the soft keybo
 covers the Find & Replace or cleanup bars. These are gated on `(pointer: coarse)`, so the
 desktop layout is unchanged.
 
+**Backups on the web build (MP9).** The browser stores your library in OPFS, which the
+browser can evict under storage pressure and which is removed if you clear site data or
+uninstall the PWA. Settings shows whether persistent storage was granted and how much
+space is in use; the library view nudges you to save a `.zip` backup when the last one is
+over a week old (dismissible, and it stays away for a week). Use **Export library**
+(Settings) or the nudge button to save a copy — to a folder you choose where the browser
+supports `showSaveFilePicker`, otherwise to Downloads (the path Chrome for Android uses).
+The last successful export is recorded as `lastLibraryBackupAt` in settings. Desktop
+stores the library as ordinary files, so it needs none of this and the nudge never appears
+there.
+
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
 

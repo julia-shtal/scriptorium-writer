@@ -38,7 +38,16 @@ export default function App(): JSX.Element {
 
   useAutosaveLifecycle()
 
+  // Boot exactly once. React 18 StrictMode intentionally double-invokes effects in dev;
+  // without this guard the two runs boot concurrently and race on the same files — most
+  // visibly, first-run demo seeding writes `story.json` while the second boot reads it
+  // mid-`rename`, surfacing as "failed to read story «демо»". The boot is genuinely a
+  // once-per-load operation (seed / open last chapter), so guarding it is correct, not a
+  // workaround for a non-idempotent effect.
+  const bootedRef = useRef(false)
   useEffect(() => {
+    if (bootedRef.current) return
+    bootedRef.current = true
     void (async () => {
       try {
         const found = await api().scanLibrary()

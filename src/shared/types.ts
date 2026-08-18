@@ -145,6 +145,8 @@ export interface Settings {
   lastOpenedStoryId?: string
   /** Id of the chapter the user last had open within `lastOpenedStoryId`. */
   lastOpenedChapterId?: string
+  /** ISO timestamp of the last successful full-library export. Used to nudge web users (MP9). */
+  lastLibraryBackupAt?: ISODate
   schemaVersion: number
 }
 

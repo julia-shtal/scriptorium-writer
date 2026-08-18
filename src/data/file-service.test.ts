@@ -514,6 +514,32 @@ describe('settings', () => {
     // Sanity: we really read the partial on-disk file (merge path), not the seed path.
     expect(settings.editorFontSizePx).toBe(19)
   })
+
+  it('round-trips lastLibraryBackupAt through save/read (MP9)', async () => {
+    const { svc } = await makeService()
+    const settings = await svc.readSettings()
+    const when = '2026-08-10T12:00:00.000Z'
+    await svc.saveSettings({ ...settings, lastLibraryBackupAt: when })
+    expect((await svc.readSettings()).lastLibraryBackupAt).toBe(when)
+  })
+
+  it('loads a settings file written before lastLibraryBackupAt existed (MP9)', async () => {
+    // A settings.json from the current schema with NO lastLibraryBackupAt key must
+    // load with no error and no data loss; the field is simply undefined.
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const lib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, lib)
+    await fsp.writeFile(
+      join(userData, 'settings.json'),
+      JSON.stringify({ editorFontSizePx: 21, language: 'ru' }),
+      'utf8'
+    )
+    const svc = new FileService({ fs: new NodeFsPort(), userDataPath: userData, defaultLibraryPath: lib })
+
+    const settings = await svc.readSettings()
+    expect(settings.lastLibraryBackupAt).toBeUndefined()
+    expect(settings.editorFontSizePx).toBe(21) // proves the on-disk file was read
+  })
 })
 
 describe('exportLibraryArchive (M13)', () => {
