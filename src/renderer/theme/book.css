@@ -592,6 +592,10 @@ body {
 .update-notice-btn.ghost:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+.update-notice-error {
+  font-size: 12px;
+  color: var(--danger);
+}
 
 /* --- Footnotes (M3) --- */
 .footnote {

@@ -185,6 +185,21 @@ Design source of truth: [`docs/SPEC.md`](docs/SPEC.md).
     LTS), then open a new terminal.
 - npm 10+ (bundled with Node; Node 24 ships npm 11).
 
+Needed only if you're building the Android app (skip these for desktop-only work):
+
+- **Android Studio** — SDK manager, Gradle sync, and on-device deployment all go
+  through it. Only the `android/` directory is opened there; IntelliJ IDEA remains the
+  editor for everything under `src/`.
+- **JDK 21** — pinned by the generated project (`android/app/capacitor.build.gradle`,
+  `sourceCompatibility`/`targetCompatibility VERSION_21`). Android Studio bundles a
+  compatible JDK, so a separate install usually isn't needed.
+- **Android SDK Platform 36**, minimum API 24 — set in `android/variables.gradle`
+  (`compileSdkVersion`/`targetSdkVersion 36`, `minSdkVersion 24`; Capacitor requires
+  API 24+). Install via Android Studio's SDK Manager.
+- **USB debugging enabled on the tablet** (Settings → About → tap Build number 7
+  times to unlock Developer options, then enable USB debugging) for `npm run
+  run:android` and on-device testing.
+
 ### Getting started (from source)
 
 ```bash
@@ -218,6 +233,9 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 | `npm run test:watch` | Run Vitest in watch mode. |
 | `npm run test:browser` | Run the browser-only suite (`*.browser.test.ts`, e.g. the OPFS `FsPort` contract) in real Chromium via Vitest browser mode. |
 | `npm run format` | Prettier-format `src`. |
+| `npm run sync:android` | Build the web bundle, then `npx cap sync android` (copies `dist-web` into the native project and installs any native plugin dependencies). |
+| `npm run open:android` | `npx cap open android` — opens the project in Android Studio. **Does not build or sync first** (see Android build below). |
+| `npm run run:android` | Build the web bundle, then `npx cap run android` (syncs and deploys to a connected/USB-debugging-enabled device or emulator). |
 
 ### Web build (MP3)
 
@@ -291,6 +309,75 @@ Spellcheck in the web build is provided by the device's own system (e.g. the
 Android keyboard), not by the app's bundled dictionaries — the desktop build is
 unaffected and still checks offline with the bundled Hunspell dictionaries.
 
+#### Android build (MC1)
+
+Capacitor wraps the same `dist-web` bundle from the web build above in an Android
+WebView container — one shared bundle that picks its platform implementation at the
+composition root. Storage is still OPFS at this point (the native filesystem swap is
+MC2), so the WebView is kept on a secure-context origin (`androidScheme: 'https'` in
+`capacitor.config.ts`) for OPFS to keep working.
+
+**Export and library backup do not work in the Android build yet — do not trust the
+tablet as backed up.** `createCapacitorPlatform()` delegates to the web platform, so
+Android inherits the web export path; there is no `showSaveFilePicker` in an Android
+WebView, so `exportLibrary` falls back to a synthetic `<a download>` click
+(`triggerDownload`, `src/platform/web/download.ts`). `@capacitor/android` registers no
+`DownloadListener`, so the WebView drops that download silently — no file is written,
+no error is thrown. `exportLibrary` still returns success, so both the Settings export
+button and the MP9 "backup overdue" nudge report a successful backup and
+`lastLibraryBackupAt` is stamped as if one had happened. Chapter and story export are
+the same dead path. For now, back up from the desktop app or the browser PWA, where
+export works; import is unaffected — Android's native file chooser works and `.md`/
+`.docx` import functions normally on the tablet. Native export via
+`@capacitor/filesystem` and the Android share sheet lands in MC2.
+
+- **Build loop:** `npm run sync:android` → `npm run open:android` → Run in Android
+  Studio. `npm run run:android` builds, syncs, and deploys straight to a connected
+  device without opening the IDE — but only after Android Studio has opened the
+  project at least once. Opening it writes the gitignored `android/local.properties`
+  with the SDK location (`android/.gitignore:27`), which Gradle needs and which
+  doesn't exist on a fresh clone; without it, or an `ANDROID_HOME` environment
+  variable set some other way, `run:android` fails with `SDK location not found`.
+  After that first open, `run:android` works standalone.
+- **`npm run open:android` does not build or sync.** It only opens Android Studio.
+  `android/app/src/main/assets/public` (the copied web assets Android runs) is
+  gitignored and doesn't exist on a fresh clone, so opening the project and hitting
+  Run before ever running `sync:android` produces an installable APK with a blank
+  white screen and no error — if a sync has completed at least once before. On a
+  truly fresh clone Gradle fails earlier and louder instead: `android/settings.gradle`
+  points at `capacitor-cordova-android-plugins/`, which is gitignored and only created
+  by `cap sync`, so Gradle settings evaluation fails outright (a red error pane, not a
+  running app). Either symptom, the fix is the same: run `sync:android` (or
+  `run:android`) first. On a non-fresh clone that has synced before, skipping the sync
+  instead silently ships whatever the last sync copied — not necessarily your current
+  code.
+- **Re-run `npx cap sync` after any dependency change** (`npm install` that touches
+  a Capacitor plugin, an `@capacitor/*` version bump, etc.) — sync doesn't just copy
+  the web bundle, it also installs the native (Gradle) dependencies a Capacitor
+  plugin needs. `npm run sync:android` does this for you.
+- **A freshly installed APK can still be running the previous build.** Android app
+  updates preserve app data, including the service worker registration and its
+  Cache Storage precache. With `registerType: 'prompt'`, the old service worker keeps
+  controlling navigation and serving the old shell after installing a new APK until
+  the in-app update strip is accepted («Обновить») or app data is cleared. If the app
+  looks unchanged after installing a new build, accept the update prompt, or clear
+  the app's data (or uninstall and reinstall), before concluding the change didn't
+  land.
+- `android/` is committed to the repo on purpose — standard Capacitor practice; it's
+  hand-editable native project configuration that shouldn't be regenerated from
+  scratch. `android/app/src/main/assets/public`, the copied web assets inside it, is
+  gitignored and regenerated by every sync.
+- The Android application ID, `com.juliashtal.scriptoriumwriter` (`capacitor.config.ts`),
+  is **permanent** — it follows Java package naming rules (no hyphens, hence not
+  `scriptorium-writer`), and changing it later produces a different app that cannot
+  upgrade over an installed one. This is separate from the desktop `appId`
+  (`com.scriptorium-writer.app` in `electron-builder.yml`) — different platform,
+  different namespace, no conflict — so "the app ID" always means this Android one
+  unless the desktop one is named explicitly.
+
+Icons, splash screen, and release signing are not part of this milestone — they land
+in MC4.
+
 ### Architecture
 
 Standard Electron three-process split. The
@@ -362,6 +449,7 @@ src/
   data/                   # Platform-neutral data layer: FileService, atomic-write, snapshots, markdown, paths (injected FsPort — no Node imports)
   platform/node/          # NodeFsPort — the Node/Electron FsPort implementation (only place in the data path that touches node:fs)
   platform/web/           # OpfsFsPort (+ opfs-worker) over OPFS, and MemoryFsPort scaffolding — browser FsPort implementations (no node: imports)
+  platform/capacitor/     # Capacitor (Android) composition root — delegates to platform/web for MC1; the one module MC2 will change
   preload/                # contextBridge → window.api (typed, decodes AppError)
   renderer/
     theme/book.css        # book theme tokens + page-stack texture

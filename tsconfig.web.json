@@ -5,7 +5,8 @@
     "src/preload/index.d.ts",
     "src/shared/**/*",
     "src/data/**/*",
-    "src/platform/web/**/*"
+    "src/platform/web/**/*",
+    "src/platform/capacitor/**/*"
   ],
   "compilerOptions": {
     "composite": true,
