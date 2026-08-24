@@ -39,9 +39,16 @@ export function SettingsView(): JSX.Element {
       const result = await runLibraryBackup()
       setExportState(result.canceled ? { kind: 'idle' } : { kind: 'done', path: result.path })
     } catch (err) {
-      const msg = isAppError(err)
-        ? t.errors.exportLibraryFailedDisk
-        : t.errors.exportLibraryFailed
+      // UNSUPPORTED means the platform has no export implementation at all (e.g. MC1's
+      // Android guard) — "check disk space and permissions" is simply wrong advice
+      // there, so that code gets its own message rather than falling into the generic
+      // AppError bucket.
+      const msg =
+        isAppError(err) && err.code === 'UNSUPPORTED'
+          ? t.errors.exportLibraryUnsupported
+          : isAppError(err)
+            ? t.errors.exportLibraryFailedDisk
+            : t.errors.exportLibraryFailed
       setExportState({ kind: 'error', msg })
     }
   }

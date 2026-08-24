@@ -29,3 +29,22 @@ Thumbs.db
 # Local env
 .env
 .env.local
+
+# Capacitor — android/ itself is tracked, it's a hand-editable Gradle project. These five
+# paths are a deliberate belt-and-braces restatement at the repo root of what `cap add
+# android` already put in the generated android/.gitignore (which git honours as a nested
+# ignore file and is the authoritative list for everything else it covers — Cordova plugin
+# dirs, capacitor.config.json/plugins.json copies, res/xml/config.xml, *.apk/*.aab — see
+# that file, not this comment, for the full picture).
+android/app/src/main/assets/public
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+
+# Release signing (MC4). android/.gitignore ships #*.jks / #*.keystore commented out —
+# uncommented here because a committed release keystore is unrecoverable: it can't be
+# rotated without breaking upgrades for every installed user.
+*.jks
+*.keystore
+key.properties

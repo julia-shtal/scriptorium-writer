@@ -295,13 +295,21 @@ export const ru = {
   backup: {
     nudgeText: 'Давно не было резервной копии. Библиотека в браузере может быть удалена — сохраните копию.',
     nudgeAction: 'Сохранить резервную копию',
-    dismiss: 'Позже'
+    dismiss: 'Позже',
+    // Shown when the export itself failed or was refused (e.g. MC1's Android export
+    // guard) — the point is to say plainly that nothing was saved, not to explain why.
+    nudgeFailed: 'Резервная копия не сохранилась. Попробуйте ещё раз или сохраните копию из Настроек.'
   },
   // Renderer-surfaced error messages (extended by later M26 tasks).
   errors: {
     exportLibraryFailedDisk:
       'Не удалось сохранить архив библиотеки. Проверьте место на диске и права доступа.',
     exportLibraryFailed: 'Не удалось экспортировать библиотеку.',
+    // Shown instead of exportLibraryFailedDisk when the platform has no export
+    // implementation at all (e.g. MC1's Android guard) — "check disk space" would be
+    // wrong advice there, so this describes the situation, not a device.
+    exportLibraryUnsupported:
+      'Экспорт пока недоступен в этом приложении. Сохраните копию библиотеки через настольную версию или в браузере.',
     // ImportDialog commit failure (whole-file import could not complete).
     importFailed:
       'Не удалось импортировать файл целиком. Возможно, он повреждён или в неподдерживаемом формате; часть глав могла быть создана.',
@@ -555,12 +563,20 @@ export const en: Dictionary = {
   backup: {
     nudgeText: 'No recent backup. Your in-browser library can be cleared — save a copy.',
     nudgeAction: 'Save a backup',
-    dismiss: 'Later'
+    dismiss: 'Later',
+    // Shown when the export itself failed or was refused (e.g. MC1's Android export
+    // guard) — the point is to say plainly that nothing was saved, not to explain why.
+    nudgeFailed: 'The backup did not save. Try again, or save a copy from Settings.'
   },
   errors: {
     exportLibraryFailedDisk:
       'Could not save the library archive. Check available disk space and permissions.',
     exportLibraryFailed: 'Could not export the library.',
+    // Shown instead of exportLibraryFailedDisk when the platform has no export
+    // implementation at all (e.g. MC1's Android guard) — "check disk space" would be
+    // wrong advice there, so this describes the situation, not a device.
+    exportLibraryUnsupported:
+      'Exporting is not available in this app yet. Save a copy of your library from the desktop app or in a browser instead.',
     importFailed:
       'Could not import the whole file. It may be corrupted or in an unsupported format; some chapters may have been created.',
     exportChapterFailed: 'Could not export the chapter to {ext}.',

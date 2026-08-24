@@ -27,6 +27,7 @@ export function BackupNudge({ storyCount }: { storyCount: number }): JSX.Element
     }
   })
   const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const isWeb = getPlatform().capabilities?.managedSpellcheck === false
   const visible = shouldShowBackupNudge({
@@ -40,9 +41,17 @@ export function BackupNudge({ storyCount }: { storyCount: number }): JSX.Element
 
   const backup = async (): Promise<void> => {
     setBusy(true)
+    setFailed(false)
     try {
       // On success this freshens lastLibraryBackupAt, which hides the nudge via the store.
       await runLibraryBackup()
+    } catch (err) {
+      // A rejected export (e.g. MC1's Android UNSUPPORTED export guard) must not look
+      // like a no-op tap. runLibraryBackup only stamps lastLibraryBackupAt after a
+      // successful export, so a throw here leaves it untouched and the nudge correctly
+      // stays visible — this just adds the missing user-facing feedback for that case.
+      console.error('Backup failed', err)
+      setFailed(true)
     } finally {
       setBusy(false)
     }
@@ -61,7 +70,14 @@ export function BackupNudge({ storyCount }: { storyCount: number }): JSX.Element
   return (
     <div className="update-notice" role="status">
       <IconDeviceFloppy size={16} className="update-notice-icon" />
-      <span className="update-notice-text">{t.backup.nudgeText}</span>
+      <div className="update-notice-text">
+        <div>{t.backup.nudgeText}</div>
+        {failed && (
+          <div className="update-notice-error" role="alert">
+            {t.backup.nudgeFailed}
+          </div>
+        )}
+      </div>
       <button className="update-notice-btn primary" disabled={busy} onClick={() => void backup()}>
         {t.backup.nudgeAction}
       </button>
