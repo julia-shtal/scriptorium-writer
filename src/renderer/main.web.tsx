@@ -15,7 +15,6 @@ import App from './app'
 import { WebUpdateNotice } from './components/WebUpdateNotice'
 import { setPlatform } from './platform'
 import { createWebPlatform } from '../platform/web'
-import { createCapacitorPlatform } from '../platform/capacitor'
 
 const container = document.getElementById('root')
 if (!container) {
@@ -30,11 +29,24 @@ if (!container) {
 const isNative = Capacitor.isNativePlatform()
 
 const boot = async (): Promise<void> => {
-  // `createCapacitorPlatform()` still delegates to `createWebPlatform()` for MC1
-  // (OPFS-backed); see `src/platform/capacitor/index.ts` for the TODO(MC2) that
-  // replaces it.
-  const platform = isNative ? await createCapacitorPlatform() : await createWebPlatform()
+  // Dynamic import so `@capacitor/filesystem` (pulled in transitively via
+  // `../platform/capacitor` → `CapacitorFsPort`) never lands in the shared chunk every
+  // PWA user downloads — only the `isNative` branch, unreachable in a browser tab, ever
+  // evaluates this import.
+  const platform = isNative
+    ? await (await import('../platform/capacitor')).createCapacitorPlatform()
+    : await createWebPlatform()
   setPlatform(platform)
+
+  // DEV-only device harness (MC2). BOTH halves matter: import.meta.env.DEV is statically
+  // replaced with false by `npm run build:web`, and the dynamic import() is what lets Rollup
+  // drop the module entirely. A top-level static import would ship it to every PWA user even
+  // though this branch is unreachable there.
+  if (import.meta.env.DEV && isNative) {
+    const { installDevContractHarness } = await import('../platform/capacitor/dev-fs-port-contract')
+    installDevContractHarness()
+  }
+
   createRoot(container).render(
     <React.StrictMode>
       <App />

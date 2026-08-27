@@ -11,15 +11,13 @@ import { SearchView } from '@renderer/views/SearchView'
 import { SettingsView } from '@renderer/views/SettingsView'
 import { RecoveryDialog } from '@renderer/components/RecoveryDialog'
 import { UpdateNotice } from '@renderer/components/UpdateNotice'
-import { bootstrapLibrary } from '@renderer/store/bootstrap'
+import { bootApp } from '@renderer/store/boot-app'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
 import { useStoryStore } from '@renderer/store/storyStore'
-import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useAutosaveLifecycle } from '@renderer/editor/useAutosaveLifecycle'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
-import { api } from '@renderer/platform'
 import type { ChapterRecovery } from '@shared/types'
 
 export default function App(): JSX.Element {
@@ -50,30 +48,23 @@ export default function App(): JSX.Element {
     bootedRef.current = true
     void (async () => {
       try {
-        const found = await api().scanLibrary()
-        if (found.length > 0) setRecoveries(found)
-        const { storyId, chapterId } = await bootstrapLibrary()
-        if (storyId && chapterId) {
-          await openChapter(storyId, chapterId)
-          await useStoryStore.getState().load(storyId)
-        } else {
-          // Empty library (nothing seeded): land on the Library view.
-          useUiStore.getState().setActiveView('library')
-        }
-        await useSettingsStore.getState().load()
+        setRecoveries(await bootApp())
       } catch (err) {
         setError(err instanceof Error ? err.message : tRef.current.errors.openLibraryFailed)
       } finally {
         setBooting(false)
       }
     })()
-  }, [openChapter])
+  }, [])
 
   const handleResolved = async (r: ChapterRecovery): Promise<void> => {
     setRecoveries((rs) => rs.filter((x) => x.chapterId !== r.chapterId))
     try {
       setError(null)
       await openChapter(r.storyId, r.chapterId)
+      // Re-read the story so the chapter list picks up the restored chapter's real
+      // title and word count in place of its placeholder row.
+      await useStoryStore.getState().load(r.storyId)
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errors.openRecoveredChapterFailed)
     }

@@ -40,11 +40,14 @@ export function EditorView(): JSX.Element {
     void api().readStory(storyId).then(async (story: Story) => {
       const rows = await Promise.all(
         story.chapterOrder.map(async (id) => {
-          const ch = await api().readChapter(storyId, id)
-          return { id: ch.id, title: ch.title }
+          // A chapter you cannot read is a chapter you cannot switch to, so it is left
+          // out of the switcher — but it must not take the rest of the list with it.
+          // Startup recovery is what puts it back (it is listed in Главы meanwhile).
+          const ch = await api().readChapter(storyId, id).catch(() => null)
+          return ch ? { id: ch.id, title: ch.title } : null
         })
       )
-      setChapters(rows)
+      setChapters(rows.filter((r): r is { id: string; title: string } => r !== null))
     })
   }, [storyId, chapterId])
 

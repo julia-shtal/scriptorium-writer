@@ -89,6 +89,9 @@ export const ru = {
     open: 'открыть',
     exportChapter: 'Экспортировать главу',
     untitled: 'Без названия',
+    // Placeholder row for a chapter whose file could not be read. Startup recovery is
+    // what fixes it; the row exists so the chapter is never silently absent from the list.
+    missingFile: 'Файл главы не найден',
     deleteConfirmTitle: 'Удалить главу?',
     deleteConfirmMessage: '«{title}» будет перемещена в корзину.'
   },
@@ -300,6 +303,17 @@ export const ru = {
     // guard) — the point is to say plainly that nothing was saved, not to explain why.
     nudgeFailed: 'Резервная копия не сохранилась. Попробуйте ещё раз или сохраните копию из Настроек.'
   },
+  // Where an export ended up. Its own namespace rather than `backup`: no backup surface will
+  // ever render it (the MP9 nudge cannot appear on Android), and both of its consumers —
+  // SettingsView's library-export note and the editor's ExportMenu — are export surfaces.
+  // MC2, Android only: exports always land in one fixed folder and NOTHING ever cleans it
+  // up, so the user has to be told where the files are in order to find, copy off, or
+  // delete them. Gated on Platform.capabilities.exportsToDeviceFolder — on desktop the user
+  // picked the folder herself and on web the browser did, so naming this folder there
+  // would be plainly false.
+  exportLocation: {
+    savedTo: 'Сохранено в Документы / Scriptorium-Writer-exports'
+  },
   // Renderer-surfaced error messages (extended by later M26 tasks).
   errors: {
     exportLibraryFailedDisk:
@@ -402,6 +416,7 @@ export const en: Dictionary = {
     open: 'open',
     exportChapter: 'Export chapter',
     untitled: 'Untitled',
+    missingFile: 'Chapter file not found',
     deleteConfirmTitle: 'Delete chapter?',
     deleteConfirmMessage: '“{title}” will be moved to the trash.'
   },
@@ -567,6 +582,10 @@ export const en: Dictionary = {
     // Shown when the export itself failed or was refused (e.g. MC1's Android export
     // guard) — the point is to say plainly that nothing was saved, not to explain why.
     nudgeFailed: 'The backup did not save. Try again, or save a copy from Settings.'
+  },
+  // MC2, Android only — see the RU entry for why this is gated rather than always shown.
+  exportLocation: {
+    savedTo: 'Saved to Documents / Scriptorium-Writer-exports'
   },
   errors: {
     exportLibraryFailedDisk:

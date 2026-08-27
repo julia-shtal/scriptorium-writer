@@ -1,5 +1,6 @@
 import { api } from '@renderer/platform'
 import { DEMO_CHAPTER_1_DOC } from './demoContent'
+import { defaultChapterTitle } from './chapter-title'
 
 export interface BootstrapResult {
   storyId: string | null
@@ -32,7 +33,10 @@ export async function bootstrapLibrary(): Promise<BootstrapResult> {
         ? settings.lastOpenedChapterId
         : story.chapterOrder[0]
     if (!chapterId) {
-      const chapter = await api().createChapter(story.id, 'Глава 1')
+      const chapter = await api().createChapter(
+        story.id,
+        defaultChapterTitle(1, settings.language ?? 'ru')
+      )
       chapterId = chapter.id
     }
     return { storyId: story.id, chapterId }
@@ -46,7 +50,10 @@ export async function bootstrapLibrary(): Promise<BootstrapResult> {
   }
 
   const story = await api().createStory({ title: 'Демо' })
-  const chapter1 = await api().createChapter(story.id, 'Глава 1')
+  const chapter1 = await api().createChapter(
+    story.id,
+    defaultChapterTitle(1, settings.language ?? 'ru')
+  )
   await api().saveChapter(story.id, {
     id: chapter1.id,
     title: chapter1.title,

@@ -82,26 +82,35 @@ export function ChaptersView(): JSX.Element {
             onDrop={() => void drop(i)}
           >
             <IconGripVertical size={16} className="chapters-grip" />
-            <input
-              className="chapters-title-input"
-              defaultValue={c.title}
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-              onBlur={(e) => void useStoryStore.getState().renameChapter(c.id, e.target.value)}
-            />
-            <span className="chapters-open linkish" onClick={() => void openCh(c.id)}>
-              {t.chapters.open}
-            </span>
-            <ExportMenu
-              chapterId={c.id}
-              variant="chapter"
-              trigger={<IconDownload size={15} />}
-              triggerLabel={t.chapters.exportChapter}
-              triggerClassName="chapters-export"
-            />
-            <span className="chapters-words">
-              {c.wordCount} {plural(c.wordCount, t.plurals.words, language)}
-            </span>
+            {/* A chapter whose canon could not be read: nothing here can open, rename or
+                export it, and offering to would only produce errors. Show it as what it
+                is and let startup recovery put it back. */}
+            {c.missing ? (
+              <span className="chapters-title-missing">{t.chapters.missingFile}</span>
+            ) : (
+              <>
+                <input
+                  className="chapters-title-input"
+                  defaultValue={c.title}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  onBlur={(e) => void useStoryStore.getState().renameChapter(c.id, e.target.value)}
+                />
+                <span className="chapters-open linkish" onClick={() => void openCh(c.id)}>
+                  {t.chapters.open}
+                </span>
+                <ExportMenu
+                  chapterId={c.id}
+                  variant="chapter"
+                  trigger={<IconDownload size={15} />}
+                  triggerLabel={t.chapters.exportChapter}
+                  triggerClassName="chapters-export"
+                />
+                <span className="chapters-words">
+                  {c.wordCount} {plural(c.wordCount, t.plurals.words, language)}
+                </span>
+              </>
+            )}
             <button className="linkish" onClick={() => setConfirmId(c.id)}>
               <IconTrash size={15} />
             </button>

@@ -540,6 +540,13 @@ body {
   font-size: 12px;
   color: var(--danger);
 }
+/* Success note (MC2, Android only): names the fixed folder the export landed in. Same
+   metrics as the error line, muted rather than alarming — nothing went wrong here. */
+.export-menu-note {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
 
 /* --- Auto-update notice (M12) --- */
 /* A small, dismissible footer strip (not a blocking modal) shown when an update has
@@ -875,6 +882,17 @@ body {
   outline: none;
   background: var(--page-bg);
   border-radius: 4px;
+}
+/* Placeholder for a chapter whose file is missing/corrupt: no title input, no open,
+   export or word count, so it spans the columns those would have filled and leaves the
+   delete button in its usual last column. */
+.chapters-title-missing {
+  grid-column: 2 / 6;
+  min-width: 0;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--muted);
+  padding: 2px 4px;
 }
 .chapters-open {
   white-space: nowrap;

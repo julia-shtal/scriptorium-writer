@@ -20,7 +20,8 @@ setPlatform({
   lifecycle: window.lifecycle,
   // Electron configures Chromium's native spellchecker with bundled dictionaries
   // (src/main/spellcheck.ts + dict-server.ts). Web cannot; see MP5.
-  capabilities: { managedSpellcheck: true }
+  // exportsToDeviceFolder: false — desktop exports go wherever the OS save dialog put them.
+  capabilities: { managedSpellcheck: true, evictableStorage: false, exportsToDeviceFolder: false }
 })
 
 createRoot(container).render(
