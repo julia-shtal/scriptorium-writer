@@ -19,7 +19,8 @@ export function SettingsView(): JSX.Element {
   const [exportState, setExportState] = useState<
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; path: string } | { kind: 'error'; msg: string }
   >({ kind: 'idle' })
-  const isWeb = getPlatform().capabilities?.managedSpellcheck === false
+  const isWeb = getPlatform().capabilities?.evictableStorage === true
+  const exportsToDeviceFolder = getPlatform().capabilities?.exportsToDeviceFolder === true
   const storagePersisted = getPlatform().storagePersisted
   const [usage, setUsage] = useState<{ used: number; total: number } | null>(null)
   useEffect(() => {
@@ -146,7 +147,13 @@ export function SettingsView(): JSX.Element {
           </button>
         </div>
         {exportState.kind === 'done' && (
-          <div className="settings-note">{t.settings.librarySaved} <code>{exportState.path}</code></div>
+          <div className="settings-note">
+            {t.settings.librarySaved} <code>{exportState.path}</code>
+            {/* Android only (MC2): exports pile up in one fixed folder nothing prunes, so
+                name it plainly — the absolute path above is not something a tablet user can
+                act on. Never shown where the user chose the destination herself. */}
+            {exportsToDeviceFolder && <div>{t.exportLocation.savedTo}</div>}
+          </div>
         )}
         {exportState.kind === 'error' && (
           <div className="settings-note settings-note--error">{exportState.msg}</div>

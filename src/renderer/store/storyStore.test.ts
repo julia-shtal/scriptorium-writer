@@ -50,6 +50,25 @@ describe('storyStore.load', () => {
   })
 })
 
+describe('storyStore.load with a broken chapter', () => {
+  it('flags the unreadable chapter instead of failing the whole story load', async () => {
+    const readChapter = api().readChapter as ReturnType<typeof vi.fn>
+    readChapter.mockImplementation(async (_s: string, id: string) => {
+      if (id === 'c2') throw new Error('canon missing')
+      return chapter(id, 'One')
+    })
+
+    await useStoryStore.getState().load('s1')
+
+    const s = useStoryStore.getState()
+    expect(s.story?.id).toBe('s1')
+    expect(s.chapters).toEqual([
+      { id: 'c1', title: 'One', wordCount: 10 },
+      { id: 'c2', title: '', wordCount: 0, missing: true }
+    ])
+  })
+})
+
 describe('storyStore.reorder', () => {
   it('persists the new order and reflects it locally', async () => {
     await useStoryStore.getState().load('s1')
@@ -101,7 +120,7 @@ describe('storyStore.renameChapter', () => {
   })
 })
 
-describe('storyStore.addChapter default title is localized by UI language', () => {
+describe('storyStore.addChapter default title is numbered and localized', () => {
   beforeEach(() => {
     // addChapter opens the new chapter in the editor after creating it.
     useEditorStore.setState({ openChapter: vi.fn(async () => {}) } as never)
@@ -111,20 +130,21 @@ describe('storyStore.addChapter default title is localized by UI language', () =
     useSettingsStore.setState({ settings: settings('en') })
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(api().createChapter).toHaveBeenCalledWith('s1', 'New chapter')
+    // The story already has two chapters, so the new one is number three.
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Chapter 3')
   })
 
   it('uses the Russian default when language is ru', async () => {
     useSettingsStore.setState({ settings: settings('ru') })
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Глава 3')
   })
 
   it('defaults to Russian when settings are unloaded', async () => {
     await useStoryStore.getState().load('s1')
     await useStoryStore.getState().addChapter('')
-    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Новая глава')
+    expect(api().createChapter).toHaveBeenCalledWith('s1', 'Глава 3')
   })
 
   it('respects an explicit title over the localized default', async () => {

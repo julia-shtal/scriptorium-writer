@@ -598,3 +598,50 @@ describe('readLibraryEntries (MP6 web zip walker)', () => {
     expect(new TextDecoder().decode(canon.data)).toContain('hello world')
   })
 })
+
+describe('chapter filename follows the title (rename)', () => {
+  it('renames the canon and its .md when a save carries a new title', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'A' })
+    const ch = await svc.createChapter(story.id, 'Новая глава')
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Новая глава', doc: docWith('text') })
+    expect(await chapterFiles(lib, story.id)).toEqual(['01-новая-глава.json'])
+
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Глава 2', doc: docWith('text') })
+
+    const dir = layout.chaptersDir(lib, story.id)
+    expect(await chapterFiles(lib, story.id)).toEqual(['01-глава-2.json'])
+    expect(existsSync(join(dir, '01-глава-2.md'))).toBe(true)
+    expect(existsSync(join(dir, '01-новая-глава.json'))).toBe(false)
+    expect(existsSync(join(dir, '01-новая-глава.md'))).toBe(false)
+    // The chapter still resolves by its stable id, and the content is the new save.
+    const read = await svc.readChapter(story.id, ch.id)
+    expect(read.title).toBe('Глава 2')
+    expect(read.doc).toEqual(docWith('text'))
+  })
+
+  it('leaves the filename alone when the title is unchanged', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'A' })
+    const ch = await svc.createChapter(story.id, 'Steady')
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Steady', doc: docWith('one') })
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Steady', doc: docWith('two') })
+    expect(await chapterFiles(lib, story.id)).toEqual(['01-steady.json'])
+  })
+
+  it('never clobbers a file already sitting at the desired name', async () => {
+    const { svc, lib } = await makeService()
+    const story = await svc.createStory({ title: 'A' })
+    const ch = await svc.createChapter(story.id, 'Original')
+    const dir = layout.chaptersDir(lib, story.id)
+    // A stray file (a leftover from an older library) already owns the name the new
+    // title would want. The save must keep its own filename rather than overwrite it.
+    await fsp.writeFile(join(dir, '01-taken.json'), JSON.stringify({ id: 'other', title: 'Taken' }))
+
+    await svc.saveChapter(story.id, { id: ch.id, title: 'Taken', doc: docWith('mine') })
+
+    expect(JSON.parse(await fsp.readFile(join(dir, '01-taken.json'), 'utf8')).title).toBe('Taken')
+    expect((await svc.readChapter(story.id, ch.id)).doc).toEqual(docWith('mine'))
+    expect(existsSync(join(dir, '01-original.json'))).toBe(true)
+  })
+})

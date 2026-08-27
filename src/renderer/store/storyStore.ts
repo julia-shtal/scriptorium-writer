@@ -4,12 +4,7 @@ import { useEditorStore } from './editorStore'
 import { useSettingsStore } from './settingsStore'
 import { moveItem } from '@renderer/views/chapters-reorder'
 import { api } from '@renderer/platform'
-
-// Persisted seed titles (author data), picked by the active UI language at creation
-// time — intentionally NOT in the i18n dictionary: once written they become chapter/
-// story data, not reactive UI chrome that should re-translate on language switch.
-const NEW_CHAPTER_TITLE: Record<'ru' | 'en', string> = { ru: 'Новая глава', en: 'New chapter' }
-const FIRST_CHAPTER_TITLE: Record<'ru' | 'en', string> = { ru: 'Глава 1', en: 'Chapter 1' }
+import { defaultChapterTitle } from './chapter-title'
 
 /** Active UI language, read lazily at creation time; defaults to 'ru' before settings load. */
 const currentLanguage = (): 'ru' | 'en' => useSettingsStore.getState().settings?.language ?? 'ru'
@@ -19,6 +14,12 @@ export interface ChapterRow {
   id: string
   title: string
   wordCount: number
+  /**
+   * The chapter is in `chapterOrder` but its canon could not be read (missing or
+   * corrupt). The row is a placeholder: title and word count are unknown, and the UI
+   * must not offer to open, rename or export it. Startup recovery is what fixes it.
+   */
+  missing?: boolean
 }
 
 interface StoryState {
@@ -38,9 +39,17 @@ interface StoryState {
 
 async function loadRows(story: Story): Promise<ChapterRow[]> {
   return Promise.all(
-    story.chapterOrder.map(async (id) => {
-      const ch = await api().readChapter(story.id, id)
-      return { id: ch.id, title: ch.title, wordCount: ch.wordCount }
+    story.chapterOrder.map(async (id): Promise<ChapterRow> => {
+      try {
+        const ch = await api().readChapter(story.id, id)
+        return { id: ch.id, title: ch.title, wordCount: ch.wordCount }
+      } catch {
+        // One unreadable chapter must never take the whole story down with it. It used
+        // to: a single missing canon left `story` null, so the app showed "no open work"
+        // — behind the very recovery dialog offering to restore that chapter. Flagged
+        // as a placeholder row, never silently dropped (CLAUDE.md: no silent blanking).
+        return { id, title: '', wordCount: 0, missing: true }
+      }
     })
   )
 }
@@ -64,7 +73,7 @@ export const useStoryStore = create<StoryState>((set, get) => ({
     set({ story, chapters: await loadRows(story) })
     let chapterId = story.chapterOrder[0]
     if (!chapterId) {
-      const ch = await api().createChapter(storyId, FIRST_CHAPTER_TITLE[currentLanguage()])
+      const ch = await api().createChapter(storyId, defaultChapterTitle(1, currentLanguage()))
       chapterId = ch.id
       await get().reload()
     }
@@ -90,7 +99,8 @@ export const useStoryStore = create<StoryState>((set, get) => ({
   addChapter: async (title) => {
     const { story } = get()
     if (!story) return
-    const ch = await api().createChapter(story.id, title || NEW_CHAPTER_TITLE[currentLanguage()])
+    const seed = defaultChapterTitle(story.chapterOrder.length + 1, currentLanguage())
+    const ch = await api().createChapter(story.id, title || seed)
     await get().reload()
     await useEditorStore.getState().openChapter(story.id, ch.id)
   },

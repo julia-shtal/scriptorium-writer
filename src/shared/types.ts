@@ -150,7 +150,20 @@ export interface Settings {
   schemaVersion: number
 }
 
-/** Result of a library export (M13). `canceled` when the user dismissed the save dialog. */
+/**
+ * Result of a library export (M13). `canceled` when the user dismissed the save dialog.
+ *
+ * `canceled: true` is reachable ONLY on desktop, which has a real OS save dialog to dismiss.
+ * On web and on Android (MC2) it never occurs: the web path either writes through the File
+ * System Access picker or falls back to a download, and the native path writes the file
+ * before anything is shown to the user — a dismissed Share sheet is not a cancellation,
+ * because the archive is already on disk.
+ *
+ * `path` means different things per platform, and callers must not assume it is openable:
+ * a real filesystem path on desktop and on Android (inside the exports folder), but only a
+ * SUGGESTED FILENAME on web, where neither the download nor the File System Access API
+ * reveals the folder the user chose.
+ */
 export type ExportLibraryResult = { canceled: true } | { canceled: false; path: string }
 
 /** Normalized payload returned by the import file-picker (M14). */
@@ -162,7 +175,13 @@ export type ImportFileResult =
 /** Which file format a chapter/story export produces (M14). */
 export type ExportFormat = 'docx' | 'md'
 
-/** Result of a chapter/story export (M14). `canceled` = user dismissed the save dialog. */
+/**
+ * Result of a chapter/story export (M14). `canceled` = user dismissed the save dialog.
+ *
+ * Same platform rules as {@link ExportLibraryResult}: `canceled: true` is reachable only on
+ * desktop, and `path` is a real device path on desktop and Android but merely a suggested
+ * download filename on web.
+ */
 export type ExportFileResult = { canceled: true } | { canceled: false; path: string }
 
 /**

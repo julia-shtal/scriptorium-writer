@@ -234,6 +234,8 @@ IPC bridge, proving the main → preload (contextBridge) → renderer path end t
 | `npm run test:browser` | Run the browser-only suite (`*.browser.test.ts`, e.g. the OPFS `FsPort` contract) in real Chromium via Vitest browser mode. |
 | `npm run format` | Prettier-format `src`. |
 | `npm run sync:android` | Build the web bundle, then `npx cap sync android` (copies `dist-web` into the native project and installs any native plugin dependencies). |
+| `npm run build:web:dev` | Build the browser bundle in **development** mode (`NODE_ENV=development`), which is what keeps the DEV-only on-device harness in the output. Not for release. |
+| `npm run sync:android:dev` | `build:web:dev` + `npx cap sync android` — the debug loop that puts `window.__fsPortContract()` on the tablet (see Android build below). |
 | `npm run open:android` | `npx cap open android` — opens the project in Android Studio. **Does not build or sync first** (see Android build below). |
 | `npm run run:android` | Build the web bundle, then `npx cap run android` (syncs and deploys to a connected/USB-debugging-enabled device or emulator). |
 
@@ -298,9 +300,14 @@ space is in use; the library view nudges you to save a `.zip` backup when the la
 over a week old (dismissible, and it stays away for a week). Use **Export library**
 (Settings) or the nudge button to save a copy — to a folder you choose where the browser
 supports `showSaveFilePicker`, otherwise to Downloads (the path Chrome for Android uses).
-The last successful export is recorded as `lastLibraryBackupAt` in settings. Desktop
-stores the library as ordinary files, so it needs none of this and the nudge never appears
-there.
+The last successful export is recorded as `lastLibraryBackupAt` in settings. All of this is
+**web-only**: it is gated on the `evictableStorage` capability flag, which is true only in
+a browser tab. Desktop and the Android app both store the library as ordinary files, so
+neither shows the nudge and neither shows the Storage/quota readout — a
+`navigator.storage.estimate()` figure means nothing in a WebView writing to `Documents`.
+(The flag is deliberately not the older `managedSpellcheck === false` proxy: that one is
+*also* false on Android, because Android genuinely has no app-managed spellchecker, so
+reusing it would have named the wrong risk.)
 
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
@@ -309,27 +316,105 @@ Spellcheck in the web build is provided by the device's own system (e.g. the
 Android keyboard), not by the app's bundled dictionaries — the desktop build is
 unaffected and still checks offline with the bundled Hunspell dictionaries.
 
-#### Android build (MC1)
+#### Android build (MC1–MC2)
 
 Capacitor wraps the same `dist-web` bundle from the web build above in an Android
 WebView container — one shared bundle that picks its platform implementation at the
-composition root. Storage is still OPFS at this point (the native filesystem swap is
-MC2), so the WebView is kept on a secure-context origin (`androidScheme: 'https'` in
-`capacitor.config.ts`) for OPFS to keep working.
+composition root (`src/renderer/main.web.tsx:36`, the single runtime platform check in
+the codebase). Storage under it is **not** OPFS: `CapacitorFsPort`
+(`src/platform/capacitor/fs-port.ts`) writes ordinary files through
+`@capacitor/filesystem`, so the library is a real folder you can open in the device's
+file manager and copy over USB — which is the whole reason the Capacitor block exists.
+Because MP2 put a port in front of `FileService`, this is one new `FsPort`
+implementation plus one swap at the composition root; the atomic write path, snapshot
+pruning and recovery scan are the desktop code, unchanged, and `createWebPlatform` and
+`createCapacitorPlatform` share a single `createPlatformFromFsPort` wiring helper so the
+`'/userdata'` / `'/library'` literals live in exactly one place.
 
-**Export and library backup do not work in the Android build yet — do not trust the
-tablet as backed up.** `createCapacitorPlatform()` delegates to the web platform, so
-Android inherits the web export path; there is no `showSaveFilePicker` in an Android
-WebView, so `exportLibrary` falls back to a synthetic `<a download>` click
-(`triggerDownload`, `src/platform/web/download.ts`). `@capacitor/android` registers no
-`DownloadListener`, so the WebView drops that download silently — no file is written,
-no error is thrown. `exportLibrary` still returns success, so both the Settings export
-button and the MP9 "backup overdue" nudge report a successful backup and
-`lastLibraryBackupAt` is stamped as if one had happened. Chapter and story export are
-the same dead path. For now, back up from the desktop app or the browser PWA, where
-export works; import is unaffected — Android's native file chooser works and `.md`/
-`.docx` import functions normally on the tablet. Native export via
-`@capacitor/filesystem` and the Android share sheet lands in MC2.
+The WebView still runs on a secure-context origin (`androidScheme: 'https'` in
+`capacitor.config.ts`, so the origin is `https://localhost`). That is no longer about
+OPFS — it is what keeps the service worker, the update prompt and the rest of the
+browser-side machinery from the PWA section working inside the container. It is also why
+there is no migration path from an installed PWA; see "Moving between the PWA and the
+Android app" below.
+
+**Where things live on Android.** Three roots, each resolved once at boot into a plain
+absolute path (`resolveCapacitorRoots`, `src/platform/capacitor/roots.ts:105`) and passed
+to the plugin absolute thereafter, with the `directory` parameter omitted — so
+`CapacitorFsPort` itself knows nothing about `Directory` and has the same shape as
+`NodeFsPort`, which is what lets it pass the same contract suite. The `Directory`
+constants live only in `roots.ts`, used once each, so MC3 can change them in one place.
+
+| Root | On the device | Why there |
+| --- | --- | --- |
+| **Library** (your stories) | `Documents/Scriptorium-Writer` (`Directory.Documents`) | Visible in the file manager and over USB. Same tree as desktop: `stories/<id>/chapters/…`, `versions/`, `notes/`, `.trash/`. |
+| **Exports** | `Documents/Scriptorium-Writer-exports` (`Directory.Documents`) | A **sibling** of the library, never inside it — `readLibraryEntries` walks the library root recursively, so nested exports would make every archive swallow the previous ones. |
+| **Settings / userdata** | app-private `Directory.Data` + `userdata/` | `settings.json` holds `libraryPath`, so settings must be findable *without* knowing `libraryPath`; and `Directory.Data` needs no runtime permission, so a denied Documents permission still boots into a comprehensible error rather than a dead screen. |
+
+**Uninstalling — stated per platform, because they are not at parity.** On Windows,
+`deleteAppDataOnUninstall` is unset in `electron-builder.yml` and therefore defaults to
+false, so the desktop `userData` folder under `AppData/Roaming` normally survives an
+uninstall. On Android, `Directory.Data` does **not** survive one: uninstalling drops
+`settings.json` with it, including `libraryPath` and `lastLibraryBackupAt`.
+
+The library itself is in `Documents`, app-scoped shared storage — and "app-scoped" turns
+out to be the operative word. **Measured on the target tablet (Honor YLE-W09, Android 16 /
+API 36, `targetSdkVersion = 36`, no storage permissions declared): the library files
+survive an uninstall on disk but the reinstalled app can no longer read them.** Uninstall
+clears the MediaStore ownership of everything the app wrote (`owner_package_name` → NULL)
+and the files keep the old install's uid with mode `770`; under scoped storage an app may
+only reach files in shared storage that it owns, so `listStories()` comes back empty. The
+app cannot tell that from a genuinely empty library, so it seeds a fresh demo story
+alongside the writing it cannot see. The same mechanism means files placed in the library
+folder from a PC over USB are invisible to the app, which is the desktop → tablet direction
+of the MC2 round trip. Closing this is MC3's central decision (all-files access vs. a
+Storage Access Framework folder picker); until then, treat an Android uninstall as data
+loss from the app's point of view and keep the `.zip` exports.
+
+**Export on Android (MC2).** Library, story, and chapter export write **real files** to
+`Documents/Scriptorium-Writer-exports` via `@capacitor/filesystem`, then offer the
+Android Share sheet (`@capacitor/share`) so the file can be sent on to Drive, mail, or
+a cable-connected PC. This replaces the web export path, which is a dead end in a
+WebView: `triggerDownload` (`src/platform/web/download.ts`) builds a `blob:` URL, and
+`@capacitor/android` registers no `DownloadListener`, so the WebView drops that
+download silently — no file, no error, and `lastLibraryBackupAt` stamped over nothing.
+
+Three things about the native path are deliberate and load-bearing
+(`src/platform/capacitor/native-export.ts`):
+
+- **Write → verify → share, in that order.** A resolved `Share.share()` proves only
+  that the user tapped a target app; Android never reports whether the receiver saved
+  anything. Success — and therefore `lastLibraryBackupAt` — rests on our own `stat` of
+  the file just written, and a short write throws `EXPORT_FAILED`. A failing or
+  dismissed Share sheet is logged and ignored: the bytes are already safe on disk.
+- **Filenames carry `YYYY-MM-DD-HHMM`.** Native has no browser `(1)` de-duplication, so
+  minute precision is what stops a second export the same day landing on top of the
+  first — and a partially-failed write over a previous good backup would destroy it.
+- **The exports folder is a sibling of the library, never inside it.**
+  `readLibraryEntries` walks the library root recursively, so exports nested inside it
+  would make every archive swallow all previous archives. Guarded by
+  `src/platform/capacitor/native-export.test.ts`.
+
+Nothing prunes `Documents/Scriptorium-Writer-exports` — old archives accumulate until
+the user deletes them, which is why Settings names the folder after a successful export.
+`android/app/src/main/res/xml/file_paths.xml` must expose that folder (Capacitor's
+FileProvider allows only the cache folder by default) or the Share sheet fails at
+runtime when the button is tapped. Import is unaffected — Android's native file chooser
+works and `.md`/`.docx` import functions normally on the tablet.
+
+**Moving between the PWA and the Android app: export a zip, import it.** There is no
+in-app migration, and that is a decision rather than an omission. OPFS is origin-keyed;
+the Capacitor WebView's origin is `https://localhost` (see `androidScheme` above), while
+a PWA installed from a dev server or any hosted URL sits on a different origin
+altogether. The native app therefore cannot see the PWA's OPFS data at all — a
+PWA→native migration is not merely awkward to write, it is impossible from inside the
+app. The supported route is **Export library** → `.zip` on one side, import on the other,
+in either direction, which is a further reason native export had to land in the same
+milestone as native storage rather than after it.
+
+Any MC1-era OPFS data still sitting on a device is left exactly where it is, on purpose.
+No cleanup code deletes storage the app no longer reads: the disk cost is trivial, and
+the blast radius of a bug in code whose job is to delete things is someone's writing.
 
 - **Build loop:** `npm run sync:android` → `npm run open:android` → Run in Android
   Studio. `npm run run:android` builds, syncs, and deploys straight to a connected
@@ -375,6 +460,42 @@ export works; import is unaffected — Android's native file chooser works and `
   different namespace, no conflict — so "the app ID" always means this Android one
   unless the desktop one is named explicitly.
 
+**The on-device `FsPort` contract harness (dev only).** `CapacitorFsPort` is the third
+implementation to run the shared contract cases in `src/data/fs-port.contract.ts` — the
+payoff of the MP2 port design. No test runner can reach it, though: the Node project
+can't load the Capacitor bridge, browser mode is headless Chromium with no native plugin,
+and Vitest doesn't run inside an Android WebView. So the device run is a DEV-gated
+console global (`src/platform/capacitor/dev-fs-port-contract.ts`), not a debug view — a
+view would need a permanent `ViewId` / `uiStore.activeView` entry that must never be
+reachable in production, whereas a global has no such footprint and gives real stack
+traces.
+
+- **Getting it onto the device:** `npm run sync:android:dev`, then Run from Android
+  Studio. This builds a *development-mode* bundle, because `dist-web` is a production
+  build and the harness is compiled out of it by design (below). Note that
+  `vite build --mode development` alone is **not** enough — Vite derives
+  `import.meta.env.DEV` from `NODE_ENV`, which a plain `vite build` forces to
+  `production` regardless of `--mode`. `build:web:dev` sets `NODE_ENV=development` via
+  `cross-env` first; that env var is what actually includes the harness.
+- **Driving it:** attach `chrome://inspect` to the app's WebView and run
+  `await __fsPortContract()`. It prints a `console.table` of every case, the resolved
+  roots, and a `passed/total` line. The case count must match the node run — a case
+  silently skipped on device is a failure, not a pass.
+- **Read the coverage caveat it prints.** Every case runs its scratch directory under
+  `roots.userdata` (`Directory.Data`), which needs no runtime permission, so a clean run
+  says nothing about `roots.library` (`Directory.Documents`) — the permission-sensitive
+  root the milestone exists for.
+- **Release builds cannot contain it, mechanically.** The call site is behind
+  `import.meta.env.DEV` **and** a dynamic `await import()`
+  (`src/renderer/main.web.tsx:45`). `npm run build:web` statically replaces the flag with
+  `false`, so Rollup drops the module from `dist-web` entirely; a top-level static import
+  would keep it in the bundle even though the branch is unreachable, which is why the
+  dynamic import is the whole mechanism rather than a style preference. It is checkable
+  rather than trusted — after a production `npm run build:web`,
+  `grep -rn "SCRIPTORIUM_DEV_FSPORT_HARNESS" dist-web/` must find nothing.
+- Capacitor live-reload would iterate faster but was rejected: it puts a `server.url` into
+  `capacitor.config.ts` that must never reach a release build.
+
 Icons, splash screen, and release signing are not part of this milestone — they land
 in MC4.
 
@@ -390,11 +511,13 @@ security boundary is strict and must not be weakened:
   through an injected `FsPort` (`src/data/fs-port.ts`) — no direct Node imports, with one
   remaining exception: `exportLibraryArchive` still reaches into `src/main/library-archive`
   (Node + `archiver`), to be hoisted behind a port in a later milestone.
-- **platform** (`src/platform/node/`, `src/platform/web/`) — per-platform `FsPort`
-  implementations. `NodeFsPort` (a thin adapter over `node:fs/promises`) for
-  Electron; `OpfsFsPort` (+ `opfs-worker.ts`) over the browser Origin Private File
-  System, plus `MemoryFsPort` scaffolding. Android (Capacitor) plugs in here later
-  without touching the data layer.
+- **platform** (`src/platform/node/`, `src/platform/web/`, `src/platform/capacitor/`) —
+  per-platform `FsPort` implementations. `NodeFsPort` (a thin adapter over
+  `node:fs/promises`) for Electron; `OpfsFsPort` (+ `opfs-worker.ts`) over the browser
+  Origin Private File System, plus `MemoryFsPort` scaffolding; `CapacitorFsPort` over
+  `@capacitor/filesystem` for Android (MC2), which plugged in here without touching the
+  data layer, exactly as the port design intended. All three pass the same
+  `src/data/fs-port.contract.ts` cases.
 - **preload** (`src/preload/`) — a typed `contextBridge` `window.api` surface; thin
   wrappers over `ipcRenderer.invoke`.
 - **renderer** (`src/renderer/`) — React UI. **Never imports `fs`, `path`, or any Node
@@ -416,6 +539,10 @@ texture — no hard-coded colours elsewhere).
   `libraryPath` so each machine knows where its library is. Deliberate: settings stay
   per-machine while the library travels.
 
+On Android the same split holds with different roots — library in
+`Documents/Scriptorium-Writer`, settings in app-private `Directory.Data` — and the
+uninstall behaviour is **not** the same as Windows. See "Android build" above.
+
 **On-disk layout**
 
 ```
@@ -436,8 +563,12 @@ Scriptorium-Writer/               ← library root (libraryPath)
 
 `NN-slug` filenames are for human legibility only; the app always resolves chapters by
 the stable `id` stored **inside** each file, never by trusting a filename — so files
-may be renamed safely. Alignment lives in the JSON canon (Markdown can't carry it),
-which is why the canon is JSON, not Markdown.
+may be renamed safely. Because they exist to be read by a human, they **follow the
+chapter title**: renaming a chapter renames its `.json` and `.md` on the next save (and
+reordering renumbers the `NN-` prefixes). The one thing that never changes is the
+`versions/<chapterId>/` folder — that id is the chapter's identity, so it keeps the slug
+of whatever the chapter was called when it was created. Alignment lives in the JSON canon
+(Markdown can't carry it), which is why the canon is JSON, not Markdown.
 
 ### Project layout
 
@@ -449,7 +580,7 @@ src/
   data/                   # Platform-neutral data layer: FileService, atomic-write, snapshots, markdown, paths (injected FsPort — no Node imports)
   platform/node/          # NodeFsPort — the Node/Electron FsPort implementation (only place in the data path that touches node:fs)
   platform/web/           # OpfsFsPort (+ opfs-worker) over OPFS, and MemoryFsPort scaffolding — browser FsPort implementations (no node: imports)
-  platform/capacitor/     # Capacitor (Android) composition root — delegates to platform/web for MC1; the one module MC2 will change
+  platform/capacitor/     # Capacitor (Android): composition root, FsPort over @capacitor/filesystem, native export + Share sheet
   preload/                # contextBridge → window.api (typed, decodes AppError)
   renderer/
     theme/book.css        # book theme tokens + page-stack texture
@@ -526,8 +657,8 @@ applies the Russian one/few/many rule and English singular/plural, so word/chapt
 "1 слово / 2 слова / 5 слов" and "1 word / 2 words". **Author content — story/chapter/notes
 text, titles, footnote text — is never routed through the dictionary and never changes with the
 switch.** New chapters seed a language-appropriate default title *at creation time*
-(`«Новая глава»` / `"New chapter"`), which then becomes ordinary author data; existing titles
-are never rewritten. The first-run demo story stays Russian by design (its body is a Russian
+(`«Глава 3»` / `"Chapter 3"`, numbered by the position the chapter takes in the story), which
+then becomes ordinary author data; existing titles are never rewritten. The first-run demo story stays Russian by design (its body is a Russian
 writing sample).
 
 **Cleanup wand.** The toolbar wand (`src/renderer/editor/cleanup/`) runs an ordered set of

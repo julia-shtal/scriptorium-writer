@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { IconDots } from '@tabler/icons-react'
 import { useExport } from '@renderer/export/useExport'
 import { useT } from '@renderer/i18n/useT'
+import { getPlatform } from '@renderer/platform'
 
 /**
  * Reusable export popover, backed by {@link useExport}.
@@ -46,6 +47,12 @@ export function ExportMenu({
   const t = useT()
   const { exportChapter, exportStory, busy, error, clearError } = useExport()
   const [open, setOpen] = useState(false)
+  // MC2, Android only: on desktop the OS save dialog and on web the download shelf ARE the
+  // confirmation, but on native the only visible feedback used to be the Share sheet — and
+  // that is deliberately non-fatal now (native-export.ts), so a failed sheet would leave the
+  // writer tapping Export and seeing nothing at all while the file sits safely on disk.
+  const exportsToDeviceFolder = getPlatform().capabilities?.exportsToDeviceFolder === true
+  const [saved, setSaved] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -54,6 +61,7 @@ export function ExportMenu({
     (returnFocus: boolean) => {
       setOpen(false)
       clearError()
+      setSaved(false)
       if (returnFocus) triggerRef.current?.focus()
     },
     [clearError]
@@ -88,12 +96,19 @@ export function ExportMenu({
 
   const runAction = useCallback(
     async (run: () => Promise<boolean>): Promise<void> => {
+      setSaved(false)
       const ok = await run()
-      // Success closes the popover (and clears any prior error); a canceled dialog
-      // leaves it open so the writer can pick a different target.
-      if (ok) close(true)
+      if (!ok) return // canceled dialog / error: leave the popover open, as before
+      if (exportsToDeviceFolder) {
+        // Where the file went is the ONLY feedback this platform has, so the popover stays
+        // open to show it — Escape, an outside click, or the trigger dismisses it as usual.
+        setSaved(true)
+        return
+      }
+      // Everywhere else success closes the popover (and clears any prior error).
+      close(true)
     },
-    [close]
+    [close, exportsToDeviceFolder]
   )
 
   const focusableItems = (): HTMLButtonElement[] =>
@@ -195,6 +210,7 @@ export function ExportMenu({
           ) : (
             compactActions.map(renderItem)
           )}
+          {saved && <div className="export-menu-note">{t.exportLocation.savedTo}</div>}
           {error && <div className="export-menu-error">{error}</div>}
         </div>
       )}

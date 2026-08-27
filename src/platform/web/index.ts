@@ -9,6 +9,12 @@
  * Storage is OPFS-backed (`OpfsFsPort`): `createWebPlatform` boots a `FileService`
  * over the Origin Private File System, so data PERSISTS across page reloads.
  *
+ * NOT web-only despite the name (MC2): `createPlatformFromFsPort` below is the SHARED
+ * FileService wiring, imported by `src/platform/capacitor/index.ts` as well. Only
+ * `createWebPlatform` and the module-private `requestPersistentStorage` are web-specific.
+ * Change anything in the shared half — or in `makeApiFromService` — and you are changing
+ * Android too, so check both composition roots rather than assuming this file is the PWA's.
+ *
  * Browser code: this module must never import a `node:` built-in.
  */
 
@@ -17,13 +23,16 @@ import type { Api, ImportFileResult, ExportFileResult, ExportLibraryResult } fro
 import type { Platform } from '@renderer/platform'
 import { AppError } from '@shared/errors'
 import { FileService } from '@data/file-service'
+import type { FsPort } from '@data/fs-port'
 import { buildChapterExportBytes, buildStoryExportBytes } from '@data/export-format'
 import { OpfsFsPort } from './opfs-fs-port'
 import { pickImportFile } from './import-file'
 import { triggerDownload, MIME } from './download'
 
-/** Strip characters illegal in filenames; mirrors the desktop saveExport sanitizer. */
-function safeName(name: string): string {
+/** Strip characters illegal in filenames; mirrors the desktop saveExport sanitizer.
+ *  Exported (MC2) so the native export path derives export filenames the same way rather
+ *  than growing a second sanitizer that could drift. */
+export function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 80)
 }
 
@@ -62,6 +71,29 @@ async function trySavePicker(bytes: Uint8Array, filename: string): Promise<'save
     if (err instanceof Error && err.name === 'AbortError') return 'canceled'
     throw err
   }
+}
+
+/**
+ * Zip the whole library into an in-memory archive (MP6, shared with Capacitor in MC2).
+ *
+ * Extracted from `exportLibrary` below so the native export path
+ * (`src/platform/capacitor/native-export.ts`) produces a byte-identical archive rather than
+ * a second, drifting copy of the same fflate call. Entry paths are the library-relative
+ * paths `readLibraryEntries` returns.
+ *
+ * NOTE the invariant this depends on: `readLibraryEntries` walks the library root
+ * RECURSIVELY, so whatever folder the caller writes the resulting archive into must live
+ * OUTSIDE that root (see `src/platform/capacitor/roots.ts` EXPORTS_FOLDER and the guard in
+ * native-export.test.ts) — otherwise each archive swallows all previous ones.
+ */
+export async function zipLibrary(service: FileService): Promise<Uint8Array> {
+  const entries = await service.readLibraryEntries()
+  const tree: Record<string, Uint8Array> = {}
+  for (const e of entries) tree[e.path] = e.data
+  return new Promise<Uint8Array>((resolve, reject) => {
+    // Async (non-blocking) zip; level 6 matches the desktop archiver setting.
+    zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
+  })
 }
 
 /**
@@ -122,13 +154,7 @@ export function makeApiFromService(service: FileService): Api {
       )
     },
     exportLibrary: async (): Promise<ExportLibraryResult> => {
-      const entries = await service.readLibraryEntries()
-      const tree: Record<string, Uint8Array> = {}
-      for (const e of entries) tree[e.path] = e.data
-      const bytes = await new Promise<Uint8Array>((resolve, reject) => {
-        // Async (non-blocking) zip; level 6 matches the desktop archiver setting.
-        zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
-      })
+      const bytes = await zipLibrary(service)
       const filename = `library-${new Date().toISOString().slice(0, 10)}.zip`
       const picked = await trySavePicker(bytes, filename)
       if (picked === 'canceled') return { canceled: true }
@@ -191,23 +217,39 @@ async function requestPersistentStorage(): Promise<boolean | undefined> {
   }
 }
 
+/** Shared FileService wiring for every FsPort-backed platform (web + Capacitor). The
+ *  '/userdata' and '/library' literals live here and nowhere else.
+ *
+ *  Returns the booted `service` alongside the `api` because the Capacitor composition root
+ *  needs library-wide reads (`readLibraryEntries`, via {@link zipLibrary}) that the `Api`
+ *  surface deliberately does not expose — `Api` is the renderer's contract, and a
+ *  whole-library byte dump has no business on it. Callers that only need the renderer
+ *  surface (e.g. `createWebPlatform`) simply destructure `api` and ignore this. */
+export async function createPlatformFromFsPort(
+  fs: FsPort,
+  paths: { userDataPath: string; defaultLibraryPath: string }
+): Promise<{ api: Api; service: FileService }> {
+  const service = new FileService({ fs, ...paths })
+  await service.ensureLibrary()
+  return { api: makeApiFromService(service), service }
+}
+
 /**
  * Boot the web {@link Platform}: OPFS-backed filesystem → FileService → Api. No
  * `lifecycle` is provided — the browser has no host quit/update lifecycle to bridge.
  */
 export async function createWebPlatform(): Promise<Platform> {
   const storagePersisted = await requestPersistentStorage()
-  const fs = new OpfsFsPort()
-  const service = new FileService({
-    fs,
+  const { api } = await createPlatformFromFsPort(new OpfsFsPort(), {
     userDataPath: '/userdata',
     defaultLibraryPath: '/library'
   })
-  await service.ensureLibrary()
   // No app-managed spellchecker on web — the device's native checker decides (MP5).
   return {
-    api: makeApiFromService(service),
+    api,
     storagePersisted,
-    capabilities: { managedSpellcheck: false }
+    // exportsToDeviceFolder: false — the browser (or showSaveFilePicker) chooses where an
+    // export lands, so naming a fixed folder here would be false.
+    capabilities: { managedSpellcheck: false, evictableStorage: true, exportsToDeviceFolder: false }
   } // no `lifecycle` on web
 }

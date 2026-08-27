@@ -29,7 +29,7 @@ export function BackupNudge({ storyCount }: { storyCount: number }): JSX.Element
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
 
-  const isWeb = getPlatform().capabilities?.managedSpellcheck === false
+  const isWeb = getPlatform().capabilities?.evictableStorage === true
   const visible = shouldShowBackupNudge({
     isWeb,
     storyCount,

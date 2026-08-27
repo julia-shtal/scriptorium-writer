@@ -2,4 +2,9 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!-- MC2: exports written by src/platform/capacitor/native-export.ts, to
+         Directory.Documents/Scriptorium-Writer-exports (see roots.ts EXPORTS_DIRECTORY).
+         The element type is coupled to that Directory constant — change one, change the
+         other, or the Share sheet fails at runtime when the user taps the button. -->
+    <external-path name="scriptorium_exports" path="Documents/Scriptorium-Writer-exports/" />
 </paths>

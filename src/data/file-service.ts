@@ -395,9 +395,11 @@ export class FileService {
     }
 
     const ordinal = story.chapterOrder.indexOf(incoming.id) + 1
-    const target =
-      existingPath ??
-      join(layout.chaptersDir(root, storyId), `${chapterFileStem(ordinal, incoming.title)}.json`)
+    const desired = join(
+      layout.chaptersDir(root, storyId),
+      `${chapterFileStem(ordinal, incoming.title)}.json`
+    )
+    const target = existingPath ? await this.retitleChapterFiles(existingPath, desired) : desired
     await atomicWriteFile(this.fs, target, pretty(chapter))
 
     // M7: write the human-readable Markdown backup alongside the canon. Best-effort —
@@ -420,6 +422,40 @@ export class FileService {
       versionId,
       ...(mdWarning ? { mdWarning } : {})
     }
+  }
+
+  /**
+   * Keep the `NN-slug` filename in step with the chapter's title, so the folder a
+   * person browses in Files/Explorer reads the same as the chapter list in the app.
+   * Returns the path the canon should be written to.
+   *
+   * Best-effort by design: filenames are human legibility only (chapters resolve by
+   * the stable id inside the file), so a rename that cannot happen is not an error —
+   * we keep the old name and let the save proceed. Two things it will never do:
+   * overwrite a file already sitting at the desired name, or leave the save without
+   * a destination.
+   */
+  private async retitleChapterFiles(current: string, desired: string): Promise<string> {
+    if (current === desired) return current
+    if (await exists(this.fs, desired)) return current // another chapter's canon — leave both alone
+    try {
+      await this.fs.rename(current, desired)
+    } catch (err) {
+      console.error(`[saveChapter] could not rename ${current} → ${desired}`, err)
+      return current
+    }
+    // The Markdown backup follows its canon; it is rewritten right after this either
+    // way, so a failure here only risks a stale sibling — remove it rather than leave
+    // an orphan under the old title.
+    const mdFrom = current.replace(/\.json$/, '.md')
+    if (await exists(this.fs, mdFrom)) {
+      try {
+        await this.fs.rename(mdFrom, desired.replace(/\.json$/, '.md'))
+      } catch {
+        await this.fs.rm(mdFrom, { force: true }).catch(() => undefined)
+      }
+    }
+    return desired
   }
 
   async deleteChapter(storyId: string, chapterId: string): Promise<void> {

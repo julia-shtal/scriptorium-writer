@@ -11,7 +11,23 @@ export interface Platform {
    *  without user-agent sniffing. Optional (like storagePersisted) so the
    *  fakePlatform test helper — which builds a bare { api } — keeps compiling;
    *  both real factories still set it. */
-  capabilities?: { managedSpellcheck: boolean }
+  capabilities?: {
+    managedSpellcheck: boolean
+    /** True only where storage is a browser sandbox the engine may evict (OPFS). Gates the
+     *  MP9 nudge and the Settings storage panel. NOT the same question as managedSpellcheck,
+     *  which is false on Android too — reusing that flag as an isWeb proxy hides nothing on
+     *  native. */
+    evictableStorage: boolean
+    /** True only where every export lands in ONE fixed, user-browsable device folder
+     *  (Android/MC2: Documents/Scriptorium-Writer-exports) instead of a location the user
+     *  chooses per export. Gates the "saved to …" hint, which must not be shown on desktop
+     *  (the user picked the folder in a real save dialog) or on web (the browser did) —
+     *  naming a folder those platforms never wrote to would be false. REQUIRED, like
+     *  evictableStorage: every field in this object is required, so a new platform factory
+     *  (or a new flag) fails to compile until someone states the answer rather than
+     *  inheriting `undefined` by omission. */
+    exportsToDeviceFolder: boolean
+  }
 }
 
 let current: Platform | null = null
