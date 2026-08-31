@@ -1,7 +1,14 @@
 // scripts/gen-icon.mjs
-// Generates resources/icons/icon.ico — a placeholder book/parchment app icon for M9.
-// Node built-ins only (no image deps). Regenerate with `npm run gen:icon`.
-// Replace with real branding by dropping a designed icon.ico at the same path.
+// Single generator for every platform's app artwork, from one vector-ish description of
+// the book/parchment mark. One command (`npm run gen:icon`) rewrites all three targets so
+// they can never drift apart:
+//   1. resources/icons/icon.ico          — Electron desktop (7 sizes in one container)
+//   2. src/renderer/public/icons/*.png   — PWA (192/512 "any" + a 512 maskable)
+//   3. android/app/src/main/res/mipmap-* — Android adaptive + legacy launcher icons (MC4)
+// Node built-ins only (no image deps) — a hand-rolled PNG encoder and ICO container, which
+// is why the art is drawn from rectangles rather than loaded from a designed source file.
+// Replace with real branding by dropping designed assets at the same paths (and then this
+// script becomes a no-op you should delete rather than keep running over them).
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -70,6 +77,21 @@ function drawIcon(n) {
 }
 
 /**
+ * Composite an `inner`x`inner` RGBA buffer into the centre of an `n`x`n` one. Every
+ * target below is "the same book art, scaled down into a safe zone" — only the safe-zone
+ * fraction and the background differ — so the scale-and-centre step lives here once.
+ */
+function compositeCentred(buf, n, art, inner) {
+  const off = Math.round((n - inner) / 2)
+  for (let y = 0; y < inner; y++) {
+    for (let x = 0; x < inner; x++) {
+      const i = (y * inner + x) * 4
+      blend(buf, n, x + off, y + off, [art[i], art[i + 1], art[i + 2], art[i + 3]])
+    }
+  }
+}
+
+/**
  * Maskable variant: solid frame background edge-to-edge with the book art inset into
  * the centre 80% safe zone. Android crops maskable icons to a circle/squircle, so the
  * art must not reach the edges and the background must be opaque.
@@ -78,14 +100,51 @@ function drawMaskableIcon(n) {
   const buf = makeCanvas(n)
   fillRect(buf, n, 0, 0, n, n, FRAME) // opaque background, no transparency
   const inner = Math.round(n * 0.8)
-  const art = drawIcon(inner) // inner x inner RGBA with the book on a transparent margin
-  const off = Math.round((n - inner) / 2)
-  for (let y = 0; y < inner; y++) {
-    for (let x = 0; x < inner; x++) {
-      const i = (y * inner + x) * 4
-      blend(buf, n, x + off, y + off, [art[i], art[i + 1], art[i + 2], art[i + 3]])
+  compositeCentred(buf, n, drawIcon(inner), inner)
+  return buf
+}
+
+/**
+ * Android adaptive-icon FOREGROUND layer (`@mipmap/ic_launcher_foreground`). The canvas is
+ * 108dp but the launcher may crop anything outside the centre 72dp — and it also parallaxes
+ * the layer, which moves the visible window around — so the art gets a 66% safe zone, not
+ * the 80% a PWA maskable icon can afford. Background stays transparent: the launcher
+ * composes `@color/ic_launcher_background` (the frame colour) underneath.
+ */
+function drawAdaptiveForeground(n) {
+  const buf = makeCanvas(n)
+  const inner = Math.round(n * 0.66)
+  compositeCentred(buf, n, drawIcon(inner), inner)
+  return buf
+}
+
+/** Zero the alpha outside the inscribed circle, in place. */
+function applyCircleMask(buf, n) {
+  const c = n / 2
+  const r2 = c * c
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const dx = x + 0.5 - c
+      const dy = y + 0.5 - c
+      if (dx * dx + dy * dy > r2) buf[(y * n + x) * 4 + 3] = 0
     }
   }
+}
+
+/**
+ * Android LEGACY launcher icon (`@mipmap/ic_launcher` / `ic_launcher_round`), used below
+ * API 26 where adaptive icons don't exist. 48dp canvas, no system-applied mask, so the
+ * shape has to be baked in: an opaque frame square with the art inset for breathing room,
+ * plus a circle-masked variant for the launchers that request `roundIcon`.
+ */
+function drawLegacyIcon(n, { round }) {
+  const buf = makeCanvas(n)
+  fillRect(buf, n, 0, 0, n, n, FRAME)
+  // 0.86 rather than the maskable 0.8: nothing crops these, so the art can sit larger —
+  // but it still needs a margin, or the round mask would clip the parchment's corners.
+  const inner = Math.round(n * 0.86)
+  compositeCentred(buf, n, drawIcon(inner), inner)
+  if (round) applyCircleMask(buf, n)
   return buf
 }
 
@@ -173,3 +232,35 @@ const pwaTargets = [
 ]
 for (const { file, bytes } of pwaTargets) writeFileSync(join(PWA_DIR, file), bytes)
 console.log(`Wrote ${pwaTargets.length} PWA icons to ${PWA_DIR}`)
+
+// Android launcher icons (MC4): same art again, overwriting Capacitor's template artwork
+// in place. The mipmap directories are checked in (they are the app's real resources, not
+// build output), so this is an edit of tracked files — re-run it after changing the art.
+// Densities are the standard mdpi..xxxhdpi ladder; the px size is dp * scale, and the two
+// families have different canvases (108dp adaptive foreground, 48dp legacy icon).
+const ANDROID_RES = join(HERE, '..', 'android', 'app', 'src', 'main', 'res')
+const DENSITIES = [
+  { dir: 'mipmap-mdpi', scale: 1 },
+  { dir: 'mipmap-hdpi', scale: 1.5 },
+  { dir: 'mipmap-xhdpi', scale: 2 },
+  { dir: 'mipmap-xxhdpi', scale: 3 },
+  { dir: 'mipmap-xxxhdpi', scale: 4 }
+]
+let androidCount = 0
+for (const { dir, scale } of DENSITIES) {
+  const target = join(ANDROID_RES, dir)
+  mkdirSync(target, { recursive: true })
+  const fg = Math.round(108 * scale)
+  const legacy = Math.round(48 * scale)
+  const files = [
+    ['ic_launcher_foreground.png', encodePng(drawAdaptiveForeground(fg), fg)],
+    ['ic_launcher.png', encodePng(drawLegacyIcon(legacy, { round: false }), legacy)],
+    ['ic_launcher_round.png', encodePng(drawLegacyIcon(legacy, { round: true }), legacy)]
+  ]
+  for (const [file, bytes] of files) writeFileSync(join(target, file), bytes)
+  androidCount += files.length
+}
+console.log(
+  `Wrote ${androidCount} Android launcher icons to ${ANDROID_RES} ` +
+    `(${DENSITIES.length} densities x foreground/legacy/round)`
+)

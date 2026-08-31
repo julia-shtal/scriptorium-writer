@@ -1,4 +1,71 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+// --- Version, derived from package.json (MC4) --------------------------------
+// The Android version is NOT maintained here. `package.json` is the single place the
+// project's semver lives (it already drives the Electron build and the web bundle), and
+// a second hand-edited copy in Gradle is a copy that will drift: the desktop release says
+// 1.6.0 while the APK still claims 1.0, and nobody notices until an install fails.
+//
+// versionName is the semver verbatim — what a human sees in Android's app info screen.
+// versionCode is the integer Android actually compares on upgrade, packed as
+//   major * 10000 + minor * 100 + patch      (1.5.0 -> 10500)
+// which keeps it monotonically increasing for any monotonically increasing semver, and
+// stays readable back to a human ("10500" is obviously 1.05.00).
+//
+// Both the semver shape and the <100 bound on each component are enforced with a hard
+// failure rather than a fallback. A wrong versionCode is not a cosmetic bug: too low and
+// the APK cannot be installed over the previous one at all; overlapping (e.g. a minor of
+// 100 colliding with the next major) and a *newer* build can be silently downgraded onto
+// a user's device, which on this app means their library meeting older storage code.
+def packageJsonFile = file('../../package.json')
+def rawVersion = new JsonSlurper().parseText(packageJsonFile.text).version
+def versionMatcher = (rawVersion?.toString() ?: '') =~ /^(\d+)\.(\d+)\.(\d+)$/
+if (!versionMatcher.matches()) {
+    throw new GradleException(
+        "Cannot derive an Android version: \"${rawVersion}\" in ${packageJsonFile} is not a " +
+        "strict MAJOR.MINOR.PATCH semver. Fix package.json's \"version\" field."
+    )
+}
+def versionParts = (1..3).collect { versionMatcher.group(it) as int }
+if (versionParts.any { it >= 100 }) {
+    throw new GradleException(
+        "Cannot derive an Android versionCode from \"${rawVersion}\": the major*10000 + " +
+        "minor*100 + patch packing gives each component exactly two digits, so a component " +
+        "of 100 or more would collide with the next one up and let an older build outrank a " +
+        "newer one. Change the packing here before shipping such a version."
+    )
+}
+def (versionMajor, versionMinor, versionPatch) = versionParts
+
+// --- Release signing (MC4) ---------------------------------------------------
+// Credentials live in android/keystore.properties, which is gitignored along with the
+// keystore itself: a committed release key can never be rotated without breaking upgrades
+// for every installed user, since Android identifies an app by (applicationId, signing key).
+// See android/keystore.properties.example for the expected keys.
+//
+// The file is optional on purpose. A fresh clone has no keystore, and Gradle sync / debug
+// builds must still work there — so its absence downgrades release builds to unsigned
+// rather than failing configuration. It is logged as a warning because an accidentally
+// unsigned release APK looks identical to a signed one until Play or a device rejects it.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+    def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].findAll {
+        !keystoreProperties.getProperty(it)
+    }
+    if (missing) {
+        // Half-filled properties would otherwise surface much later as an opaque
+        // "Keystore was tampered with" or a null-path NPE deep inside the signing task.
+        throw new GradleException(
+            "${keystorePropertiesFile} is missing required key(s): ${missing.join(', ')}. " +
+            "See android/keystore.properties.example."
+        )
+    }
+}
 
 android {
     namespace = "com.juliashtal.scriptoriumwriter"
@@ -7,8 +74,8 @@ android {
         applicationId "com.juliashtal.scriptoriumwriter"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode versionMajor * 10000 + versionMinor * 100 + versionPatch
+        versionName rawVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +83,34 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // Only populated when the properties file is present; an empty signingConfig is
+            // harmless as long as nothing references it (see buildTypes.release below).
+            if (hasReleaseKeystore) {
+                // storeFile is resolved against android/ (the Gradle root project) rather than
+                // against this module, so the properties file can say `scriptorium-upload.jks`
+                // and mean the keystore sitting next to it. Gradle's file() passes absolute
+                // paths through unchanged, so pointing at a keystore kept outside the repo
+                // also works.
+                storeFile rootProject.file(keystoreProperties.getProperty('storeFile'))
+                storePassword keystoreProperties.getProperty('storePassword')
+                keyAlias keystoreProperties.getProperty('keyAlias')
+                keyPassword keystoreProperties.getProperty('keyPassword')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn(
+                    "MC4: ${keystorePropertiesFile} not found — release builds will be UNSIGNED " +
+                    "and cannot be installed on a device or uploaded to Play. Copy " +
+                    "android/keystore.properties.example and point it at your keystore."
+                )
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

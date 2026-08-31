@@ -19,7 +19,15 @@ const config: CapacitorConfig = {
   android: {
     // The app makes zero network requests after load, so this makes any accidental
     // http:// subresource fail loudly instead of silently loading over an insecure origin.
-    allowMixedContent: false
+    allowMixedContent: false,
+    // MC4: the WebView's OWN background, i.e. what is on screen after the native splash
+    // hands off but before the bundle's first paint. Default is WebView white, which on a
+    // dark-leather app reads as a flash. Same #3a2a1d as `--book-frame` /
+    // `THEME_COLOR` (src/renderer/pwa/manifest.ts) and as @color/scriptorium_frame in
+    // android/app/src/main/res/values/colors.xml — the three are asserted equal by
+    // src/platform/capacitor/android-theme.test.ts. Capacitor takes a hex string here, not
+    // a resource reference, so this is one place the literal genuinely has to be repeated.
+    backgroundColor: '#3a2a1d'
   },
   server: {
     // Explicit, not relying on default: keeps the WebView on a secure-context origin
@@ -31,10 +39,27 @@ const config: CapacitorConfig = {
     // unreachable (not deleted, just invisible), which would also make an OPFS->native
     // migration silently find nothing to migrate.
     androidScheme: 'https'
+  },
+  plugins: {
+    // Capacitor 8 ships SystemBars as a CORE plugin in @capacitor/android — this is why
+    // @capacitor/status-bar is deliberately NOT installed: it would be a second thing
+    // fighting for the same window flags, for behaviour already present.
+    //
+    // 'DARK' names the BACKGROUND, not the icons: it maps to
+    // setAppearanceLightStatusBars(false), i.e. LIGHT icons — which is what a #3a2a1d
+    // frame needs. Left unset the style is 'DEFAULT', which follows the system light/dark
+    // setting, so a device in light mode would draw dark icons on dark leather.
+    //
+    // insetsHandling is left at its 'css' default and edge-to-edge stays OFF. Under 'css'
+    // with no `viewport-fit=cover` in src/renderer/index.web.html, SystemBars pads the
+    // WebView's parent by the system-bar insets, so web content never sits under system
+    // UI and nothing in the renderer has to know about safe areas. Going true
+    // edge-to-edge would mean adding viewport-fit=cover AND reworking the top and bottom
+    // bars against the injected --safe-area-inset-* variables — renderer work with no
+    // payoff on a tablet whose UI is already a dark inset panel inside the same frame
+    // colour. Revisit only if the design ever wants content bleeding under the bars.
+    SystemBars: { style: 'DARK' }
   }
-  // TODO(MC4): only SplashScreen *plugin options* would land here (under a `plugins` key).
-  // The icon/splash assets themselves are generated into android/app/src/main/res/, and
-  // release signing lives in android/app/build.gradle + key.properties — not in this file.
 }
 
 export default config
