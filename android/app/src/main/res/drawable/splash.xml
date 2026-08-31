@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MC4. The target of `@drawable/splash`, referenced by AppTheme.NoActionBarLaunch. That
+  reference goes through `android:background`, a View attribute rather than a window one, so
+  in practice the launch screen is painted by windowSplashScreenBackground on both the
+  pre-31 and 31+ paths and this drawable is rarely reached — see the comment in styles.xml.
+  It exists so the inherited reference still resolves, and it draws exactly what those paths
+  draw (frame colour, launcher mark centred) so the two can never disagree on screen.
+
+  This replaces eleven checked-in splash.png files (drawable/ plus five densities x two
+  orientations). A layer-list is resolution- and orientation-independent — the gravity keeps
+  the mark centred and unstretched at any screen size — so the density/orientation buckets
+  bought nothing but eleven binaries to keep in sync with the art. Note a `splash.png` and a
+  `splash.xml` cannot coexist in the same drawable bucket (same resource name, duplicate
+  resource build error), which is why the PNGs are deleted rather than left behind.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/scriptorium_frame" />
+    <item>
+        <!--
+          The adaptive-icon foreground, which is transparent outside the mark, so it reads
+          as the mark floating on the leather. Not @mipmap/ic_launcher: that one bakes in
+          its own opaque frame square, which would show as a seam against this background.
+        -->
+        <bitmap
+            android:src="@mipmap/ic_launcher_foreground"
+            android:gravity="center" />
+    </item>
+</layer-list>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MC4. One app-owned colour: the `book-frame` leather the whole app is inset into
+  (src/renderer/theme/book.css, also THEME_COLOR in src/renderer/pwa/manifest.ts).
+  Every stage of launch that could otherwise flash a default colour carries this same
+  colour, so no stage ever shows Android/WebView white. Two of them are genuine references
+  to this resource, in values/styles.xml: windowSplashScreenBackground on the launch theme
+  (the splash), and android:windowBackground on AppTheme.NoActionBar (which Capacitor's
+  SystemBars plugin copies onto the decor view, i.e. behind the transparent system bars).
+
+  The WebView's own background is NOT a reference to this resource: it is set in
+  capacitor.config.ts, which takes a hex string rather than a resource reference, so that
+  one is a repeated literal by necessity. The icon generator (scripts/gen-icon.mjs) is a
+  repeated literal too, as dependency-free .mjs that cannot import anything.
+
+  A node test (src/platform/capacitor/android-theme.test.ts) asserts that all of the
+  repeated literals still equal THEME_COLOR (src/renderer/pwa/manifest.ts); changing the
+  theme token means changing every one of them.
+
+  Deliberately NOT redefining colorPrimary/colorPrimaryDark/colorAccent: those come from
+  the @capacitor/android library's own colors.xml, and shadowing them here would silently
+  restyle Capacitor's own UI with no benefit.
+-->
+<resources>
+    <color name="scriptorium_frame">#3a2a1d</color>
+</resources>

@@ -1,5 +1,12 @@
 /* Book theme tokens (SPEC §10) — the single home for palette values. */
 :root {
+  /* Origin of the frame colour. Unlike every other token here, this one is duplicated
+     outside CSS: the native platforms cannot import it. Copies live in THEME_COLOR
+     (src/renderer/pwa/manifest.ts), the FRAME literal in scripts/gen-icon.mjs, Android
+     res/values/colors.xml and ic_launcher_background.xml, and capacitor.config.ts.
+     Change it here and src/platform/capacitor/android-theme.test.ts fails until the
+     copies follow — that test is the only thing keeping the app's frame, its launcher
+     icon, its splash and its status bar the same colour. */
   --book-frame: #3a2a1d;
   --page-bg: #f5efe0;
   --sidebar-bg: #efe6d3;

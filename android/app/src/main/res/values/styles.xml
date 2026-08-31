@@ -9,14 +9,76 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!--
+      The theme BridgeActivity switches to once the WebView is up (postSplashScreenTheme
+      below). windowBackground is load-bearing twice over, which is why it is the frame
+      colour and no longer @null:
+        1. Capacitor's core SystemBars plugin does
+           decorView.setBackgroundColor(getThemeColor(context, android.R.attr.windowBackground))
+           in setStyle — so this is literally the colour painted behind the transparent
+           status and navigation bars.
+        2. It is what shows in the gap between the splash tearing down and the WebView's
+           first paint. With @null that gap was Android white against a dark leather app —
+           the white flash MC4 exists to remove.
+    -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/scriptorium_frame</item>
     </style>
 
 
+    <!--
+      Launch theme, applied by AndroidManifest.xml to MainActivity (androidx
+      core-splashscreen, see coreSplashScreenVersion in android/variables.gradle).
+      minSdkVersion is 24, so two eras have to be covered — and both windowSplashScreen*
+      attrs below reach both of them, by two entirely different routes:
+
+      - API 31+ (the device under test is API 36): Theme.SplashScreen's values-v31 variant
+        forwards ?windowSplashScreenBackground / ?windowSplashScreenAnimatedIcon into the
+        platform's android:windowSplashScreen* attrs, and the system reads them off the
+        launch theme before the activity exists. Note this works without anyone calling
+        installSplashScreen() — which Capacitor's BridgeActivity does not do.
+      - API 24..30: the library's Theme.SplashScreen.Common sets android:windowBackground to
+        @drawable/compat_splash_screen_no_icon_background. That resource has two variants in
+        the AAR, and with minSdkVersion 24 the one that always resolves is the
+        res/drawable-v23/ one; the bare colour drawable in res/drawable/ is only selected
+        below API 23, so it is dead code here. The v23 variant is not a colour but a
+        layer-list of three items: ?attr/windowSplashScreenBackground filling the window,
+        then ?windowSplashScreenAnimatedIcon centred at
+        @dimen/splashscreen_icon_size_no_background, then an oval stroke painted in the
+        same background colour that crops the mark down to a circle.
+        So the same frame colour lands there too, and the mark is drawn on 24..30 as well:
+        circle masked by that compat stroke rather than by the platform.
+
+      windowSplashScreenAnimatedIcon is therefore live on EVERY supported API level, not
+      only 31+. Changing or dropping it changes the pre-31 splash too, silently.
+      It takes the *adaptive foreground* (transparent outside the mark), not
+      @mipmap/ic_launcher: the frame colour is painted beneath it either way (by the
+      platform on 31+, by the layer-list's first item below that) and the icon ends up
+      circle masked in both eras, so the legacy icon's baked-in frame square would only
+      add a seam.
+
+      Two items are kept despite being inert, both inherited from Capacitor's template:
+      - android:background is a View attribute, not a window one, so @drawable/splash is not
+        what paints the pre-31 launch screen. That is the android:windowBackground this
+        style inherits from Theme.SplashScreen.Common, described just above. It is NOT the
+        android:windowBackground declared in AppTheme.NoActionBar earlier in this file:
+        the name here reads as if it implicitly extended that style (Android's dot notation
+        would make AppTheme.NoActionBar its parent), but the explicit parent= attribute
+        below overrides the name, so this style descends from Theme.SplashScreen only and
+        inherits nothing at all from AppTheme.NoActionBar. The item stays because it is
+        Capacitor's generated line and because @drawable/splash must keep resolving;
+        drawable/splash.xml draws the same frame + mark should it ever be used.
+      - postSplashScreenTheme is only read inside installSplashScreen(), which BridgeActivity
+        never calls — it does setTheme(AppTheme_NoActionBar) itself in onCreate, so the
+        handoff happens regardless. Declared so the intent is explicit and so the theme keeps
+        working if the activity ever adopts the library's normal entry point.
+    -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/scriptorium_frame</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

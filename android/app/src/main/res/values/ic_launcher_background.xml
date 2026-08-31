@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The adaptive icon's BACKGROUND layer: mipmap-anydpi-v26/ic_launcher{,_round}.xml
+  reference `@color/ic_launcher_background`, so the resource name has to stay exactly this
+  even though the value is now the frame colour rather than Capacitor's template white.
+  Kept as its own file (rather than folded into colors.xml) for the same reason — it is
+  Capacitor's generated resource, and the next `npx cap` template diff should stay legible.
+
+  The launcher composes this under the transparent ic_launcher_foreground.png that
+  scripts/gen-icon.mjs emits, so the two must agree: same #3a2a1d as scriptorium_frame.
+-->
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#3a2a1d</color>
 </resources>

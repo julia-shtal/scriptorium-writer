@@ -44,7 +44,9 @@ android/build/
 
 # Release signing (MC4). android/.gitignore ships #*.jks / #*.keystore commented out —
 # uncommented here because a committed release keystore is unrecoverable: it can't be
-# rotated without breaking upgrades for every installed user.
+# rotated without breaking upgrades for every installed user. keystore.properties holds the
+# store/key passwords in plaintext, so it goes with them; android/keystore.properties.example
+# is the committed template that documents the shape.
 *.jks
 *.keystore
-key.properties
+keystore.properties
