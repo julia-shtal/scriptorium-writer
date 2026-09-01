@@ -9,6 +9,10 @@
  * never exercised 0007 (it needs a denied Documents permission — MC3's scope), so this test
  * is the ONLY guard on that property today.
  *
+ * The last block (MC3) reaches one layer higher than the rest of this file, driving a real
+ * `FileService.saveChapter` over this port to prove a failed write reaches the caller instead
+ * of being swallowed. See its own comment for why it lives here and not in file-service.test.ts.
+ *
  * Triage note: a red `FsPort contract: CapacitorFsPort (faked plugin) > <case name>` is
  * ambiguous on its own — it could mean `CapacitorFsPort` regressed, or it could mean
  * `FakeFilesystem` (fake-filesystem.ts) drifted from what it claims to model. The intended way
@@ -17,6 +21,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { runFsPortContract } from '@data/fs-port.contract'
+import { FileService } from '@data/file-service'
 import type {
   DeleteFileOptions,
   GetUriOptions,
@@ -28,6 +33,7 @@ import type {
   StatOptions,
   WriteFileOptions
 } from '@capacitor/filesystem'
+import type { ProseMirrorJSON } from '@shared/types'
 import { FakeFilesystem } from './fake-filesystem'
 import { CapacitorFsPort } from './fs-port'
 
@@ -100,5 +106,88 @@ describe('CapacitorFsPort mkdir on an existing directory (device-observed, Node-
     const dir = `/fake/scratch-${crypto.randomUUID()}`
     await fs.mkdir(dir, { recursive: true })
     await expect(fs.mkdir(dir, { recursive: true })).resolves.toBeUndefined()
+  })
+})
+
+/**
+ * A failed save must stay visible (MC3, CLAUDE.md priority #1: a silent failed save is the
+ * worst thing this app can do).
+ *
+ * This exercises the whole Android write path rather than one layer of it, because every layer
+ * on it has a documented reason to swallow something and the question is whether they compose
+ * into a leak: `CapacitorFsPort.writeFile` is the ONE method with no try/catch (its comment
+ * explains why — `recursive: true` means it cannot produce the missing-parent ENOENT that
+ * `translate()` exists to relabel); `atomicWriteFile` catches only around the rename, and
+ * removes the orphaned temp rather than reporting success; `FileService.saveChapter` swallows a
+ * failed Markdown backup by design, and must NOT extend that leniency to the JSON canon.
+ *
+ * It lives here rather than in file-service.test.ts because the plugin substitution is
+ * file-scoped (`vi.mock('@capacitor/filesystem')` at the top of this module) and file-service's
+ * suite is built on real temp directories over `NodeFsPort` — mocking the Capacitor plugin
+ * across that whole file to add one case would be far more invasive than adding a FileService
+ * to the file that already owns the fake.
+ *
+ * The leg above this one is already covered and is deliberately not duplicated:
+ * editorStore.test.ts's "a failed save keeps dirty and reports error" rejects `api.saveChapter`
+ * and asserts `saveStatus === 'error'` with `dirty` still true, which is what the footer
+ * renders. Together the two cover plugin → port → FileService → store.
+ */
+describe('FileService.saveChapter over CapacitorFsPort, out of space (MC3)', () => {
+  const doc = (text: string): ProseMirrorJSON => ({
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }]
+  })
+
+  const makeService = async (): Promise<FileService> => {
+    const svc = new FileService({
+      fs: new CapacitorFsPort(),
+      // Absolute POSIX paths under the fake's pre-existing '/fake' root: FakeFilesystem
+      // refuses a relative path given without a `directory` (see its `resolvePath`).
+      userDataPath: '/fake/userdata',
+      defaultLibraryPath: '/fake/library'
+    })
+    await svc.ensureLibrary()
+    return svc
+  }
+
+  it('propagates the plugin write failure out of saveChapter instead of swallowing it', async () => {
+    const svc = await makeService()
+    const story = await svc.createStory({ title: 'Roman' })
+    const chapter = await svc.createChapter(story.id, 'Glava')
+    await svc.saveChapter(story.id, { id: chapter.id, title: 'Glava', doc: doc('written before') })
+
+    activeFake.outOfSpace = true
+
+    const failed = svc.saveChapter(story.id, {
+      id: chapter.id,
+      title: 'Glava',
+      doc: doc('written after')
+    })
+    // The identity of the failure matters as much as the fact of it. It must arrive with the
+    // plugin's own code (0013, the documented catch-all a full volume surfaces as) — NOT
+    // rewritten to ENOENT by `translate()`, which would tell FileService the chapter is
+    // MISSING and put a healthy chapter on the recovery path over a merely-unwritable disk.
+    await expect(failed).rejects.toMatchObject({ code: 'OS-PLUG-FILE-0013' })
+    await expect(failed).rejects.not.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('leaves the previous canon intact when the write fails', async () => {
+    const svc = await makeService()
+    const story = await svc.createStory({ title: 'Roman' })
+    const chapter = await svc.createChapter(story.id, 'Glava')
+    await svc.saveChapter(story.id, { id: chapter.id, title: 'Glava', doc: doc('written before') })
+
+    activeFake.outOfSpace = true
+    await expect(
+      svc.saveChapter(story.id, { id: chapter.id, title: 'Glava', doc: doc('written after') })
+    ).rejects.toThrow()
+    activeFake.outOfSpace = false
+
+    // The atomic-write contract, observed from the layer that matters to the user: the failure
+    // happened on the temp file, so the good canon was never touched. Losing the newest edit is
+    // survivable (the store keeps it in memory and stays dirty); losing the last saved draft
+    // would not be.
+    const still = await svc.readChapter(story.id, chapter.id)
+    expect(JSON.stringify(still.doc)).toContain('written before')
   })
 })

@@ -227,7 +227,17 @@ async function requestPersistentStorage(): Promise<boolean | undefined> {
  *  surface (e.g. `createWebPlatform`) simply destructure `api` and ignore this. */
 export async function createPlatformFromFsPort(
   fs: FsPort,
-  paths: { userDataPath: string; defaultLibraryPath: string }
+  paths: {
+    userDataPath: string
+    defaultLibraryPath: string
+    /** Forwarded straight to {@link FileServiceOptions.isLibraryPathUsable} (MC3). Capacitor
+     *  passes `isNativeLibraryPathUsable` so a Windows `libraryPath` that travelled in with a
+     *  synced settings.json is ignored rather than opened; web passes nothing, keeping today's
+     *  accept-everything behaviour exactly. Threaded through here rather than set inside each
+     *  factory because this function owns the single `new FileService(...)` call both
+     *  platforms share. */
+    isLibraryPathUsable?: (path: string) => boolean
+  }
 ): Promise<{ api: Api; service: FileService }> {
   const service = new FileService({ fs, ...paths })
   await service.ensureLibrary()
@@ -250,6 +260,13 @@ export async function createWebPlatform(): Promise<Platform> {
     storagePersisted,
     // exportsToDeviceFolder: false — the browser (or showSaveFilePicker) chooses where an
     // export lands, so naming a fixed folder here would be false.
-    capabilities: { managedSpellcheck: false, evictableStorage: true, exportsToDeviceFolder: false }
+    // libraryLocation 'path' — `/library` is a genuine path, just inside OPFS, and
+    // `revealInFolder` throws UNSUPPORTED here, so the reveal control must not render.
+    capabilities: {
+      managedSpellcheck: false,
+      evictableStorage: true,
+      exportsToDeviceFolder: false,
+      libraryLocation: 'path'
+    }
   } // no `lifecycle` on web
 }

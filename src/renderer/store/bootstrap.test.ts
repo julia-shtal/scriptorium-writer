@@ -115,4 +115,65 @@ describe('bootstrapLibrary', () => {
     expect(createStory).not.toHaveBeenCalled()
     expect(result).toEqual({ storyId: null, chapterId: null })
   })
+
+  // MC3. The fixture reproduces the MC2 measurement rather than an error case: with
+  // all-files access withheld the library files are still on disk, but listStories() comes
+  // back EMPTY instead of throwing, and demoSeeded is genuinely false because this really is
+  // a fresh install (over an old library). Every signal says "first run"; only the platform's
+  // storageAccess.granted says the app cannot see anything. That is what must win.
+  test('seeds nothing when the platform reports storage access withheld', async () => {
+    const listStories = vi.fn(async () => [])
+    const readSettings = vi.fn(async () => ({ demoSeeded: false }))
+    const createStory = vi.fn()
+    const createChapter = vi.fn()
+    const saveChapter = vi.fn()
+    const saveSettings = vi.fn()
+    setFakeApi(
+      { listStories, readSettings, createStory, createChapter, saveChapter, saveSettings },
+      {
+        storageAccess: {
+          granted: false,
+          request: vi.fn(async () => {}),
+          recheck: vi.fn(async () => false)
+        }
+      }
+    )
+
+    const result = await bootstrapLibrary()
+
+    expect(result).toEqual({ storyId: null, chapterId: null })
+    expect(createStory).not.toHaveBeenCalled()
+    expect(createChapter).not.toHaveBeenCalled()
+    expect(saveChapter).not.toHaveBeenCalled()
+    // The load-bearing one: demoSeeded stays untouched, so the real first run is still ahead
+    // of us once the permission is granted. Writing it here would burn it on a library the
+    // app never managed to read.
+    expect(saveSettings).not.toHaveBeenCalled()
+    // It does not even ask — the refusal is above the reads, so nothing acts on their answers.
+    expect(listStories).not.toHaveBeenCalled()
+  })
+
+  test('seeds normally when storage access is present and granted', async () => {
+    const listStories = vi.fn(async () => [])
+    const createStory = vi.fn(async () => ({ id: 's1', chapterOrder: [] }))
+    const createChapter = vi.fn().mockResolvedValueOnce({ id: 'c1', title: 'Глава 1' })
+    const saveChapter = vi.fn(async () => ({ savedAt: '', wordCount: 0, versionId: 'v' }))
+    const readSettings = vi.fn(async () => ({ demoSeeded: false }))
+    const saveSettings = vi.fn(async () => {})
+    setFakeApi(
+      { listStories, createStory, createChapter, saveChapter, readSettings, saveSettings },
+      {
+        storageAccess: {
+          granted: true,
+          request: vi.fn(async () => {}),
+          recheck: vi.fn(async () => true)
+        }
+      }
+    )
+
+    const result = await bootstrapLibrary()
+
+    expect(result).toEqual({ storyId: 's1', chapterId: 'c1' })
+    expect(saveSettings).toHaveBeenCalledWith(expect.objectContaining({ demoSeeded: true }))
+  })
 })

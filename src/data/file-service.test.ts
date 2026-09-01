@@ -542,6 +542,77 @@ describe('settings', () => {
   })
 })
 
+describe('libraryPath from another platform (MC3)', () => {
+  /** A service whose settings.json already carries `libraryPath`, with an optional predicate.
+   *  Written BEFORE construction so the very first readSettings must take the merge path —
+   *  makeService() would warm the cache via ensureLibrary and mask the override entirely. */
+  async function serviceWithLibraryPath(
+    libraryPath: string,
+    isLibraryPathUsable?: (path: string) => boolean
+  ): Promise<{ svc: FileService; defaultLib: string }> {
+    const userData = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-ud-'))
+    const defaultLib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-lib-'))
+    dirsToClean.push(userData, defaultLib)
+    await fsp.writeFile(join(userData, 'settings.json'), JSON.stringify({ libraryPath }), 'utf8')
+    const svc = new FileService({
+      fs: new NodeFsPort(),
+      userDataPath: userData,
+      defaultLibraryPath: defaultLib,
+      isLibraryPathUsable
+    })
+    await svc.ensureLibrary()
+    return { svc, defaultLib }
+  }
+
+  it('falls back to defaultLibraryPath when the predicate rejects the persisted path', async () => {
+    // The real case: settings.json synced in from the desktop build. The path is meaningless
+    // here, and MC3's rule is to ignore it rather than fail to launch.
+    const windowsPath = 'C:\\Users\\julia\\Documents\\Scriptorium-Writer'
+    const { svc, defaultLib } = await serviceWithLibraryPath(
+      windowsPath,
+      (p) => !/^[A-Za-z]:[\\/]/.test(p)
+    )
+
+    const story = await svc.createStory({ title: 'Rejected path' })
+    expect(existsSync(join(layout.storiesDir(defaultLib), story.id))).toBe(true)
+
+    // Ignored, NOT rewritten: the value is still correct on the platform that wrote it, and
+    // the same settings file may travel back there.
+    expect((await svc.readSettings()).libraryPath).toBe(windowsPath)
+  })
+
+  it('honours a persisted path the predicate accepts', async () => {
+    const chosenLib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-chosen-'))
+    dirsToClean.push(chosenLib)
+    const { svc, defaultLib } = await serviceWithLibraryPath(chosenLib, () => true)
+
+    const story = await svc.createStory({ title: 'Accepted path' })
+    expect(existsSync(join(layout.storiesDir(chosenLib), story.id))).toBe(true)
+    expect(existsSync(join(layout.storiesDir(defaultLib), story.id))).toBe(false)
+  })
+
+  it('accepts everything when no predicate is supplied (desktop/web unchanged)', async () => {
+    // The default must stay accept-all, or adding the option would silently change how every
+    // existing desktop install resolves its library.
+    const chosenLib = await fsp.mkdtemp(join(tmpdir(), 'scriptorium-writer-chosen-'))
+    dirsToClean.push(chosenLib)
+    const { svc, defaultLib } = await serviceWithLibraryPath(chosenLib)
+
+    const story = await svc.createStory({ title: 'No predicate' })
+    expect(existsSync(join(layout.storiesDir(chosenLib), story.id))).toBe(true)
+    expect(existsSync(join(layout.storiesDir(defaultLib), story.id))).toBe(false)
+  })
+
+  it('still falls back on an empty libraryPath, predicate or not', async () => {
+    // '' has always meant "no override". The predicate is never consulted for it, so a
+    // predicate that (wrongly) accepted '' could not turn the library root into ''.
+    const { svc, defaultLib } = await serviceWithLibraryPath('', () => true)
+
+    const story = await svc.createStory({ title: 'Empty path' })
+    expect(existsSync(join(layout.storiesDir(defaultLib), story.id))).toBe(true)
+  })
+})
+
 describe('exportLibraryArchive (M13)', () => {
   it('writes a valid zip of the library with no .part remnant', async () => {
     const { svc } = await makeService()

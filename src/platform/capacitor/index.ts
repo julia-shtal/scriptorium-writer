@@ -22,28 +22,52 @@
 
 import type { Platform } from '@renderer/platform'
 import { createPlatformFromFsPort } from '../web'
+import { hasAllFilesAccess, openAllFilesAccessSettings } from './all-files-access'
 import { CapacitorFsPort } from './fs-port'
+import { isNativeLibraryPathUsable } from './library-path'
 import { createNativeExportApi } from './native-export'
 import { resolveCapacitorRoots } from './roots'
 
 export async function createCapacitorPlatform(): Promise<Platform> {
+  // FIRST, before any filesystem work: the renderer's gate needs this answer to decide whether
+  // it may boot the library at all, and MC3 exists because acting before knowing is what let
+  // MC2 seed a demo story over an unreadable library.
+  const granted = await hasAllFilesAccess()
+
+  // Resolved even when access is withheld, deliberately. Settings and userdata live in
+  // Directory.Data and stay reachable regardless, so the app still has somewhere to work; and
+  // if the Documents mkdir genuinely fails on permission, resolveRoot propagates the real 0007
+  // rather than inventing a phantom path (see roots.ts). A comprehensible error beats a boot
+  // crash, and skipping this would trade one for the other.
   const roots = await resolveCapacitorRoots()
   const fs = new CapacitorFsPort()
   const { api, service } = await createPlatformFromFsPort(fs, {
     userDataPath: roots.userdata,
-    defaultLibraryPath: roots.library
+    defaultLibraryPath: roots.library,
+    // A settings.json that travelled in from the desktop carries a Windows libraryPath; ignore
+    // it and use the resolved Documents root instead of failing to launch (MC3 §6).
+    isLibraryPathUsable: isNativeLibraryPathUsable
   })
   return {
     // Spread order matters: the native export methods must WIN over the web ones.
     api: { ...api, ...createNativeExportApi(fs, service, roots.exports) },
     // No navigator.storage.persist() and no OPFS worker on native — and no storagePersisted,
     // which is an OPFS-eviction concept with no native meaning.
+    storageAccess: {
+      granted,
+      request: openAllFilesAccessSettings,
+      recheck: hasAllFilesAccess
+    },
     // exportsToDeviceFolder: native export writes to a fixed folder nothing cleans up, so
     // the UI must be able to tell the user where to find the files (native-export.ts).
+    // libraryLocation 'androidDocuments': roots.library is an internal
+    // /storage/emulated/0/... string, and there is no reliable file-manager intent to reveal
+    // it, so Settings shows the human-readable location and no reveal control.
     capabilities: {
       managedSpellcheck: false,
       evictableStorage: false,
-      exportsToDeviceFolder: true
+      exportsToDeviceFolder: true,
+      libraryLocation: 'androidDocuments'
     }
   }
 }

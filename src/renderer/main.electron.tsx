@@ -21,7 +21,14 @@ setPlatform({
   // Electron configures Chromium's native spellchecker with bundled dictionaries
   // (src/main/spellcheck.ts + dict-server.ts). Web cannot; see MP5.
   // exportsToDeviceFolder: false — desktop exports go wherever the OS save dialog put them.
-  capabilities: { managedSpellcheck: true, evictableStorage: false, exportsToDeviceFolder: false }
+  // libraryLocation 'path-revealable' — the only platform where the path is both meaningful
+  // to the user and backed by a working shell.showItemInFolder.
+  capabilities: {
+    managedSpellcheck: true,
+    evictableStorage: false,
+    exportsToDeviceFolder: false,
+    libraryLocation: 'path-revealable'
+  }
 })
 
 createRoot(container).render(

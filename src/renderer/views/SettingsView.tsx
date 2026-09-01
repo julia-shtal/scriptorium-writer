@@ -21,6 +21,13 @@ export function SettingsView(): JSX.Element {
   >({ kind: 'idle' })
   const isWeb = getPlatform().capabilities?.evictableStorage === true
   const exportsToDeviceFolder = getPlatform().capabilities?.exportsToDeviceFolder === true
+  // MC3: how the library location is presented is a per-platform answer, not something to
+  // sniff — see the `libraryLocation` doc comment in platform.ts for what each value means.
+  // `capabilities` is optional (so the bare `{ api }` test platform keeps compiling), and the
+  // fallback here is deliberately 'path-revealable': that is the behaviour this field renders
+  // today, so a platform that never declared keeps exactly what it had rather than silently
+  // losing its reveal control or being told its books live in Documents when they do not.
+  const libraryLocation = getPlatform().capabilities?.libraryLocation ?? 'path-revealable'
   const storagePersisted = getPlatform().storagePersisted
   const [usage, setUsage] = useState<{ used: number; total: number } | null>(null)
   useEffect(() => {
@@ -134,10 +141,25 @@ export function SettingsView(): JSX.Element {
 
       <div className="settings-field">{t.settings.libraryFolder}
         <div className="settings-path">
-          <code>{settings.libraryPath}</code>
-          <button className="linkish" onClick={() => void api().revealInFolder(settings.libraryPath)}>
-            {t.settings.reveal}
-          </button>
+          {/* On Android the stored path is an internal /storage/emulated/0/... string; showing
+              it would send the user hunting for a folder she cannot name. Everywhere else the
+              path IS the useful answer (a desktop path she can paste, or web's /library inside
+              OPFS, which at least says "not on your disk"). */}
+          {libraryLocation === 'androidDocuments'
+            ? <span className="settings-location">{t.settings.libraryInDocuments}</span>
+            : <code>{settings.libraryPath}</code>}
+          {/* Reveal only where an OS file explorer can actually be opened. This DROPS the
+              button on web (behaviour change, intentional): `revealInFolder` in
+              src/platform/web/index.ts rejects with UNSUPPORTED, so clicking it there only ever
+              produced an unhandled rejection — the control was dead from the day web shipped.
+              Android has no reliable universal file-manager intent, so it gets none either. */}
+          {libraryLocation === 'path-revealable' && (
+            <button className="linkish" onClick={() => void api().revealInFolder(settings.libraryPath)}>
+              {t.settings.reveal}
+            </button>
+          )}
+          {/* Export stays on every platform: it is unrelated to reveal, and on Android it is
+              the ONLY route to a backup the user can copy off the device. */}
           <button
             className="linkish"
             disabled={exportState.kind === 'busy'}

@@ -17,7 +17,8 @@
  *    translates to ENOENT.
  *  - 0007 (permission denied) was never exercised on device (needs a denied Documents
  *    permission — MC3's scope). The `denied` set below is this project's ONLY coverage of
- *    that path; see fs-port.test.ts's whitelist regression test.
+ *    that path; see fs-port.test.ts's whitelist regression test. The `outOfSpace` flag beside
+ *    it is the same idea for a full volume — likewise never exercised on device.
  *  - `getUri()` returns `file://` URIs; resolved DIRECTORY roots came back WITH a trailing
  *    slash (e.g. `file:///storage/emulated/0/Documents/Scriptorium-Writer/`). Files are not
  *    observed to carry one.
@@ -71,7 +72,15 @@ const CODES = {
   // NOT OBSERVED — invented. The real plugin's web implementation throws for Blob data
   // (native never does — see writeFile below), but the device spike never exercised this
   // path and this exact code is a guess, not a device reading.
-  unsupportedData: 'OS-PLUG-FILE-0013'
+  unsupportedData: 'OS-PLUG-FILE-0013',
+  // NOT OBSERVED on device, but NOT invented either: 0013 is the plugin's documented
+  // catch-all, "The operation failed with an error" (@capacitor/filesystem README, Errors
+  // table). A full volume surfaces on Android as a java.io.IOException inside the write, and
+  // the plugin has no dedicated out-of-space code to give it, so 0013 is what reaches the
+  // WebView. The value is shared with `unsupportedData` above precisely because the plugin
+  // itself does not distinguish these — do not "disambiguate" them into different codes, that
+  // would model a plugin more informative than the real one.
+  operationFailed: 'OS-PLUG-FILE-0013'
 } as const
 
 function pluginError(code: string, message: string): Error & { code: string } {
@@ -160,6 +169,18 @@ export class FakeFilesystem {
   private readonly dirs = new Set<string>(['/fake'])
   /** Paths configured to reject with 0007, so the whitelist can be tested. */
   readonly denied = new Set<string>()
+  /**
+   * When true, every `writeFile` rejects with 0013 — the device is out of space.
+   *
+   * A flag rather than a path set (the shape `denied` uses) for two reasons. A full volume is
+   * a device-wide condition, not a property of one file; and the write a save actually fails
+   * on is `atomicWriteFile`'s temp file, whose name is random (`.<8 hex>.tmp`), so there is no
+   * path a test could name in advance. Only `writeFile` is affected, not `mkdir` — the
+   * directories a save touches already exist, so the narrow model is the one that matches the
+   * failure being reproduced. Exists so the save path can be driven to a genuine write failure
+   * end-to-end; see the out-of-space test in fs-port.test.ts.
+   */
+  outOfSpace = false
 
   private guard(path: string): void {
     if (this.denied.has(path)) throw pluginError(CODES.permissionDenied, `denied: ${path}`)
@@ -198,6 +219,11 @@ export class FakeFilesystem {
   async writeFile({ path, directory, data, encoding, recursive }: WriteFileOptions): Promise<WriteFileResult> {
     const resolved = resolvePath(path, directory)
     this.guard(resolved)
+    // Checked before anything is recorded: a failed write must leave the store exactly as it
+    // was, which is the whole reason a caller can trust the previous canon survived.
+    if (this.outOfSpace) {
+      throw pluginError(CODES.operationFailed, `ENOSPC: no space left on device, '${resolved}'`)
+    }
     const parent = parentOf(resolved)
     if (!this.dirs.has(parent)) {
       if (!recursive) throw pluginError(CODES.missingParent, `missing parent: ${resolved}`)

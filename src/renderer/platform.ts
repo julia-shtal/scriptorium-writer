@@ -7,6 +7,21 @@ export interface Platform {
   /** Whether the browser granted persistent storage (navigator.storage.persist()).
    *  undefined on platforms without OPFS storage pressure (Electron). MP9 surfaces this. */
   storagePersisted?: boolean
+  /** Present ONLY where the OS can withhold access to the library, i.e. Android/MC3
+   *  (MANAGE_EXTERNAL_STORAGE). Absent on desktop and web, where storage is always
+   *  reachable — so `storageAccess === undefined` means "no gate applies", not "denied".
+   *  Callers must null-check and treat absence as granted. */
+  storageAccess?: {
+    /** State as of boot. The live value moves (the user grants it from system Settings while
+     *  the app is backgrounded), which is what `recheck` is for. */
+    granted: boolean
+    /** Route the user to the system All-files-access screen. REJECTS if no such screen
+     *  resolves on this device — some OEM builds have neither the per-app nor the global one —
+     *  so the caller can fall back to written instructions instead of a dead button. */
+    request: () => Promise<void>
+    /** Re-read the live state (called when the app regains focus after `request`). */
+    recheck: () => Promise<boolean>
+  }
   /** Static, per-platform capability flags read by the UI to adapt behaviour
    *  without user-agent sniffing. Optional (like storagePersisted) so the
    *  fakePlatform test helper — which builds a bare { api } — keeps compiling;
@@ -27,6 +42,16 @@ export interface Platform {
      *  (or a new flag) fails to compile until someone states the answer rather than
      *  inheriting `undefined` by omission. */
     exportsToDeviceFolder: boolean
+    /** How Settings should present the library location. REQUIRED, like the flags above.
+     *  'path-revealable' — a real OS path with a working reveal-in-folder (Electron).
+     *  'path'            — a real path string, no reveal control (web: `/library` inside OPFS,
+     *                      where `revealInFolder` throws UNSUPPORTED, so that button was
+     *                      always dead).
+     *  'androidDocuments'— the raw path is an internal `/storage/emulated/0/...` string that
+     *                      means nothing to a tablet user, and Android has no reliable
+     *                      universal file-manager intent; show the human-readable location
+     *                      («Документы / Scriptorium-Writer») and render no reveal control. */
+    libraryLocation: 'path-revealable' | 'path' | 'androidDocuments'
   }
 }
 

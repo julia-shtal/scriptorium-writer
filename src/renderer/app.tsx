@@ -10,7 +10,9 @@ import { StatisticsView } from '@renderer/views/StatisticsView'
 import { SearchView } from '@renderer/views/SearchView'
 import { SettingsView } from '@renderer/views/SettingsView'
 import { RecoveryDialog } from '@renderer/components/RecoveryDialog'
+import { StorageAccessGate } from '@renderer/components/StorageAccessGate'
 import { UpdateNotice } from '@renderer/components/UpdateNotice'
+import { getPlatform } from '@renderer/platform'
 import { bootApp } from '@renderer/store/boot-app'
 import { useEditorStore } from '@renderer/store/editorStore'
 import { useUiStore } from '@renderer/store/uiStore'
@@ -28,6 +30,12 @@ export default function App(): JSX.Element {
   const [recoveries, setRecoveries] = useState<ChapterRecovery[]>([])
   const [booting, setBooting] = useState(true)
 
+  // MC3: on Android the OS can withhold access to the library (MANAGE_EXTERNAL_STORAGE).
+  // `storageAccess` is absent everywhere else, and absent means "no gate applies" — hence the
+  // `?? true`, which keeps desktop and web on exactly the path they had before.
+  const storageAccess = getPlatform().storageAccess
+  const [storageGranted, setStorageGranted] = useState(storageAccess?.granted ?? true)
+
   // The boot effect must run exactly once, so it can't depend on the reactive `t`
   // (a live language switch would otherwise re-scan + re-open the library). Read the
   // current dictionary through a ref instead — only the rare non-Error fallback uses it.
@@ -42,8 +50,16 @@ export default function App(): JSX.Element {
   // mid-`rename`, surfacing as "failed to read story «демо»". The boot is genuinely a
   // once-per-load operation (seed / open last chapter), so guarding it is correct, not a
   // workaround for a non-idempotent effect.
+  //
+  // MC3 adds `storageGranted` as a *gate* in front of that once-guard, not as a second
+  // trigger for it. The two compose: while access is withheld the effect returns before
+  // touching `bootedRef`, so nothing has been consumed; the grant flips the state once and
+  // only forward (nothing ever sets it back to false), which re-runs the effect, and from
+  // there `bootedRef` is the same single-shot latch it always was — including under
+  // StrictMode's double-invoke of that re-run.
   const bootedRef = useRef(false)
   useEffect(() => {
+    if (!storageGranted) return
     if (bootedRef.current) return
     bootedRef.current = true
     void (async () => {
@@ -55,7 +71,7 @@ export default function App(): JSX.Element {
         setBooting(false)
       }
     })()
-  }, [])
+  }, [storageGranted])
 
   const handleResolved = async (r: ChapterRecovery): Promise<void> => {
     setRecoveries((rs) => rs.filter((x) => x.chapterId !== r.chapterId))
@@ -83,6 +99,15 @@ export default function App(): JSX.Element {
       case 'editor':
       default: return <EditorView />
     }
+  }
+
+  // Access withheld: the gate REPLACES the app rather than covering it. No AppFrame, no
+  // views, and — because the boot effect above is gated on the same flag — no scanLibrary,
+  // no bootstrapLibrary, no seeding. Nothing at all is written until the answer is yes.
+  // (`storageAccess &&` is what narrows the optional for the prop; where it is absent
+  // `storageGranted` was seeded `true` and this branch is unreachable anyway.)
+  if (storageAccess && !storageGranted) {
+    return <StorageAccessGate access={storageAccess} onGranted={() => setStorageGranted(true)} />
   }
 
   return (
