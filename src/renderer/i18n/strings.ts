@@ -58,6 +58,15 @@ export const ru = {
     versionsPerChapter: 'Версий на главу',
     libraryFolder: 'Папка библиотеки',
     reveal: 'показать',
+    // MC3, shown INSTEAD of the raw path where capabilities.libraryLocation is
+    // 'androidDocuments' (see platform.ts): the real value there is an internal
+    // `/storage/emulated/0/Documents/Scriptorium-Writer` string that tells a tablet user
+    // nothing about where to look in her file manager. Lives in `settings` rather than
+    // beside `exportLocation` because that namespace is scoped to export surfaces (see its
+    // comment) — this names the LIBRARY, and SettingsView is its only consumer.
+    // COUPLING: the folder name mirrors LIBRARY_FOLDER in src/platform/capacitor/roots.ts.
+    // Rename that constant and this string starts lying about where the books are.
+    libraryInDocuments: 'Документы / Scriptorium-Writer',
     exportLibrary: 'Экспортировать библиотеку',
     exporting: 'Экспорт…',
     librarySaved: 'Библиотека сохранена:',
@@ -314,6 +323,36 @@ export const ru = {
   exportLocation: {
     savedTo: 'Сохранено в Документы / Scriptorium-Writer-exports'
   },
+  // Full-screen permission gate shown before boot on Android (StorageAccessGate.tsx, MC3).
+  // Android only: it renders only where Platform.storageAccess exists and reports the
+  // permission withheld. Note it is the ONE surface that always speaks Russian in practice —
+  // useT falls back to `ru` until settings load, and settings load inside the boot the gate
+  // is holding back. Since Russian is the app's primary voice that is acceptable; the EN
+  // copy below is what a user sees if she reaches the gate again after a language change.
+  storageAccess: {
+    title: 'Доступ к файлам',
+    // Names the two things the permission actually buys, because both were measured to be
+    // missing without it in MC2: uninstall survival and the USB round trip from the PC.
+    why:
+      'Scriptorium Writer хранит книги обычными файлами в папке «Документы / Scriptorium-Writer». ' +
+      'Чтобы они пережили переустановку приложения и были видны с компьютера по USB, Android ' +
+      'требует разрешение «Доступ ко всем файлам».',
+    // The promise the gate exists to keep. Deliberately explains the failure it prevents:
+    // the user is being asked for a large permission and deserves the real reason.
+    untouched:
+      'Без этого разрешения приложение не открывает и не изменяет библиотеку. Пустой список ' +
+      'файлов невозможно отличить от библиотеки, которую не удалось прочитать, — а спутать их ' +
+      'значит записать демо-историю поверх ваших рукописей.',
+    grant: 'Разрешить',
+    opening: 'Открываем настройки…',
+    // Shown instead of the button when `request()` rejects: some OEM builds (Honor/EMUI, the
+    // family the target tablet is from) resolve neither the per-app nor the global all-files
+    // screen. A dead button is the one outcome the ticket forbids, so name the manual route.
+    manual:
+      'Не удалось открыть системный экран. Включите доступ вручную: Настройки → Приложения → ' +
+      'Scriptorium Writer → Доступ ко всем файлам.',
+    recheckHint: 'Вернитесь в приложение после того, как включите доступ, — оно проверит само.'
+  },
   // Renderer-surfaced error messages (extended by later M26 tasks).
   errors: {
     exportLibraryFailedDisk:
@@ -390,6 +429,8 @@ export const en: Dictionary = {
     versionsPerChapter: 'Versions per chapter',
     libraryFolder: 'Library folder',
     reveal: 'reveal',
+    // MC3, Android only — see the RU entry for why this replaces the raw path.
+    libraryInDocuments: 'Documents / Scriptorium-Writer',
     exportLibrary: 'Export library',
     exporting: 'Exporting…',
     librarySaved: 'Library saved:',
@@ -586,6 +627,24 @@ export const en: Dictionary = {
   // MC2, Android only — see the RU entry for why this is gated rather than always shown.
   exportLocation: {
     savedTo: 'Saved to Documents / Scriptorium-Writer-exports'
+  },
+  // MC3, Android only — see the RU entry for why this section is effectively RU-first.
+  storageAccess: {
+    title: 'File access',
+    why:
+      'Scriptorium Writer keeps your books as ordinary files in Documents / Scriptorium-Writer. ' +
+      'For them to survive reinstalling the app and to be visible from a computer over USB, ' +
+      'Android requires the "All files access" permission.',
+    untouched:
+      'Without it the app will not open or change your library. An empty file list is ' +
+      'indistinguishable from a library it failed to read — and confusing the two means ' +
+      'writing a demo story on top of your manuscripts.',
+    grant: 'Allow',
+    opening: 'Opening Settings…',
+    manual:
+      'The system screen could not be opened. Turn the access on by hand: Settings → Apps → ' +
+      'Scriptorium Writer → All files access.',
+    recheckHint: 'Come back to the app once access is on — it re-checks by itself.'
   },
   errors: {
     exportLibraryFailedDisk:

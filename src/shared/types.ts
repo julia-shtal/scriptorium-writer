@@ -128,7 +128,21 @@ export interface Settings {
   editorFontFamily: string
   editorFontSizePx: number
   maxVersionsPerChapter: number
-  /** Where the library folder lives. */
+  /**
+   * Where the library folder lives. The string is an absolute path in every build, but what
+   * counts as absolute is per-platform:
+   *
+   * - desktop — a real OS path (`C:\Users\…\Documents\Scriptorium-Writer`).
+   * - Android — an absolute POSIX path under `Directory.Documents`, as resolved at boot
+   *   (`/storage/emulated/0/Documents/Scriptorium-Writer`); see `src/platform/capacitor/roots.ts`.
+   * - web — `/library` inside OPFS, which is a path in the OPFS namespace only.
+   *
+   * A settings.json can therefore arrive from a platform other than the one reading it: the
+   * library is meant to travel over USB and through `exportLibrary`. An unusable value is
+   * IGNORED, not fatal — `FileService.getLibraryRoot()` falls back to the platform default via
+   * `FileServiceOptions.isLibraryPathUsable` (MC3), and never rewrites the file, since the
+   * rejected path is still correct on the platform that wrote it.
+   */
   libraryPath: string
   /** True once the first-run demo story has been seeded; prevents re-seeding a deliberately-emptied library. */
   demoSeeded?: boolean

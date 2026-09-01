@@ -193,9 +193,12 @@ Needed only if you're building the Android app (skip these for desktop-only work
 - **JDK 21** — pinned by the generated project (`android/app/capacitor.build.gradle`,
   `sourceCompatibility`/`targetCompatibility VERSION_21`). Android Studio bundles a
   compatible JDK, so a separate install usually isn't needed.
-- **Android SDK Platform 36**, minimum API 24 — set in `android/variables.gradle`
-  (`compileSdkVersion`/`targetSdkVersion 36`, `minSdkVersion 24`; Capacitor requires
-  API 24+). Install via Android Studio's SDK Manager.
+- **Android SDK Platform 36**, minimum API 30 — set in `android/variables.gradle`
+  (`compileSdkVersion`/`targetSdkVersion 36`, `minSdkVersion 30`). Install via Android
+  Studio's SDK Manager. Capacitor itself only needs API 24; MC3 raised the floor from 24
+  to 30 because the all-files-access permission the library depends on, and the
+  `Environment.isExternalStorageManager()` call that reads its state, are both API 30+.
+  See "Storage and permissions on Android (MC3)" below.
 - **USB debugging enabled on the tablet** (Settings → About → tap Build number 7
   times to unlock Developer options, then enable USB debugging) for `npm run
   run:android` and on-device testing.
@@ -343,33 +346,86 @@ absolute path (`resolveCapacitorRoots`, `src/platform/capacitor/roots.ts:105`) a
 to the plugin absolute thereafter, with the `directory` parameter omitted — so
 `CapacitorFsPort` itself knows nothing about `Directory` and has the same shape as
 `NodeFsPort`, which is what lets it pass the same contract suite. The `Directory`
-constants live only in `roots.ts`, used once each, so MC3 can change them in one place.
+constants live only in `roots.ts`, used once each, so MC3 could have changed them in one
+place — it did not need to. They are unchanged, which is what keeps
+`android/app/src/main/res/xml/file_paths.xml` and its `<external-path>` element valid; that
+coupling breaks at runtime when the user taps Share, not at build time.
 
 | Root | On the device | Why there |
 | --- | --- | --- |
-| **Library** (your stories) | `Documents/Scriptorium-Writer` (`Directory.Documents`) | Visible in the file manager and over USB. Same tree as desktop: `stories/<id>/chapters/…`, `versions/`, `notes/`, `.trash/`. |
+| **Library** (your stories) | `Documents/Scriptorium-Writer` (`Directory.Documents`) | Visible in the file manager and over USB. Same tree as desktop: `stories/<id>/chapters/…`, `versions/`, `notes/`, `.trash/`. Reading it back after a reinstall, or reading files a PC put there, needs all-files access — see MC3 below. |
 | **Exports** | `Documents/Scriptorium-Writer-exports` (`Directory.Documents`) | A **sibling** of the library, never inside it — `readLibraryEntries` walks the library root recursively, so nested exports would make every archive swallow the previous ones. |
-| **Settings / userdata** | app-private `Directory.Data` + `userdata/` | `settings.json` holds `libraryPath`, so settings must be findable *without* knowing `libraryPath`; and `Directory.Data` needs no runtime permission, so a denied Documents permission still boots into a comprehensible error rather than a dead screen. |
+| **Settings / userdata** | app-private `Directory.Data` + `userdata/` | `settings.json` holds `libraryPath`, so settings must be findable *without* knowing `libraryPath` — which rules out putting them in the library folder, or anywhere else the user is expected to point at. `Directory.Data` also needs no permission at all, so even with all-files access withheld the app still reads its own settings and can show the permission gate rather than a dead screen. The trade is that app-private storage does not survive an uninstall; see below. |
+
+**Storage and permissions on Android (MC3).** The tablet under test is an **Honor YLE-W09,
+Android 16 / API 36**. The native project targets that exact level —
+`compileSdkVersion`/`targetSdkVersion 36` — with a floor of `minSdkVersion 30`
+(`android/variables.gradle`).
+
+**Why the floor is 30 and not Capacitor's 24.** `MANAGE_EXTERNAL_STORAGE` and the
+`Environment.isExternalStorageManager()` call that reads whether it was granted both arrive
+in **API 30 (Android 11)**. Supporting 24–29 as well would mean a second storage path built
+on legacy `WRITE_EXTERNAL_STORAGE` — an extra permission on the app's listing, a second
+code path with different failure modes, and no device in existence on which to test it.
+This is a sideloaded single-user tablet app; Android 11 (September 2020) is a floor that
+costs nothing here. The comment in `variables.gradle` says the same thing, so nobody
+lowers it back "helpfully".
+
+**The app requests `MANAGE_EXTERNAL_STORAGE` — "All files access", «Доступ ко всем
+файлам».** This is a large permission for a writing app and it is taken deliberately, with
+both sides of the trade written down.
+
+*What it buys*, and nothing smaller buys either:
+
+- **The library survives uninstall and reinstall.** Without it, the reinstalled app cannot
+  read the files the previous install left in `Documents` — see the measurement below.
+- **Files placed from a PC over USB are readable.** Unzipping a library export into
+  `Documents/Scriptorium-Writer` from the Windows machine is the only restore path the app
+  has on Android, and the desktop → tablet half of the round trip depends on it.
+
+*What it costs:* **Google Play will not approve `MANAGE_EXTERNAL_STORAGE` for a writing
+app** — it is granted to file-manager-class apps with a specific justification. So MC6
+distribution is **sideloaded APKs only** (`docs/mobile/MC6-distribution.md`, Option A);
+Play remains closed as long as this permission is held. The Storage Access Framework is the
+recorded alternative for the day that trade needs revisiting (`docs/TASKS-backlog.md`), and
+it is deferred because URI-based paths do not fit `FsPort`'s plain-absolute-path model
+without rewriting how the data layer handles paths.
+
+*If the permission is denied:* the app **gates and does not touch the library at all**. It
+shows a full-screen rationale with a route into the system All-files-access screen and
+re-checks when it regains focus; there is no "continue anyway". That is not caution for its
+own sake — without the permission the app is exactly as blind as the MC2 measurement below
+describes, and the previous behaviour on that path was to write a fresh demo story on top of
+work it could not see.
 
 **Uninstalling — stated per platform, because they are not at parity.** On Windows,
 `deleteAppDataOnUninstall` is unset in `electron-builder.yml` and therefore defaults to
 false, so the desktop `userData` folder under `AppData/Roaming` normally survives an
 uninstall. On Android, `Directory.Data` does **not** survive one: uninstalling drops
-`settings.json` with it, including `libraryPath` and `lastLibraryBackupAt`.
+`settings.json` with it, including `libraryPath` and `lastLibraryBackupAt`. The library
+itself is a different question, and it is the question MC3 exists to answer.
 
-The library itself is in `Documents`, app-scoped shared storage — and "app-scoped" turns
-out to be the operative word. **Measured on the target tablet (Honor YLE-W09, Android 16 /
-API 36, `targetSdkVersion = 36`, no storage permissions declared): the library files
-survive an uninstall on disk but the reinstalled app can no longer read them.** Uninstall
-clears the MediaStore ownership of everything the app wrote (`owner_package_name` → NULL)
-and the files keep the old install's uid with mode `770`; under scoped storage an app may
-only reach files in shared storage that it owns, so `listStories()` comes back empty. The
-app cannot tell that from a genuinely empty library, so it seeds a fresh demo story
-alongside the writing it cannot see. The same mechanism means files placed in the library
-folder from a PC over USB are invisible to the app, which is the desktop → tablet direction
-of the MC2 round trip. Closing this is MC3's central decision (all-files access vs. a
-Storage Access Framework folder picker); until then, treat an Android uninstall as data
-loss from the app's point of view and keep the `.zip` exports.
+**Measured in MC2, on the target tablet** (Honor YLE-W09, Android 16 / API 36,
+`targetSdkVersion = 36`, **no storage permission declared**): the library files **survived
+an uninstall on disk but the reinstalled app could no longer read them**. Uninstall clears
+the MediaStore ownership of everything the app wrote (`owner_package_name` → NULL) and the
+files keep the old install's uid with mode `770`; under scoped storage an app may only
+reach files in shared storage that it owns. So `listStories()` came back **empty rather
+than failing** — and an empty list is indistinguishable from a genuinely empty library, so
+the app seeded a fresh demo story beside writing it could not see. Three of them
+accumulated over one MC2 test session. The same mechanism made PC-placed files invisible,
+which is why there was no restore path on Android at all.
+
+**What MC3 changes, and what is still unconfirmed.** With all-files access held, the
+ownership rule does not apply, so a library written by a previous install — or unpacked
+from the PC — should be readable again. The demo-seeding half of the failure is closed in
+code regardless of what the OS does: `bootstrapLibrary` returns without seeding and without
+stamping `demoSeeded` whenever access is withheld, and that is covered by the unit suite.
+The durability half is a claim about Android, not about this repository, and it is
+**pending device confirmation** — scenario 3 of
+[`docs/mobile/MC3-device-acceptance.md`](docs/mobile/MC3-device-acceptance.md) is the check,
+and only the tablet can answer it. Until that checklist comes back filled in, keep taking
+the `.zip` exports before any uninstall.
 
 **Export on Android (MC2).** Library, story, and chapter export write **real files** to
 `Documents/Scriptorium-Writer-exports` via `@capacitor/filesystem`, then offer the
@@ -712,8 +768,13 @@ texture — no hard-coded colours elsewhere).
   per-machine while the library travels.
 
 On Android the same split holds with different roots — library in
-`Documents/Scriptorium-Writer`, settings in app-private `Directory.Data` — and the
-uninstall behaviour is **not** the same as Windows. See "Android build" above.
+`Documents/Scriptorium-Writer`, exports in the sibling `Documents/Scriptorium-Writer-exports`,
+settings in app-private `Directory.Data`. Two things differ from Windows: reaching the
+library needs the all-files-access permission, and the uninstall behaviour is **not** the
+same. Settings there shows the location as «Документы / Scriptorium-Writer» with no
+reveal-in-folder control, because the raw `/storage/emulated/0/…` path means nothing to a
+tablet user and Android has no reliable universal file-manager intent to reveal it with.
+See "Storage and permissions on Android (MC3)" above.
 
 **On-disk layout**
 

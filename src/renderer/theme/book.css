@@ -1215,7 +1215,12 @@ fieldset.settings-field {
   border-radius: 5px;
   padding: 7px 9px;
 }
-.settings-path code {
+/* MC3: on Android this row shows a human-readable location instead of a path (see
+   SettingsView), but it fills the same slot in the flex row — without the same `flex: 1` the
+   buttons beside it would bunch up against the text instead of sitting at the right edge the
+   way they do everywhere else. */
+.settings-path code,
+.settings-path .settings-location {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1258,6 +1263,80 @@ fieldset.settings-field {
 .search-result-count { opacity: 0.6; }
 .search-snippet { margin-top: 4px; opacity: 0.85; }
 .search-snippet mark { background: var(--accent); color: var(--page-bg); padding: 0 2px; border-radius: 2px; }
+
+/* ── Storage access gate (MC3) ─────────────────────────────────────
+   The Android permission gate (StorageAccessGate.tsx). Full-screen because it REPLACES the
+   app: nothing behind it has booted, so there is no page to overlay and no .modal-backdrop
+   to sit on. Android-only in practice, but styled with the same tokens as everything else —
+   the first screen of a first launch should already look like the book. */
+.storage-gate {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: var(--book-frame);
+}
+.storage-gate-card {
+  max-width: 520px;
+  padding: 26px 28px;
+  background: var(--page-bg);
+  color: var(--ink);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.storage-gate-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 20px;
+  color: var(--ink-heading);
+}
+.storage-gate-body {
+  margin: 0 0 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* Sized for a thumb without relying on the MP8 ::after overlay: this is a lone primary
+   button on a touch-only screen, so the real control is simply big enough. */
+.storage-gate-btn {
+  min-height: 44px;
+  padding: 10px 22px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--page-bg);
+  background: var(--accent);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.storage-gate-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.storage-gate-actions {
+  display: flex;
+  margin: 16px 0 12px;
+}
+/* The fallback when no system all-files-access screen resolves. --danger, not --muted: it is
+   the one line the user must actually read and act on, since there is no button left. */
+.storage-gate-manual {
+  margin: 16px 0 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+.storage-gate-hint {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+}
 
 /* ── Touch targets (MP8) ───────────────────────────────────────────
    Coarse pointer only, so the desktop look is untouched. Grow ONLY the invisible hit area

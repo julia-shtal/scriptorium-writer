@@ -1,5 +1,16 @@
 ext {
-    minSdkVersion = 24
+    // minSdk 30 (Android 11), NOT Capacitor's own floor of 24 — do not lower it.
+    //
+    // MC3 takes MANAGE_EXTERNAL_STORAGE ("All files access"), and both the permission and
+    // the only way to read its state, Environment.isExternalStorageManager(), are API 30+.
+    // Supporting 24–29 would mean carrying a second, legacy WRITE_EXTERNAL_STORAGE code path
+    // that no device in this project can test, and shipping an extra storage permission on
+    // the listing for the sake of it. This is a sideloaded single-user tablet app whose
+    // target device runs Android 16, so Android 11 (Sept 2020) costs nothing real.
+    //
+    // Dropping this back to 24 also silently breaks AllFilesAccessPlugin.java, which relies
+    // on the floor to skip its version guards — see the comment there.
+    minSdkVersion = 30
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.11.0'

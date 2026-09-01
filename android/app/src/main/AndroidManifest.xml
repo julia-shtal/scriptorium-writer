@@ -38,4 +38,31 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        All files access (MC3). This is the permission that makes the library DURABLE rather
+        than merely visible.
+
+        Measured on the target tablet during MC2 (Honor YLE-W09, Android 16, no storage
+        permission): files written to Documents/Scriptorium-Writer survive an uninstall on
+        disk, but the reinstalled app can no longer read them — uninstall clears MediaStore
+        ownership, and under scoped storage an app may only reach shared-storage files it
+        owns. listStories() then returns EMPTY rather than an error, which the app could not
+        tell from a genuinely empty library, so it seeded a fresh demo story on top of writing
+        it could not see (three accumulated in one test session). The same mechanism made
+        files copied in from a PC over USB invisible.
+
+        MANAGE_EXTERNAL_STORAGE fixes both — uninstall survival and the USB round trip —
+        while keeping FsPort's plain-absolute-path model intact. The price is distribution:
+        Google Play grants this only to file-manager-class apps, so MC6 is committed to
+        sideloaded APKs. SAF is the recorded backlog alternative for the day that trade needs
+        revisiting.
+
+        Deliberately NO READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE: minSdk is 30, so the
+        legacy pair buys nothing and an unnecessary permission on the listing is a real cost.
+        The acceptance criterion is about the MERGED manifest, so after a build check
+        android/app/build/intermediates/merged_manifests/debug/AndroidManifest.xml for one
+        injected by a dependency, and remove it with tools:node="remove" if it appears.
+    -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 </manifest>

@@ -5,10 +5,17 @@
  * plugin (`mkdir`/`getUri`) and needs a real device or a faked plugin, which this milestone
  * deliberately defers until after the on-device spike (see dev-fs-port-contract.ts header).
  * `fileUriToPath` is pure, so it is unit-testable on its own.
+ *
+ * The second describe block covers no code at all: it reads `android/app/src/main/res/xml/
+ * file_paths.xml` and pins it against this module's exports constants (MC3). See its own
+ * comment for why that cross-file agreement needs a test rather than the header note it had.
  */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi } from 'vitest'
+import { Directory } from '@capacitor/filesystem'
 import { joinPath } from '@data/path-utils'
-import { fileUriToPath } from './roots'
+import { EXPORTS_DIRECTORY, EXPORTS_FOLDER, fileUriToPath } from './roots'
 
 describe('fileUriToPath', () => {
   it('strips a file:// scheme down to a plain absolute path', () => {
@@ -69,5 +76,58 @@ describe('fileUriToPath', () => {
 
   it('pins the empty-string boundary', () => {
     expect(fileUriToPath('')).toBe('')
+  })
+})
+
+/**
+ * Pins the coupling `roots.ts`'s header only asks for in prose: `file_paths.xml` must expose
+ * the exports folder to Android's FileProvider, and the element type it uses is decided by
+ * EXPORTS_DIRECTORY.
+ *
+ * Why this is worth a test rather than a comment: a mismatch is invisible at build time and at
+ * boot. Exports keep writing fine — it is only the Share sheet that breaks, and only at the
+ * moment the user taps the button, with an IllegalArgumentException from FileProvider about a
+ * path outside the configured ones. So the failure lands on the user, in the one flow that is
+ * her sole route to a backup off the device (MC2/MC3), long after the edit that caused it.
+ * Deriving the expectation from the constants below means renaming EXPORTS_FOLDER *or* editing
+ * the XML alone fails here instead.
+ */
+describe('file_paths.xml ↔ roots.ts exports coupling', () => {
+  // Resolved from this file, not from the process CWD: vitest can be invoked from anywhere,
+  // and a CWD-relative path would fail as "file missing" rather than as a real mismatch.
+  const xmlPath = fileURLToPath(
+    new URL('../../../android/app/src/main/res/xml/file_paths.xml', import.meta.url)
+  )
+  // Comments are stripped first. The XML documents this very coupling in a comment that spells
+  // out `Directory.Documents/Scriptorium-Writer-exports`, so matching against the raw text
+  // could keep passing on the prose after the real element was deleted.
+  const body = readFileSync(xmlPath, 'utf8').replace(/<!--[\s\S]*?-->/g, '')
+
+  const entries = [...body.matchAll(/<([\w-]+)\s+name="([^"]*)"\s+path="([^"]*)"\s*\/>/g)].map(
+    ([, element, name, path]) => ({ element, name, path })
+  )
+
+  // A trailing slash is tolerated on purpose: FileProvider treats the `path` attribute as a
+  // directory subpath, so `Documents/X` and `Documents/X/` name the same directory and the
+  // difference cannot break sharing. Nothing else is tolerated — the `Documents/` prefix and
+  // the folder segment itself are exactly what must agree with the constants.
+  const normalise = (p: string): string => p.replace(/\/+$/, '')
+
+  it('EXPORTS_DIRECTORY is still Directory.Documents (the XML element type depends on it)', () => {
+    // <external-path> maps to external storage, which is where Directory.Documents lives.
+    // Switching the constant to Directory.Data would move exports into app-private storage,
+    // which FileProvider only reaches through <files-path> — the XML below would then be
+    // pointing at a directory nothing writes to.
+    expect(EXPORTS_DIRECTORY).toBe(Directory.Documents)
+  })
+
+  it('exposes the exports folder as an <external-path> matching EXPORTS_FOLDER', () => {
+    const expected = `Documents/${EXPORTS_FOLDER}`
+    const match = entries.find((e) => normalise(e.path) === expected)
+    expect(
+      match,
+      `file_paths.xml has no entry for "${expected}". Found: ${JSON.stringify(entries)}`
+    ).toBeDefined()
+    expect(match?.element).toBe('external-path')
   })
 })

@@ -73,6 +73,20 @@ export interface FileServiceOptions {
    * which stays 'ru' via the merge-over-defaults path).
    */
   firstRunLanguage?: 'ru' | 'en'
+  /**
+   * Optional per-platform sanity check on a persisted `settings.libraryPath` (MC3).
+   *
+   * A settings file can arrive from another platform — the library travels by USB and by
+   * `exportLibrary`, so a Windows `C:\Users\...` path can land on Android, where `FsPort`
+   * speaks plain absolute POSIX paths only. Returning false makes {@link getLibraryRoot} fall
+   * back to `defaultLibraryPath`: an ignored setting, never a failed launch.
+   *
+   * Ignore only — the rejected value is deliberately NOT rewritten on disk, because it is
+   * still correct on the platform that wrote it and the same file may travel back.
+   *
+   * Default: accept everything, so desktop and web behave exactly as before.
+   */
+  isLibraryPathUsable?: (path: string) => boolean
 }
 
 const nowIso = (): string => new Date().toISOString()
@@ -85,6 +99,7 @@ export class FileService {
   private readonly userDataPath: string
   private readonly defaultLibraryPath: string
   private readonly firstRunLanguage: 'ru' | 'en'
+  private readonly isLibraryPathUsable: (path: string) => boolean
   private readonly settingsPath: string
   private settingsCache: Settings | null = null
   /** Guarantees strictly-increasing, unique, lexically-sortable snapshot names. */
@@ -95,6 +110,7 @@ export class FileService {
     this.userDataPath = options.userDataPath
     this.defaultLibraryPath = options.defaultLibraryPath
     this.firstRunLanguage = options.firstRunLanguage ?? 'ru'
+    this.isLibraryPathUsable = options.isLibraryPathUsable ?? (() => true)
     this.settingsPath = join(this.userDataPath, 'settings.json')
   }
 
@@ -152,7 +168,14 @@ export class FileService {
 
   private async getLibraryRoot(): Promise<string> {
     const settings = await this.readSettings()
-    return settings.libraryPath || this.defaultLibraryPath
+    const override = settings.libraryPath
+    // Two independent reasons to fall back, kept separate on purpose: an empty string means
+    // "no override recorded", while a non-empty value the platform predicate rejects means
+    // "recorded on a different platform" (MC3 — see isLibraryPathUsable). Both land on the
+    // default; neither is an error, and neither rewrites settings.json.
+    if (!override) return this.defaultLibraryPath
+    if (!this.isLibraryPathUsable(override)) return this.defaultLibraryPath
+    return override
   }
 
   /** Create the top-level library folders. Called once at app init. */
