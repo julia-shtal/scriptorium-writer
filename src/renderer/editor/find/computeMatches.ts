@@ -69,7 +69,7 @@ function isWholeWord(text: string, from: number, to: number): boolean {
  * Case-insensitive comparison lower-cases both sides with `toLocaleLowerCase('ru')`.
  * Safe for this app's RU/EN content, where lower-casing is 1:1 in length so an index
  * into the lower-cased haystack maps back to the original position. (Length-changing
- * folds like Turkish İ or ß are out of scope — see docs/m15.md.)
+ * folds like Turkish İ or ß are out of scope — see internal/m15.md.)
  */
 export function computeMatches(doc: PMNode, query: string, opts: FindOptions): FindMatch[] {
   if (query.trim().length === 0) return []
