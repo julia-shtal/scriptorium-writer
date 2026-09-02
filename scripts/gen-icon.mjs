@@ -5,25 +5,34 @@
 //   1. resources/icons/icon.ico          — Electron desktop (7 sizes in one container)
 //   2. src/renderer/public/icons/*.png   — PWA (192/512 "any" + a 512 maskable)
 //   3. android/app/src/main/res/mipmap-* — Android adaptive + legacy launcher icons (MC4)
-// Node built-ins only (no image deps) — a hand-rolled PNG encoder and ICO container, which
-// is why the art is drawn from rectangles rather than loaded from a designed source file.
-// Replace with real branding by dropping designed assets at the same paths (and then this
-// script becomes a no-op you should delete rather than keep running over them).
-import { deflateSync } from 'node:zlib'
+// Node built-ins only (no image deps) — a hand-rolled ICO container over the shared PNG
+// encoder in ./png.mjs, which is why the art is drawn from rectangles rather than loaded
+// from a designed source file. Replace with real branding by dropping designed assets at
+// the same paths (and then this script becomes a no-op you should delete rather than keep
+// running over them).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { encodePng } from './png.mjs'
+import {
+  PARCHMENT as HEX_PARCHMENT,
+  ICON_INK,
+  PAGE as HEX_PAGE,
+  ACCENT as HEX_ACCENT,
+  FRAME as HEX_FRAME,
+  rgba
+} from './palette.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const OUT = join(HERE, '..', 'resources', 'icons', 'icon.ico')
 const SIZES = [16, 24, 32, 48, 64, 128, 256]
 
-// Book-theme-ish palette (literals; the script does not import renderer CSS).
-const PARCHMENT = [0xef, 0xe2, 0xc4, 0xff] // warm page
-const INK = [0x4a, 0x33, 0x22, 0xff]       // deep brown cover/spine
-const PAGE = [0xfb, 0xf4, 0xe4, 0xff]      // cream pages
-const ACCENT = [0x8a, 0x5a, 0x2b, 0xff]    // accent line
-const FRAME = [0x3a, 0x2a, 0x1d, 0xff]     // --book-frame: dark leather (PWA bg/theme)
+// Book-theme-ish palette, as RGBA bytes (hex lives once, in ./palette.mjs).
+const PARCHMENT = rgba(HEX_PARCHMENT) // warm page
+const INK = rgba(ICON_INK)            // deep brown cover/spine
+const PAGE = rgba(HEX_PAGE)           // cream pages
+const ACCENT = rgba(HEX_ACCENT)       // accent line
+const FRAME = rgba(HEX_FRAME)         // --book-frame: dark leather (PWA bg/theme)
 
 // --- tiny raster helpers (operate on a size*size RGBA Uint8Array) ---
 function makeCanvas(n) {
@@ -146,50 +155,6 @@ function drawLegacyIcon(n, { round }) {
   compositeCentred(buf, n, drawIcon(inner), inner)
   if (round) applyCircleMask(buf, n)
   return buf
-}
-
-// --- PNG encoder (color type 6, 8-bit) ---
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256)
-  for (let n = 0; n < 256; n++) {
-    let c = n
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    t[n] = c >>> 0
-  }
-  return t
-})()
-function crc32(bytes) {
-  let c = 0xffffffff
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
-  return (c ^ 0xffffffff) >>> 0
-}
-function chunk(type, data) {
-  const typeBytes = Buffer.from(type, 'ascii')
-  const len = Buffer.alloc(4)
-  len.writeUInt32BE(data.length, 0)
-  const crc = Buffer.alloc(4)
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), 0)
-  return Buffer.concat([len, typeBytes, data, crc])
-}
-function encodePng(buf, n) {
-  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(n, 0)
-  ihdr.writeUInt32BE(n, 4)
-  ihdr[8] = 8
-  ihdr[9] = 6
-  ihdr[10] = 0
-  ihdr[11] = 0
-  ihdr[12] = 0
-  const raw = Buffer.alloc(n * (n * 4 + 1))
-  for (let y = 0; y < n; y++) {
-    raw[y * (n * 4 + 1)] = 0
-    buf.subarray(y * n * 4, (y + 1) * n * 4).forEach((v, i) => {
-      raw[y * (n * 4 + 1) + 1 + i] = v
-    })
-  }
-  const idat = deflateSync(raw)
-  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))])
 }
 
 // --- ICO container (PNG-in-ICO) ---
