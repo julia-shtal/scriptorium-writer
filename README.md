@@ -2,12 +2,54 @@
 > [Инструкция на русском](docs/writers-guide.ru.md) ·
 > [Скачать последнюю версию](https://github.com/julia-shtal/scriptorium-writer/releases/latest)
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/banner-dark.svg">
+    <img src="assets/readme/banner-light.svg" alt="Scriptorium Writer" width="760">
+  </picture>
+</p>
+
 # Scriptorium Writer
 
 *A desktop writing room for long-form fiction — offline, crash-safe, and warm to look at.*
 *Electron · React · TypeScript · TipTap. Single user, offline-first, Windows.*
 
-[What it is](#what-it-is) · [Reliability first](#reliability-first) · [Features](#features) · [Platform status](#platform-status) · [Install](#install) · [Development](#development) · [Architecture](#architecture) · [Documentation](#documentation)
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="#install"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-quill-dark.svg">
+        <img src="assets/readme/sprite-quill.svg" alt="Quill" width="24">
+      </picture></a>
+      <br>
+      <a href="#install">For writers</a>
+    </td>
+    <td align="center">
+      <a href="#development"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-dividers-dark.svg">
+        <img src="assets/readme/sprite-dividers.svg" alt="Dividers" width="24">
+      </picture></a>
+      <br>
+      <a href="#development">For developers</a>
+    </td>
+    <td align="center">
+      <a href="#reliability-first"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-seal-dark.svg">
+        <img src="assets/readme/sprite-seal.svg" alt="Wax seal" width="24">
+      </picture></a>
+      <br>
+      <a href="#reliability-first">Reliability first</a>
+    </td>
+    <td align="center">
+      <a href="#data-on-disk"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-pages-dark.svg">
+        <img src="assets/readme/sprite-pages.svg" alt="Stacked pages" width="24">
+      </picture></a>
+      <br>
+      <a href="#data-on-disk">Data on disk</a>
+    </td>
+  </tr>
+</table>
 
 <p align="center">✳✳✳</p>
 

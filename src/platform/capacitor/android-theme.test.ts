@@ -4,7 +4,7 @@
  *
  *   1. src/renderer/theme/book.css        `--book-frame`      <- the ORIGIN
  *   2. src/renderer/pwa/manifest.ts       THEME_COLOR         <- the reference below
- *   3. scripts/gen-icon.mjs               FRAME[]
+ *   3. scripts/palette.mjs                FRAME               <- both generators read this
  *   4. android/.../values/colors.xml      scriptorium_frame
  *   5. android/.../ic_launcher_background.xml
  *   6. capacitor.config.ts                android.backgroundColor
@@ -13,6 +13,11 @@
  * behind the system bars, WebView background — and a single stale copy shows up as a flash
  * of the wrong colour mid-launch, on a device, which is exactly the kind of thing nobody
  * notices for a release or two.
+ *
+ * (3) used to be a byte array inside gen-icon.mjs. It now lives once in scripts/palette.mjs,
+ * which BOTH gen-icon.mjs and gen-readme-art.mjs import — so the chain to the launcher icon
+ * is one link longer than it was, but still unbroken, and the README art now hangs off the
+ * same link. scripts/palette.test.ts guards the rest of that shared palette.
  *
  * (1) is the one that matters most to guard, and it is the one a re-theme starts from:
  * book.css is where the palette lives and the obvious place to edit. If it is not linked to
@@ -99,17 +104,22 @@ describe('Android chrome colours agree with the book-frame theme token', () => {
     expect(cssVar(read('src/renderer/theme/book.css'), 'book-frame')).toBe(THEME_COLOR)
   })
 
-  it('the icon generator paints its FRAME with THEME_COLOR', () => {
-    // The generator can't import the renderer's TS (it is a dependency-free .mjs run by
-    // node), so it carries the colour as four hex byte literals. Reassemble and compare.
-    const src = read('scripts/gen-icon.mjs')
-    const m = /const FRAME = \[(.+?)\]/.exec(src)
+  it('the shared art palette paints FRAME with THEME_COLOR', () => {
+    // The generators can't import the renderer's TS (they are dependency-free .mjs run by
+    // node), so the colour is written out a second time in scripts/palette.mjs, which
+    // gen-icon.mjs and gen-readme-art.mjs both import. Either quote character, for the same
+    // Prettier reason as everywhere else in this file.
+    const src = read('scripts/palette.mjs')
+    const m = /export\s+const\s+FRAME\s*=\s*['"](#[0-9a-fA-F]+)['"]/.exec(src)
     expect(m).not.toBeNull()
-    const bytes = m![1].split(',').map((v) => Number(v.trim()))
-    expect(bytes).toHaveLength(4)
-    expect(bytes[3]).toBe(0xff) // opaque: the adaptive/legacy backgrounds must not be see-through
-    const hex = '#' + bytes.slice(0, 3).map((b) => b.toString(16).padStart(2, '0')).join('')
-    expect(hex).toBe(THEME_COLOR)
+    expect(m![1].toLowerCase()).toBe(THEME_COLOR)
+    // Opaque: the adaptive/legacy backgrounds must not be see-through. The alpha used to be
+    // the fourth byte of a literal here; it now lives in palette.mjs's `rgba()` helper,
+    // which every rasteriser goes through, so assert that helper still ends its tuple at
+    // full opacity.
+    const helper = /export\s+const\s+rgba\s*=[\s\S]*?\]/.exec(src)
+    expect(helper).not.toBeNull()
+    expect(/0xff\s*,?\s*\]$/i.test(helper![0])).toBe(true)
   })
 
   it('values/colors.xml declares scriptorium_frame as THEME_COLOR', () => {
