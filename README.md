@@ -1,6 +1,4 @@
-> **Пишете книгу и просто хотите скачать программу?** →
-> [Инструкция на русском](docs/writers-guide.ru.md) ·
-> [Скачать последнюю версию](https://github.com/julia-shtal/scriptorium-writer/releases/latest)
+
 
 <p align="center">
   <picture>
