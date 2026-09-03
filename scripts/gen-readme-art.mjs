@@ -10,22 +10,42 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { encodePng } from './png.mjs'
-import { PARCHMENT, PAGE, ACCENT, FRAME, GOLD, EMBER, ICON_INK, rgba } from './palette.mjs'
+import { PARCHMENT, PAGE, ACCENT, FRAME, GOLD, EMBER, ICON_INK, INK_NAV, rgba } from './palette.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const OUT_DIR = process.argv[2] ?? join(HERE, '..', 'assets', 'readme')
 
 // ---------------------------------------------------------------- palette
-// F frame  P parchment  p page(light)  I ink  A accent  g gold  e ember
+// F frame  P parchment  p page(light)  I ink  A accent  g gold  e ember  m impressed mark
+// `m` is split out of `F` for the seal alone: on light both are the frame colour, but on a
+// dark page the shadow rim and the impressed device need opposite treatment (see SPRITE_DARK).
 const LIGHT = {
   F: FRAME, P: PARCHMENT, p: PAGE, I: ICON_INK,
-  A: ACCENT, g: GOLD, e: EMBER,
+  A: ACCENT, g: GOLD, e: EMBER, m: FRAME,
 }
 // Candlelit variant for GitHub dark mode: same object, dimmer room. These stay literal and
 // local — they are art direction for the README only, and nothing else in the app uses them.
+// This dresses the banner, where every element sits on a dimmed parchment field.
 const DARK = {
   F: '#241a12', P: '#d8c7a3', p: '#e8dcc0', I: '#3a2a1d',
-  A: '#7a4d24', g: '#967742', e: '#8a3427',
+  A: '#7a4d24', g: '#967742', e: '#8a3427', m: '#241a12',
+}
+// Sprites sit directly on the page, with no parchment field behind them, so they need their
+// own palette rather than a substitution on DARK. The tonal order inverts — a light outline
+// over a *dark* fill, rather than DARK's dark-on-light — because lifting the outline alone
+// leaves it the same colour as the fill and the sprite renders as one flat blob. Contrast
+// against GitHub's #0d1117: outline 13.9, outline/fill 5.05, fill/page 2.75.
+const SPRITE_DARK = {
+  I: '#e8dcc0',  // outline
+  p: INK_NAV,    // fill — book.css --ink-nav, asserted in scripts/palette.test.ts
+  g: GOLD,       // gold, unchanged
+  A: ACCENT,
+  e: EMBER,      // ember disc, unchanged
+  F: GOLD,       // rim: the ember disc clears the page by only 2.81, so there is no room for
+                 // a shadow rim beneath it — light-and-shadow modelling is dropped and the
+                 // rim goes gold all the way round
+  m: '#e8dcc0',  // impressed mark
+  P: '#d8c7a3',
 }
 
 // ---------------------------------------------------------------- 5x7 titling face
@@ -98,13 +118,17 @@ function toRects(g) {
   return out
 }
 // One <path> per colour: far smaller than one <rect> per run.
+// Keyed on the *resolved* colour rather than the palette key, so two keys that share a value
+// — `m` and `F` on LIGHT — still emit a single path. Keying on the key instead would split
+// the light seal into two identically-filled paths and rewrite art nobody asked to change.
 function paths(g, pal) {
   const byColor = new Map()
   for (const r of toRects(g)) {
+    const hex = pal[r.c]
     const d = `M${r.x} ${r.y}h${r.w}v${r.h}h-${r.w}z`
-    byColor.set(r.c, (byColor.get(r.c) ?? '') + d)
+    byColor.set(hex, (byColor.get(hex) ?? '') + d)
   }
-  return [...byColor].map(([c, d]) => `<path fill="${pal[c]}" d="${d}"/>`).join('')
+  return [...byColor].map(([hex, d]) => `<path fill="${hex}" d="${d}"/>`).join('')
 }
 
 // ---------------------------------------------------------------- candle
@@ -229,7 +253,8 @@ const SPRITES = {
 }
 
 // Reliability: a wax seal. Circle computed, then a lit rim up-left,
-// a shadow rim down-right, and an impressed device.
+// a shadow rim down-right, and an impressed device. The device is `m`, not `F`: it is the
+// same colour as the shadow rim on light, but the two part company on dark.
 function sealRows(mark, r0 = 6.4, rim = 1.0) {
   const S = 16
   const cx = 7.5
@@ -246,7 +271,7 @@ function sealRows(mark, r0 = 6.4, rim = 1.0) {
     }
   }
   mark.forEach((row, dy) => [...row].forEach((ch, dx) => {
-    if (ch !== '.') px[5 + dy][5 + dx] = 'F'
+    if (ch !== '.') px[5 + dy][5 + dx] = 'm'
   }))
   return px.map((r) => r.join(''))
 }
@@ -366,9 +391,7 @@ function rasterize(g, pal, scale) {
 const out = { 'banner-light.svg': banner(LIGHT), 'banner-dark.svg': banner(DARK) }
 for (const name of Object.keys(SPRITES)) {
   out[`sprite-${name}.svg`] = sprite(name, LIGHT)
-  // Ink and frame are the sprite outline; at DARK's values they vanish against GitHub's
-  // #0d1117, so both are lifted to DARK.p — the palette's lightest tone.
-  out[`sprite-${name}-dark.svg`] = sprite(name, { ...DARK, I: DARK.p, F: DARK.p })
+  out[`sprite-${name}-dark.svg`] = sprite(name, SPRITE_DARK)
 }
 
 mkdirSync(OUT_DIR, { recursive: true })

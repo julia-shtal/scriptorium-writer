@@ -64,6 +64,13 @@ describe('the shared art palette agrees with the book theme', () => {
     expect(paletteConst(palette, 'EMBER')).toBe(cssVar(book, 'danger'))
   })
 
+  it('INK_NAV is book.css --ink-nav', () => {
+    // The fill of the dark sprite variants (SPRITE_DARK in gen-readme-art.mjs). It is the
+    // one tone in that palette taken from the app rather than chosen for the README, and it
+    // carries the whole sprite: with the fill wrong the light outline has nothing to sit on.
+    expect(paletteConst(palette, 'INK_NAV')).toBe(cssVar(book, 'ink-nav'))
+  })
+
   it('records the known ICON_INK / --ink divergence rather than asserting they agree', () => {
     // These two are NOT equal, and that is deliberate — see the note above ICON_INK in
     // scripts/palette.mjs: gen-icon.mjs has always used #4a3322, the icon is already
