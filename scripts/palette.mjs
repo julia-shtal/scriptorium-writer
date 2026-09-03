@@ -6,6 +6,7 @@ export const ACCENT = '#8a5a2b'    // accent line
 export const FRAME = '#3a2a1d'     // --book-frame: dark leather
 export const GOLD = '#a8874e'      // --accent
 export const EMBER = '#9e3b2e'     // --danger
+export const INK_NAV = '#6b573c'   // --ink-nav: the muted ink the sidebar uses
 
 // gen-icon.mjs has always used this value for ink; book.css --ink is #4a3a2a.
 // The two differ by a hair and the icon is already shipped, so they stay separate.

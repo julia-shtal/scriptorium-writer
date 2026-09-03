@@ -14,42 +14,30 @@
 *A desktop writing room for long-form fiction — offline, crash-safe, and warm to look at.*
 *Electron · React · TypeScript · TipTap. Single user, offline-first, Windows.*
 
-<table align="center">
-  <tr>
-    <td align="center">
-      <a href="#install"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-quill-dark.svg">
-        <img src="assets/readme/sprite-quill.svg" alt="Quill" width="24">
-      </picture></a>
-      <br>
-      <a href="#install">For writers</a>
-    </td>
-    <td align="center">
-      <a href="#development"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-dividers-dark.svg">
-        <img src="assets/readme/sprite-dividers.svg" alt="Dividers" width="24">
-      </picture></a>
-      <br>
-      <a href="#development">For developers</a>
-    </td>
-    <td align="center">
-      <a href="#reliability-first"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-seal-dark.svg">
-        <img src="assets/readme/sprite-seal.svg" alt="Wax seal" width="24">
-      </picture></a>
-      <br>
-      <a href="#reliability-first">Reliability first</a>
-    </td>
-    <td align="center">
-      <a href="#data-on-disk"><picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-pages-dark.svg">
-        <img src="assets/readme/sprite-pages.svg" alt="Stacked pages" width="24">
-      </picture></a>
-      <br>
-      <a href="#data-on-disk">Data on disk</a>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <a href="#install"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-quill-dark.svg">
+    <img src="assets/readme/sprite-quill.svg" width="20" alt="">
+  </picture> For writers</a> ·
+  <a href="#development"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-dividers-dark.svg">
+    <img src="assets/readme/sprite-dividers.svg" width="20" alt="">
+  </picture> For developers</a> ·
+  <a href="#reliability-first"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-seal-dark.svg">
+    <img src="assets/readme/sprite-seal.svg" width="20" alt="">
+  </picture> Reliability first</a> ·
+  <a href="#data-on-disk"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/sprite-pages-dark.svg">
+    <img src="assets/readme/sprite-pages.svg" width="20" alt="">
+  </picture> Data on disk</a>
+</p>
+
+<p align="center">
+  <a href="#platform-status">Platform status</a> ·
+  <a href="docs/">Documentation</a> ·
+  <a href="../../releases/latest">Download</a>
+</p>
 
 <p align="center">✳✳✳</p>
 
