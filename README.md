@@ -1,7 +1,3 @@
-> **Пишете книгу и просто хотите скачать программу?** →
-> [Инструкция на русском](docs/writers-guide.ru.md) ·
-> [Скачать последнюю версию](https://github.com/julia-shtal/scriptorium-writer/releases/latest)
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/readme/banner-dark.svg">
@@ -38,6 +34,10 @@
   <a href="docs/">Documentation</a> ·
   <a href="../../releases/latest">Download</a>
 </p>
+
+> **Writing a book and just want the app?**
+> Read the setup guide in [English](docs/writers-guide.en.md) or
+> [Русский](docs/writers-guide.ru.md). No development tools required.
 
 <p align="center">✳✳✳</p>
 
