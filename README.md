@@ -37,6 +37,10 @@
   <a href="../../releases/latest">Download</a>
 </p>
 
+> **Writing a book and just want the app?**
+> Read the setup guide in [English](docs/writers-guide.en.md) or
+> [Русский](docs/writers-guide.ru.md). No development tools required.
+
 <p align="center">✳✳✳</p>
 
 ## What it is
