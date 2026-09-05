@@ -89,7 +89,7 @@ android {
             // harmless as long as nothing references it (see buildTypes.release below).
             if (hasReleaseKeystore) {
                 // storeFile is resolved against android/ (the Gradle root project) rather than
-                // against this module, so the properties file can say `scriptorium-upload.jks`
+                // against this module, so the properties file can say `scriptorium-release.jks`
                 // and mean the keystore sitting next to it. Gradle's file() passes absolute
                 // paths through unchanged, so pointing at a keystore kept outside the repo
                 // also works.

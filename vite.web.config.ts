@@ -132,7 +132,13 @@ export default defineConfig({
         // Precache the whole shell. The app makes ZERO network requests after load
         // (all storage is OPFS), so there is intentionally NO runtimeCaching — do not
         // add a network-first strategy for requests that never happen.
-        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}']
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
+        // library-archive is `archiver`, reached only by the dynamic import at
+        // file-service.ts:654. The web Platform answers exportLibrary with UNSUPPORTED
+        // before that line runs, so the chunk is unreachable — but the glob above would
+        // still precache 645 KB of it into every install. MP6 removes the chunk at the
+        // source by hoisting zip behind a port; until then, keep it out of the precache.
+        globIgnores: ['**/library-archive-*.js']
       },
       // Serve an installable PWA straight from `dev:web` (over mkcert HTTPS) so the tablet
       // can install without a separate preview server.

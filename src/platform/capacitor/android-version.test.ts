@@ -9,7 +9,7 @@
  * here, in `npm test`, rather than at the next release.
  *
  * The packing formula is also reimplemented below in TypeScript. That is deliberate
- * duplication: the README quotes a worked example (1.5.0 -> 10500), and a formula that
+ * duplication: the docs quote a worked example (1.6.0 -> 10600), and a formula that
  * only lives in Groovy can be silently changed without the documentation noticing. It
  * also makes the rejection rules — which in Gradle are `throw new GradleException` and so
  * can only be reached by actually running a build — testable as plain functions.
@@ -92,8 +92,8 @@ describe('android/app/build.gradle — version derived from package.json', () =>
     // Not a tautology: the right-hand side is what a human reads off build.gradle and the
     // README. If either the formula or package.json's version changes, this is where the
     // worked example gets caught being stale.
-    expect(androidVersionCode(PACKAGE_VERSION)).toBe(10500)
-    expect(PACKAGE_VERSION).toBe('1.5.0')
+    expect(androidVersionCode(PACKAGE_VERSION)).toBe(10600)
+    expect(PACKAGE_VERSION).toBe('1.6.0')
   })
 })
 
