@@ -53,3 +53,6 @@ android/build/
 *.jks
 *.keystore
 keystore.properties
+
+CLAUDE.md
+book_editor_mockup.html
