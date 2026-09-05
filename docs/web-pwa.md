@@ -16,6 +16,16 @@ The same React renderer also builds as a plain browser app — a second Vite tar
   with `--host` so a tablet on the same LAN can reach it. Storage is **OPFS-backed**
   (Origin Private File System), so your stories **persist across page reloads**.
 - `npm run build:web` — typechecks, then bundles the browser build into `dist-web/`.
+- `npm run verify:web` — checks a built `dist-web/`: that the entry HTML was renamed to
+  `index.html` (Capacitor requires that name), that the manifest is complete, English, and
+  points only at icons that exist, that the service worker precaches the shell but not the
+  unreachable `archiver` chunk, and that the bundle is still inside its size budgets. It
+  prints the measured sizes and the margin left against each budget.
+- `npm run preview:web` — serves the built `dist-web/` so a production bundle can actually be
+  looked at before release. Note that `vite preview` serves plain HTTP, so **the service worker
+  will not register there**: preview verifies the bundle's *shape* (the HTML entry loads, the
+  app boots, assets resolve), while installability and offline behaviour are verified on the
+  real HTTPS host.
 
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).

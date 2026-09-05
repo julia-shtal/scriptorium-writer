@@ -380,7 +380,10 @@ same window flags, for behaviour that is already there.
 **`package.json` is the only place the semver lives.**
 `android/app/build.gradle` reads `package.json` at configure time with Groovy's
 `JsonSlurper`. `versionName` is the `version` field verbatim; `versionCode` is
-`major * 10000 + minor * 100 + patch` — **`1.5.0` → `10500`**, confirmed in the built APK.
+`major * 10000 + minor * 100 + patch` — **`1.6.0` → `10600`**. The packing has been confirmed
+by reading it back out of a real APK, at 1.5.0 → 10500 (see
+[Verification status](#verification-status)); `npm run verify:apk` now makes that read-back a
+routine pre-upload check rather than a one-off.
 A second hand-edited copy of the version in Gradle is a copy that drifts, and the failure is
 quiet: the desktop release says 1.6.0 while the APK still claims 1.0, and nobody finds out
 until an install is refused.
@@ -428,16 +431,59 @@ Release signing is configured in
 - **`*.jks`, `*.keystore` and `keystore.properties` are gitignored at the repository
   root**, which uncomments what Capacitor's own `android/.gitignore` ships commented out.
   Only the `.example` is tracked.
-- **Back the keystore up somewhere durable and outside the repository.** Android identifies
-  an installed app by (`applicationId`, signing key). Lose the key and no future build can
-  ever update `com.juliashtal.scriptoriumwriter`; leak it and anyone can publish an
-  "update" that devices will accept.
+- **The signing key is the app's identity, and there is no recovery.** Android identifies an
+  installed app by the pair (`applicationId`, signing key). Under Play App Signing that pair is
+  Google's to keep: an *upload* key that is lost can be rotated, because the authority sits with
+  the store. This app is distributed by its author — sideloaded from GitHub Releases, never
+  Play (the all-files-access permission closes that door; see
+  [Storage and permissions](#storage-and-permissions)) — and sideloading has no such authority
+  behind it. The key that signs the APK **is** what the device compares on every upgrade. Lose
+  it and no future build can ever update an existing install of
+  `com.juliashtal.scriptoriumwriter`: the only route to a newer version is uninstall and
+  reinstall, which discards `Directory.Data` — `settings.json` with `libraryPath` and
+  `lastLibraryBackupAt` — though the library under `Documents` survives (see
+  [Uninstall behaviour](#uninstall-behaviour)). Leak it and anyone can publish an "update" that
+  devices accept without complaint. So: exactly one copy, outside the repository, backed up
+  somewhere durable together with its passwords.
+- **Users get no platform check, so give them one.** Play vets the publisher before an app
+  reaches anyone; a sideloaded APK vets nothing — a downloaded file is just a downloaded file,
+  and the install dialog says nothing about who built it. Two published values close that gap:
+  the release certificate's **SHA-256 fingerprint**, quoted in this section and committed to
+  `android/release-fingerprint.txt`, and the APK's own **SHA-256 checksum**, published on each
+  release. Neither exists yet — nothing has been released, so there is no certificate to quote;
+  both are written down as part of cutting the first release. A user can then confirm both
+  before installing:
+
+  ```bash
+  sha256sum Scriptorium-Writer-1.6.0.apk
+  apksigner verify --print-certs Scriptorium-Writer-1.6.0.apk
+  ```
+
+  The checksum is per file and differs with every build; **the fingerprint never changes across
+  releases**, because it is the key. A fingerprint that has moved means a different key signed
+  the APK — a compromise, or a key that was replaced — and after the first release, replacing
+  it is not a thing that can be done quietly: every existing install would have to be
+  uninstalled first. A changed fingerprint is a reason to stop, not to update.
+- **`npm run verify:apk` is the author-side half of that same check.**
+  `scripts/verify-apk.mjs`, run by hand on the built APK before it is uploaded, asserts that
+  the APK is signed at all; that it carries a v2 or v3 signature, since a v1-only APK on
+  `minSdk 30` means the signing config did not apply the way it was meant to; and that
+  `versionCode`/`versionName` read back out of the artifact (via `aapt2`, skipped with a note
+  if it isn't installed) match `package.json`, which catches a stale APK left in
+  `android/app/build/outputs/` by an earlier build. It prints the certificate's SHA-256
+  fingerprint and, once `android/release-fingerprint.txt` exists, requires the APK to match it
+  — so the published fingerprint is enforced rather than remembered. That file is committed
+  once, after the first release build, from the digest the script prints; until then the
+  comparison is skipped with a note and the rest still runs. The script needs `ANDROID_HOME`
+  (or `ANDROID_SDK_ROOT`) set, and reads only public certificate material — never the keystore.
 - **Gradle applies the signing config only when `keystore.properties` exists**, and warns
   in the build log when it doesn't. A keystore-less fresh clone therefore still configures
   — Gradle sync and debug builds work — instead of failing outright, while an unsigned
-  release APK, which looks identical to a signed one until a device or Play rejects it, is
+  release APK, which looks identical to a signed one until a device refuses to install it, is
   never a silent outcome. A half-filled `keystore.properties` fails immediately rather than
-  surfacing much later as an opaque "keystore was tampered with".
+  surfacing much later as an opaque "keystore was tampered with". A warning in a build log is
+  easy to scroll past, which is the other reason `npm run verify:apk` exists: it turns "was
+  this signed?" into an answer before upload rather than after.
 - This is **not** Windows code signing. Different certificate, different issuing
   authority, different purpose: Android release signing is a self-signed identity key you
   generate and keep; Windows code signing is a CA-issued certificate you buy to satisfy
@@ -447,9 +493,12 @@ Release signing is configured in
 
 **There is no auto-update on Android, and that is a platform gap rather than an omission.**
 The desktop has `electron-updater`; a sideloaded APK has no equivalent — nothing polls
-a feed, nothing prompts. **Updates are manual reinstalls:** install an APK with a higher
-`versionCode` over the old one. It must be signed with the **same key**, or Android refuses
-the install outright rather than offering to replace the app. (The in-app "Update" strip
+a feed, nothing prompts. **Updates are manual reinstalls:** download the newer APK from the
+GitHub release, check it against the published checksum and fingerprint
+([Release signing](#release-signing)), and install it over the old one. It must carry a higher
+`versionCode` and be signed with the **same key**, or Android refuses the install outright
+rather than offering to replace the app — which is also why a lost key strands every existing
+install rather than merely inconveniencing the next build. (The in-app "Update" strip
 from the PWA is a *service-worker* update of the web bundle inside an already
 installed APK — a different mechanism at a different layer, and not a way to ship native
 changes.)
@@ -460,6 +509,9 @@ What has been checked, from the build output: a signed release APK builds and re
 `versionCode='10500' versionName='1.5.0'` for `com.juliashtal.scriptoriumwriter`, signed by
 `CN=Julia Shtal`; its resource table carries `color/scriptorium_frame`,
 `color/ic_launcher_background`, `drawable/splash`, and all five densities of each mipmap.
+That was read off the build output by hand; the signature and version half of it is now
+`npm run verify:apk` ([Release signing](#release-signing)), which is the check that has to pass
+before an APK is uploaded anywhere.
 
 Everything below needs eyes on a physical tablet and **has not been checked yet**:
 
