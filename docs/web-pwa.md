@@ -1,10 +1,11 @@
 # Web build and PWA
 
 The same React renderer also builds as a plain browser app, installable as a PWA. This
-page covers the build target, OPFS storage, offline and update behaviour, HTTPS in
-development, touch adaptations, and backups against storage eviction.
+page covers the build target, where it is hosted, OPFS storage, offline and update
+behaviour, HTTPS in development, touch adaptations, and backups against storage eviction.
 
-**Status: unreleased.** It works, but it has never been tagged or published.
+**Status: released in 1.6.0**, live at
+<https://julia-shtal.github.io/scriptorium-writer/>.
 
 ## The web build target
 
@@ -29,6 +30,25 @@ The same React renderer also builds as a plain browser app — a second Vite tar
 
 The Electron build is unchanged and still owns `src/renderer/index.html`
 (→ `main.electron.tsx`).
+
+## Where it is hosted
+
+The app is live at **<https://julia-shtal.github.io/scriptorium-writer/>**, served by GitHub
+Pages from the **`gh-pages`** branch of this repository. That branch holds a built bundle,
+not source: it is the contents of `dist-web/` and nothing else.
+
+- **Nothing is built on GitHub.** There is no Actions workflow and no Pages build step. A
+  deployment is `npm run build:web` on the author's machine, then copying `dist-web/` onto
+  `gh-pages`. The bundle that was verified with `npm run verify:web` and looked at with
+  `npm run preview:web` is byte-for-byte the bundle that gets served — a build that only
+  ever happens in one place cannot disagree with itself.
+- **`base` is `'./'`** (`vite.web.config.ts`), so every asset URL in the bundle is relative.
+  That is what lets a project page at the `/scriptorium-writer/` subpath work with no
+  configuration, and it is the same property that makes the Capacitor WebView's
+  `https://localhost` origin work — one setting, both platforms.
+- **Self-hosting therefore needs no configuration at all.** Drop `dist-web/` behind any
+  static HTTPS server, at the root or under any subpath, and it runs. HTTPS is the only
+  real requirement: the service worker and OPFS both need a secure context.
 
 ## OPFS and the worker write path
 
