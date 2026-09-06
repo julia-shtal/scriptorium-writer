@@ -1,5 +1,3 @@
-
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/readme/banner-dark.svg">
@@ -9,8 +7,10 @@
 
 # Scriptorium Writer
 
-*A desktop writing room for long-form fiction — offline, crash-safe, and warm to look at.*
-*Electron · React · TypeScript · TipTap. Single user, offline-first, Windows.*
+<p align="center">
+  <i>A desktop writing room for long-form fiction — offline, crash-safe, and warm to look at.<br>
+  Electron · React · TypeScript · TipTap. Windows, browser, and Android tablet.</i>
+</p>
 
 <p align="center">
   <a href="#install"><picture>
@@ -93,9 +93,9 @@ Per-feature detail: [docs/features.md](docs/features.md).
 
 | Platform | Status | How it ships |
 | --- | --- | --- |
-| Windows 10/11 | Stable — current release 1.5.0 | NSIS installer, auto-update |
-| Browser / PWA | Unreleased, works | Self-hosted |
-| Android tablet | Unreleased, beta — on-device verification incomplete | Sideloaded APK, manual updates |
+| Windows 10/11 | Released — 1.6.0 | [Installer](../../releases/latest), auto-update |
+| Browser / PWA | Released — 1.6.0 | [Open the app](https://julia-shtal.github.io/scriptorium-writer/), installable |
+| Android tablet | Beta — 1.6.0 | [Sideloaded APK](../../releases/latest), updated by hand |
 
 Detail: [docs/web-pwa.md](docs/web-pwa.md) and [docs/android.md](docs/android.md).
 

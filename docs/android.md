@@ -3,8 +3,9 @@
 The Android tablet build: what it is, where it puts your files, the permission it takes
 and why, how to build and sign it, and what has and has not been verified on a device.
 
-**Status: unreleased beta.** It builds, installs, and runs, but on-device verification is
-incomplete — see [Verification status](#verification-status).
+**Status: beta, shipped in 1.6.0** as a sideloaded APK on the release page. It builds,
+installs, and runs, but on-device verification is incomplete and there is an open interface
+defect — see [Known issues](#known-issues) and [Verification status](#verification-status).
 
 ## Contents
 
@@ -19,7 +20,9 @@ incomplete — see [Verification status](#verification-status).
 - [Icons, splash, and system bars](#icons-splash-and-system-bars)
 - [Versioning](#versioning)
 - [Release signing](#release-signing)
+- [Verifying an APK](#verifying-an-apk)
 - [Updates](#updates)
+- [Known issues](#known-issues)
 - [Verification status](#verification-status)
 
 ## How the Android build relates to the web build
@@ -448,16 +451,10 @@ Release signing is configured in
 - **Users get no platform check, so give them one.** Play vets the publisher before an app
   reaches anyone; a sideloaded APK vets nothing — a downloaded file is just a downloaded file,
   and the install dialog says nothing about who built it. Two published values close that gap:
-  the release certificate's **SHA-256 fingerprint**, quoted in this section and committed to
+  the release certificate's **SHA-256 fingerprint**, committed to
   `android/release-fingerprint.txt`, and the APK's own **SHA-256 checksum**, published on each
-  release. Neither exists yet — nothing has been released, so there is no certificate to quote;
-  both are written down as part of cutting the first release. A user can then confirm both
-  before installing:
-
-  ```bash
-  sha256sum Scriptorium-Writer-1.6.0.apk
-  apksigner verify --print-certs Scriptorium-Writer-1.6.0.apk
-  ```
+  release as `SHA256SUMS.txt`. Both exist as of 1.6.0; the procedure a user follows is
+  [Verifying an APK](#verifying-an-apk).
 
   The checksum is per file and differs with every build; **the fingerprint never changes across
   releases**, because it is the key. A fingerprint that has moved means a different key signed
@@ -489,6 +486,32 @@ Release signing is configured in
   generate and keep; Windows code signing is a CA-issued certificate you buy to satisfy
   SmartScreen. They look alike and are not.
 
+## Verifying an APK
+
+Sideloaded packages carry no platform check, so verify them yourself. Both values below
+come from the release page.
+
+Compare the file's checksum against `SHA256SUMS.txt`:
+
+```bash
+sha256sum Scriptorium-Writer-1.6.0.apk
+```
+
+Then confirm the signing certificate:
+
+```bash
+apksigner verify --print-certs Scriptorium-Writer-1.6.0.apk
+```
+
+The SHA-256 digest must be:
+
+```
+c129d7e7951e7a589eec0ccb87753c6598ec35210be5dfa8acd45dd06968f16b
+```
+
+This fingerprint is the same for every release, now and in future. A different one means
+a different signing key — which, after the first release, cannot happen legitimately.
+
 ## Updates
 
 **There is no auto-update on Android, and that is a platform gap rather than an omission.**
@@ -502,6 +525,17 @@ install rather than merely inconveniencing the next build. (The in-app "Update" 
 from the PWA is a *service-worker* update of the web bundle inside an already
 installed APK — a different mechanism at a different layer, and not a way to ship native
 changes.)
+
+## Known issues
+
+**Dropdown menus render against the wrong background.** Opening a `<select>` — interface
+language, editor font, and the two elsewhere in the app — shows the options over a dark
+panel instead of parchment, partly obscuring them. The options remain readable and
+selectable.
+
+The popup is drawn by Android, not by the WebView, so the application's stylesheet cannot
+reach it; it takes its appearance from the activity theme, which is `DayNight` and
+therefore follows the system setting. A fix is planned.
 
 ## Verification status
 

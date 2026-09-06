@@ -2,6 +2,12 @@ appId: com.scriptorium-writer.app
 productName: Scriptorium Writer
 copyright: Copyright © 2026 Julia Shtal
 
+# GitHub replaces spaces in uploaded asset names with dots, while electron-builder writes
+# the hyphenated form into latest.yml. With a space in productName the two never agree and
+# electron-updater's download 404s. Naming the artifact explicitly, with no spaces, makes
+# the built file, the name on the release, and the name in latest.yml the same string.
+artifactName: Scriptorium-Writer-Setup-${version}.${ext}
+
 directories:
   buildResources: build
   output: release
