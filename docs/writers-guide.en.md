@@ -59,7 +59,9 @@ Nothing is written yet — the app first shows what is in the archive, story by 
   of the app). The reason is shown, and the story is skipped; the rest still import.
 
 **Replace** does not delete anything: your current copy goes to the trash folder
-(`.trash` inside the library), so you can still get it back. If a chapter's file is
+(`.trash` inside the library), so you can still get it back. Each copy shows when it was
+last changed, and if your copy on this device is newer than the one in the archive, the
+app warns you before you choose **Replace**. If a chapter's file is
 missing from the archive, the app offers to restore it from version history afterwards.
 
 Settings (language, library location and the like) do not travel with the archive —

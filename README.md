@@ -83,7 +83,7 @@ a full disk, or closing the laptop mid-save can never corrupt what you already w
 | **Find & Replace** | Non-modal bar with live highlighting, case-sensitive and whole-word toggles, and a single-transaction Replace-all. |
 | **Full-text search** | Read-only sweep of every chapter and every notes section for a phrase, with hit counts, snippets, and jump-to-match. |
 | **Import / Export** | Import a `.md`/`.docx` as one chapter or split by headings; export any chapter or the whole story to `.docx`/`.md`. |
-| **Library backup** | One click zips the whole library folder (stories, snapshots, notes, `.trash/`) to a chosen path — atomic, read-only. |
+| **Library backup** | One click zips the whole library folder (stories, snapshots, notes, `.trash/`) plus a `manifest.json` header into one `.zip` — atomic, read-only. On Windows you pick the path; the browser and Android save it the way their platform allows. |
 | **Library import** | Settings → Import library… restores or merges a library `.zip` from any platform (Windows, web, Android) after a per-story preview; conflicts can keep both, replace (old copy to `.trash/`), or skip. |
 | **Auto-update** | Packaged builds check GitHub Releases in the background and offer a restart routed through the quit-guard flush. |
 | **UI language (RU / EN)** | Switch the whole interface between Russian and English live from Settings — never touches your story text. |
