@@ -143,7 +143,11 @@ that story Invalid.
    library: **New** (id not present), **Identical** (byte-equal to the local copy, ignoring
    `versions/`), **Conflict** (same id, different content), or **Invalid** (with a reason).
    Story ids are compared case-insensitively. Nothing is written. Missing chapter files are
-   a per-story warning, not a failure.
+   a per-story warning, not a failure. Each side's "last modified" date is the newest of
+   `story.json`'s `updatedAt` and the `updatedAt` of every chapter in `chapterOrder`
+   (`storyLastModified`, one helper for both sides). Saving a chapter does not touch
+   `story.json`, so its date alone would hide local edits; the dialog compares these dates
+   and warns on Replace when the local copy is newer.
 2. **Decide** (`src/shared/library-import-rules.ts`, shared by the dialog and the data
    layer so they cannot disagree). Allowed decisions, first is the default: New →
    Import / Skip; Identical → Skip; Conflict → Keep both / Replace / Skip; Invalid → Skip.

@@ -126,10 +126,12 @@ with the same temp-then-rename atomic write.
 ## Library export
 
 Settings → "Export library" streams the entire library
-folder into one `.zip` (via `archiver`), including `.trash/`, reproducing the on-disk
-`stories/<story-id>/…` layout exactly. Read-only against the library; writes to a `.part`
-file and renames over the destination only once complete, so a failure never touches the
-source or leaves a truncated archive.
+folder into one `.zip` (via `archiver` on desktop, `fflate` in the browser and on
+Android), including `.trash/`, reproducing the on-disk `stories/<story-id>/…` layout.
+Only import staging (`.import-tmp/`) and a stray root `manifest.json` are left out.
+Read-only against the library. On desktop it writes to a `.part` file and renames over the
+destination only once complete, so a failure never touches the source or leaves a
+truncated archive.
 
 Every archive also carries a generated `manifest.json` at its root (format, app and schema
 versions) so an import can recognise it; the manifest is never stored in the library folder.
