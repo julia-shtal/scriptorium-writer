@@ -62,6 +62,11 @@ const api: Api = {
   revealInFolder: (path) => invoke('revealInFolder', path),
   exportLibrary: () => invoke('exportLibrary'),
 
+  // library import (M31)
+  previewLibraryImport: () => invoke('previewLibraryImport'),
+  applyLibraryImport: (importId, decisions) => invoke('applyLibraryImport', importId, decisions),
+  discardLibraryImport: (importId) => invoke('discardLibraryImport', importId),
+
   // import / export (M14)
   readImportFile: () => invoke('readImportFile'),
   exportChapter: (storyId, chapterId, format) =>

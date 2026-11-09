@@ -135,6 +135,22 @@ export const FS_PORT_CONTRACT_CASES: FsPortCase[] = [
       const dirStat = await fs.stat(dir)
       t.isTrue(dirStat.isDirectory, 'dir isDirectory')
     }
+  },
+  {
+    name: 'renames a directory with its contents',
+    run: async ({ fs, dir }, t) => {
+      const from = joinPath(dir, 'src-dir')
+      const to = joinPath(dir, 'moved', 'dst-dir')
+      await fs.mkdir(joinPath(from, 'sub'), { recursive: true })
+      await fs.writeFile(joinPath(from, 'a.txt'), 'A')
+      await fs.writeFile(joinPath(from, 'sub', 'b.txt'), 'B')
+      await fs.mkdir(joinPath(dir, 'moved'), { recursive: true })
+      await fs.rename(from, to)
+      t.equal(await fs.readFile(joinPath(to, 'a.txt')), 'A', 'top-level file moved')
+      t.equal(await fs.readFile(joinPath(to, 'sub', 'b.txt')), 'B', 'nested file moved')
+      t.isTrue((await fs.stat(to)).isDirectory, 'target is a directory')
+      await t.rejectsWithCode(() => fs.stat(from), 'ENOENT', 'source gone')
+    }
   }
 ]
 

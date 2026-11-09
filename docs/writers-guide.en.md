@@ -39,6 +39,32 @@ It's a normal folder, not a locked-away database inside the app. You can:
 - sync it through OneDrive, Dropbox, Google Drive, or anything similar;
 - open it in File Explorer and see what's inside (one file per chapter).
 
+## Moving the library between devices
+
+1. On the first device, open **Settings** and press **Export library**. You get one
+   `.zip` file with all your stories.
+2. Copy that file to the other device (USB drive, cloud storage, email to yourself).
+3. On the second device, open **Settings** and press **Import library…**, then choose
+   the `.zip`. This works in the Windows app, the browser version, and on Android, and
+   the archive can come from any of them.
+
+Nothing is written yet — the app first shows what is in the archive, story by story:
+
+- **New** — you don't have this story on this device. It will be added.
+- **Identical** — you already have exactly this story. Nothing to do; it is skipped.
+- **Conflict** — a story with the same identity exists here, but the text differs.
+  You choose: **Keep both** (the default — the imported one is added with
+  "(imported date)" in its title), **Replace**, or **Skip**.
+- **Invalid** — this story can't be imported (damaged files, or saved by a newer version
+  of the app). The reason is shown, and the story is skipped; the rest still import.
+
+**Replace** does not delete anything: your current copy goes to the trash folder
+(`.trash` inside the library), so you can still get it back. If a chapter's file is
+missing from the archive, the app offers to restore it from version history afterwards.
+
+Settings (language, library location and the like) do not travel with the archive —
+each device keeps its own.
+
 ## If something goes wrong
 
 - Every save creates a version snapshot — older drafts of a chapter never disappear;

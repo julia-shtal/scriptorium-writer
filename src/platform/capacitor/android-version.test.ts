@@ -92,8 +92,8 @@ describe('android/app/build.gradle — version derived from package.json', () =>
     // Not a tautology: the right-hand side is what a human reads off build.gradle and the
     // README. If either the formula or package.json's version changes, this is where the
     // worked example gets caught being stale.
-    expect(androidVersionCode(PACKAGE_VERSION)).toBe(10600)
-    expect(PACKAGE_VERSION).toBe('1.6.0')
+    expect(androidVersionCode(PACKAGE_VERSION)).toBe(10700)
+    expect(PACKAGE_VERSION).toBe('1.7.0')
   })
 })
 

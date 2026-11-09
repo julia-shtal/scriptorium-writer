@@ -627,6 +627,17 @@ describe('exportLibraryArchive (M13)', () => {
     expect(existsSync(dest + '.part')).toBe(false)
     const names = new AdmZip(dest).getEntries().map((e) => e.entryName.replace(/\\/g, '/'))
     expect(names.some((n) => n.startsWith('stories/'))).toBe(true)
+    // M31: every export carries the manifest, same six keys as the web/Android one.
+    const m = JSON.parse(new AdmZip(dest).readAsText('manifest.json')) as Record<string, unknown>
+    expect(m.format).toBe('scriptorium-library')
+    expect(Object.keys(m).sort()).toEqual([
+      'appVersion',
+      'exportedAt',
+      'format',
+      'formatVersion',
+      'platform',
+      'schema'
+    ])
   })
 
   it('throws AppError(EXPORT_FAILED) for an unwritable destination and leaves the source intact', async () => {
@@ -667,6 +678,20 @@ describe('readLibraryEntries (MP6 web zip walker)', () => {
     // Bytes are real: the chapter canon decodes to JSON containing the text.
     const canon = entries.find((e) => e.path.includes('chapters/') && e.path.endsWith('.json'))!
     expect(new TextDecoder().decode(canon.data)).toContain('hello world')
+  })
+
+  it('skips a root manifest.json and the .import-tmp staging tree (M31)', async () => {
+    const { svc, lib } = await makeService()
+    await svc.createStory({ title: 'Kept' })
+    await fsp.writeFile(join(lib, 'manifest.json'), '{}')
+    await fsp.writeFile(join(lib, 'stories', 'kept', 'manifest.json'), '{}')
+    await fsp.mkdir(join(lib, '.import-tmp', 'run', 'x'), { recursive: true })
+    await fsp.writeFile(join(lib, '.import-tmp', 'run', 'x', 'story.json'), '{}')
+    const paths = (await svc.readLibraryEntries()).map((e) => e.path)
+    expect(paths).toContain('stories/kept/story.json')
+    expect(paths).toContain('stories/kept/manifest.json') // exclusion is root-only
+    expect(paths).not.toContain('manifest.json')
+    expect(paths.some((p) => p.startsWith('.import-tmp'))).toBe(false)
   })
 })
 
@@ -714,5 +739,23 @@ describe('chapter filename follows the title (rename)', () => {
     expect(JSON.parse(await fsp.readFile(join(dir, '01-taken.json'), 'utf8')).title).toBe('Taken')
     expect((await svc.readChapter(story.id, ch.id)).doc).toEqual(docWith('mine'))
     expect(existsSync(join(dir, '01-original.json'))).toBe(true)
+  })
+})
+
+describe('import staging cleanup (M31)', () => {
+  it('ensureLibrary removes a leftover .import-tmp', async () => {
+    const { svc, lib } = await makeService()
+    await fsp.mkdir(join(lib, '.import-tmp', 'run', 'ghost'), { recursive: true })
+    await fsp.writeFile(join(lib, '.import-tmp', 'run', 'ghost', 'story.json'), '{}')
+    await svc.ensureLibrary()
+    expect(existsSync(join(lib, '.import-tmp'))).toBe(false)
+  })
+
+  it('ensureLibrary with no .import-tmp is a no-op', async () => {
+    const { svc, lib } = await makeService()
+    await svc.createStory({ title: 'Kept' })
+    await svc.ensureLibrary()
+    expect((await svc.listStories()).map((s) => s.id)).toEqual(['kept'])
+    expect(existsSync(join(lib, '.import-tmp'))).toBe(false)
   })
 })

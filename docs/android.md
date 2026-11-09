@@ -14,6 +14,7 @@ defect — see [Known issues](#known-issues) and [Verification status](#verifica
 - [Storage and permissions](#storage-and-permissions)
 - [Uninstall behaviour](#uninstall-behaviour)
 - [Export on Android](#export-on-android)
+- [Restoring a library](#restoring-a-library)
 - [Moving between the PWA and the Android app](#moving-between-the-pwa-and-the-android-app)
 - [Prerequisites and build loop](#prerequisites-and-build-loop)
 - [The on-device FsPort contract harness](#the-on-device-fsport-contract-harness)
@@ -90,8 +91,10 @@ both sides of the trade written down.
 - **The library survives uninstall and reinstall.** Without it, the reinstalled app cannot
   read the files the previous install left in `Documents` — see the measurement below.
 - **Files placed from a PC over USB are readable.** Unzipping a library export into
-  `Documents/Scriptorium-Writer` from the Windows machine is the only restore path the app
-  has on Android, and the desktop → tablet half of the round trip depends on it.
+  `Documents/Scriptorium-Writer` from the Windows machine still works as a fallback restore
+  path. The normal route is now in-app: Settings → «Импортировать библиотеку…» /
+  "Import library…" picks a `.zip` and previews it before anything is written (see
+  [Restoring a library](#restoring-a-library)).
 
 *What it costs:* **Google Play will not approve `MANAGE_EXTERNAL_STORAGE` for a writing
 app** — it is granted to file-manager-class apps with a specific justification. So
@@ -126,11 +129,13 @@ reach files in shared storage that it owns. So `listStories()` came back **empty
 than failing** — and an empty list is indistinguishable from a genuinely empty library, so
 the app seeded a fresh demo story beside writing it could not see. Three of them
 accumulated over one test session. The same mechanism made PC-placed files invisible,
-which is why there was no restore path on Android at all.
+which is why there was no restore path on Android at the time; library import has since
+given it one that does not depend on file ownership.
 
 **What all-files access changes, and what is still unconfirmed.** With the permission held,
 the ownership rule does not apply, so a library written by a previous install — or unpacked
-from the PC — should be readable again. The demo-seeding half of the failure is closed in
+from the PC — should be readable again. (If it is not, the in-app import below is the way
+to bring a `.zip` back.) The demo-seeding half of the failure is closed in
 code regardless of what the OS does: `bootstrapLibrary` returns without seeding and without
 stamping `demoSeeded` whenever access is withheld, and that is covered by the unit suite.
 The durability half is a claim about Android, not about this repository, and it is
@@ -170,6 +175,21 @@ FileProvider allows only the cache folder by default) or the Share sheet fails a
 runtime when the button is tapped. Import is unaffected — Android's native file chooser
 works and `.md`/`.docx` import functions normally on the tablet.
 
+## Restoring a library
+
+Settings → «Импортировать библиотеку…» / "Import library…" opens the native file chooser
+for a `.zip` made by **Export library** on any platform (Windows, PWA, or this app);
+archives from 1.6.0, which carry no manifest, import too. The app shows a preview first —
+per story New, Identical, Conflict, or Invalid — and writes nothing until you confirm.
+Conflicts default to **Keep both** (the incoming copy gets a new id and a
+« (импорт DD.MM.YYYY)» / " (imported YYYY-MM-DD)" suffix on its title); **Replace** moves
+the current copy to `.trash/` rather than deleting it. Settings are not in the archive, so
+they stay as they are on the tablet. The pipeline is described in
+[architecture.md](architecture.md#library-import).
+
+Unzipping a `.zip` into `Documents/Scriptorium-Writer` over USB remains a fallback, but it
+bypasses the preview and the conflict handling, so prefer the in-app route.
+
 ## Moving between the PWA and the Android app
 
 **Export a zip, import it.** There is no
@@ -178,8 +198,8 @@ the Capacitor WebView's origin is `https://localhost` (see `androidScheme` above
 a PWA installed from a dev server or any hosted URL sits on a different origin
 altogether. The native app therefore cannot see the PWA's OPFS data at all — a
 PWA→native migration is not merely awkward to write, it is impossible from inside the
-app. The supported route is **Export library** → `.zip` on one side, import on the other,
-in either direction, which is a further reason native export had to land in the same
+app. The supported route is **Export library** → `.zip` on one side, **Import library…**
+on the other, in either direction, which is a further reason native export had to land in the same
 milestone as native storage rather than after it.
 
 Any OPFS data left on a device by the earlier container builds is left exactly where it is,

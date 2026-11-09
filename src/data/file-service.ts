@@ -21,11 +21,16 @@
  */
 
 import type { FsPort } from './fs-port'
-import { basenamePath as basename, joinPath as join } from './path-utils'
+import { basenamePath as basename, joinPath as join, randomHex } from './path-utils'
 import type {
   Chapter,
   ChapterRecovery,
   ChapterWrite,
+  ImportDecision,
+  ImportStoryPreview,
+  ImportStoryStatus,
+  LibraryImportPreview,
+  LibraryImportResult,
   NewStoryInput,
   Notes,
   ProseMirrorJSON,
@@ -33,6 +38,7 @@ import type {
   Settings,
   Story,
   StoryMeta,
+  LibraryManifest,
   StorySummary,
   VersionSummary
 } from '@shared/types'
@@ -44,6 +50,10 @@ import {
 } from '@shared/schema'
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
+import { buildLibraryManifest, isExcludedFromExport, manifestJson } from './library-manifest'
+import { filesEqual, parseLibraryArchive, storyLastModified, type ParsedArchive } from './library-import'
+import { applyImport, type PlannedStory } from './library-import-apply'
+import { allowedDecisions, defaultDecision } from '@shared/library-import-rules'
 import { serializeChapterToMarkdown } from './markdown'
 // TODO(MP6): the remaining Node coupling in the data layer — `library-archive` uses
 // `node:fs` + `archiver` and stays in `src/main` for now. Hoist zip/export behind a
@@ -73,6 +83,8 @@ export interface FileServiceOptions {
    * which stays 'ru' via the merge-over-defaults path).
    */
   firstRunLanguage?: 'ru' | 'en'
+  /** Recorded in export manifests (M31): `process.platform` on desktop, 'web', 'android'. */
+  platform?: string
   /**
    * Optional per-platform sanity check on a persisted `settings.libraryPath` (MC3).
    *
@@ -99,17 +111,27 @@ export class FileService {
   private readonly userDataPath: string
   private readonly defaultLibraryPath: string
   private readonly firstRunLanguage: 'ru' | 'en'
+  private readonly platform: string
   private readonly isLibraryPathUsable: (path: string) => boolean
   private readonly settingsPath: string
   private settingsCache: Settings | null = null
   /** Guarantees strictly-increasing, unique, lexically-sortable snapshot names. */
   private lastSnapshotMs = 0
+  /** The one parsed archive awaiting a decision (M31). A new preview replaces it. */
+  private pendingImport: {
+    importId: string
+    parsed: ParsedArchive
+    statuses: Map<string, ImportStoryStatus>
+    /** Archive id → the local id it matched (case-insensitively). */
+    localIds: Map<string, string>
+  } | null = null
 
   constructor(options: FileServiceOptions) {
     this.fs = options.fs
     this.userDataPath = options.userDataPath
     this.defaultLibraryPath = options.defaultLibraryPath
     this.firstRunLanguage = options.firstRunLanguage ?? 'ru'
+    this.platform = options.platform ?? 'unknown'
     this.isLibraryPathUsable = options.isLibraryPathUsable ?? (() => true)
     this.settingsPath = join(this.userDataPath, 'settings.json')
   }
@@ -183,6 +205,13 @@ export class FileService {
     const root = await this.getLibraryRoot()
     await this.fs.mkdir(layout.storiesDir(root), { recursive: true })
     await this.fs.mkdir(layout.trashDir(root), { recursive: true })
+    // M31: a crash mid-import leaves staged stories here. They were never published, so
+    // dropping them loses nothing — the archive they came from is still on disk.
+    // Safe only because ensureLibrary runs once at boot (main before the IPC handlers are
+    // registered; web/Android before the Api exists), so no apply can be in flight. Two
+    // PWA tabs on one origin are the exception: a second tab booting mid-import in the
+    // first would wipe its staging, and the story being staged then fails (and is reported).
+    await this.fs.rm(layout.importTmpDir(root), { recursive: true, force: true })
   }
 
   // ── Library / stories ───────────────────────────────────────────────────────
@@ -262,11 +291,17 @@ export class FileService {
 
   async deleteStory(id: string): Promise<void> {
     const root = await this.getLibraryRoot()
+    await this.moveStoryToTrash(root, id)
+  }
+
+  /** Soft-delete a story folder; returns where it went (M31 Replace needs it to roll back). */
+  private async moveStoryToTrash(root: string, id: string): Promise<string> {
     const from = layout.storyDir(root, id)
     await assertExists(this.fs, from, () => new AppError('NOT_FOUND', `story "${id}" not found`))
     const dest = join(layout.trashDir(root), `${id}-${isoSafeTimestamp(new Date())}`)
     await this.fs.mkdir(layout.trashDir(root), { recursive: true })
     await this.fs.rename(from, dest)
+    return dest
   }
 
   async reorderChapters(id: string, chapterIds: string[]): Promise<void> {
@@ -645,14 +680,15 @@ export class FileService {
 
   /**
    * Export the entire library directory to a single `.zip` at `destPath`
-   * (full-fidelity backup — includes `.trash/`). Reads only from the library;
+   * (full-fidelity backup — includes `.trash/`; leaves out a stray root `manifest.json`
+   * and `.import-tmp/`, and adds a generated `manifest.json`, M31). Reads only from the library;
    * the source is never modified. Any failure surfaces as a typed AppError.
    */
   async exportLibraryArchive(destPath: string): Promise<void> {
     const root = await this.getLibraryRoot()
     try {
       const { zipDirectory } = await import('../main/library-archive')
-      await zipDirectory(root, destPath)
+      await zipDirectory(root, destPath, manifestJson(this.libraryManifest()))
     } catch (err) {
       throw new AppError('EXPORT_FAILED', `failed to export library to ${destPath}`, {
         cause: err
@@ -660,30 +696,181 @@ export class FileService {
     }
   }
 
+  /** The manifest an export made right now would carry (M31). */
+  libraryManifest(): LibraryManifest {
+    return buildLibraryManifest(this.platform)
+  }
+
   /**
    * Walk the entire library tree through the injected {@link FsPort} and return every
    * file as `{ path, data }`, where `path` is forward-slash separated and relative to
-   * the library root (reproducing the on-disk layout, `.trash/` included). Reused by
+   * the library root (reproducing the on-disk layout, `.trash/` included, minus a stray
+   * root `manifest.json` and `.import-tmp/`). Reused by
    * the web `.zip` export (fflate) and, later, Capacitor (MC2) — the walk stays in the
    * tested data layer rather than in any single platform. Reads only; never mutates.
    */
   async readLibraryEntries(): Promise<{ path: string; data: Uint8Array }[]> {
-    const root = await this.getLibraryRoot()
-    const out: { path: string; data: Uint8Array }[] = []
+    return this.walkFiles(await this.getLibraryRoot(), isExcludedFromExport)
+  }
 
-    const walk = async (absDir: string, relDir: string): Promise<void> => {
-      const names = await this.fs.readdir(absDir)
-      for (const name of names) {
-        const abs = join(absDir, name)
+  /**
+   * Every file under `absDir` as `{ path relative to absDir, data }`, forward-slashed.
+   * A `skip`ped path is not descended into (a skipped directory drops its whole subtree).
+   */
+  private async walkFiles(
+    absDir: string,
+    skip: (rel: string) => boolean
+  ): Promise<{ path: string; data: Uint8Array }[]> {
+    const out: { path: string; data: Uint8Array }[] = []
+    const walk = async (abs: string, relDir: string): Promise<void> => {
+      for (const name of await this.fs.readdir(abs)) {
+        const child = join(abs, name)
         const rel = relDir ? `${relDir}/${name}` : name
-        const st = await this.fs.stat(abs)
-        if (st.isDirectory) await walk(abs, rel)
-        else out.push({ path: rel, data: await this.fs.readFileBytes(abs) })
+        if (skip(rel)) continue
+        if ((await this.fs.stat(child)).isDirectory) await walk(child, rel)
+        else out.push({ path: rel, data: await this.fs.readFileBytes(child) })
       }
     }
-
-    await walk(root, '')
+    await walk(absDir, '')
     return out
+  }
+
+  // ── Library import (M31) ────────────────────────────────────────────────────
+
+  /**
+   * Parse and validate an archive and classify each story against the library. Writes
+   * nothing. The parsed archive is held under the returned `importId` until applied,
+   * discarded, or replaced by the next preview.
+   */
+  async previewLibraryImport(
+    bytes: Uint8Array,
+    fileName: string
+  ): Promise<Extract<LibraryImportPreview, { canceled: false }>> {
+    // Drop the previous preview first: if this archive is refused, no stale import
+    // stays applicable behind a dialog that now shows an error.
+    this.pendingImport = null
+    const parsed = parseLibraryArchive(bytes)
+    const root = await this.getLibraryRoot()
+    const localIdList = await this.listStoryIds(root)
+    const localExact = new Set(localIdList)
+    // Match ids case-insensitively: on Windows and Android storage "A" and "a" are one
+    // folder, so an archive "A" against a local "a" is a conflict, not a new story (whose
+    // publish would then fail). An exact match wins when both spellings exist locally.
+    const localFolded = new Map<string, string>()
+    for (const id of localIdList) if (!localFolded.has(id.toLowerCase())) localFolded.set(id.toLowerCase(), id)
+    const summaries = new Map((await this.listStories()).map((s) => [s.id, s]))
+    const statuses = new Map<string, ImportStoryStatus>()
+    const matched = new Map<string, string>()
+    const stories: ImportStoryPreview[] = []
+    for (const p of parsed.stories) {
+      const localId = localExact.has(p.id) ? p.id : localFolded.get(p.id.toLowerCase())
+      const isLocal = localId !== undefined
+      if (localId !== undefined) matched.set(p.id, localId)
+      const summary = localId !== undefined ? summaries.get(localId) : undefined
+      let status: ImportStoryStatus
+      let localFiles: Map<string, Uint8Array> | undefined
+      if (p.invalidReason) status = 'invalid'
+      else if (localId === undefined) status = 'new'
+      else {
+        localFiles = await this.readStoryFiles(root, localId)
+        status = filesEqual(p.files, localFiles) ? 'identical' : 'conflict'
+      }
+      statuses.set(p.id, status)
+      stories.push({
+        id: p.id,
+        status,
+        incoming: p.incoming,
+        local: !isLocal
+          ? undefined
+          : summary
+            ? {
+                title: summary.title,
+                chapterCount: summary.chapterCount,
+                wordCount: summary.wordCount,
+                // Same definition as the incoming side (newest chapter edit counts, not just
+                // story.json); only colliding non-invalid stories were read, else the summary's.
+                updatedAt: (localFiles ? storyLastModified(localFiles) : '') || summary.updatedAt
+              }
+            : // The folder exists but story.json is unreadable (listStories skipped it).
+              { title: localId, chapterCount: 0, wordCount: 0, updatedAt: '' },
+        warnings: p.warnings,
+        invalidReason: p.invalidReason
+      })
+    }
+    const importId = randomHex(8)
+    this.pendingImport = { importId, parsed, statuses, localIds: matched }
+    return {
+      canceled: false,
+      importId,
+      fileName,
+      manifest: parsed.manifest,
+      stories,
+      ignoredEntries: parsed.ignoredEntries
+    }
+  }
+
+  /**
+   * Apply decisions to the pending import. A story with no entry in `decisions` takes
+   * its status default. Every decision is validated BEFORE the pending import is
+   * consumed and before the first write, so a bad request (INVALID_INPUT) changes
+   * nothing and the same `importId` can be applied again with corrected decisions.
+   * Keys in `decisions` that name no story in the archive are ignored.
+   * Once validation passes the import is consumed — whatever happens next — so a retry
+   * can never apply the same archive twice (Keep both would duplicate stories).
+   */
+  async applyLibraryImport(
+    importId: string,
+    decisions: Record<string, ImportDecision>
+  ): Promise<LibraryImportResult> {
+    const pending = this.pendingImport
+    if (!pending || pending.importId !== importId) {
+      throw new AppError('NOT_FOUND', 'this import is no longer available — choose the archive again')
+    }
+    const plan: PlannedStory[] = pending.parsed.stories.map((parsed) => {
+      const status = pending.statuses.get(parsed.id)
+      if (!status) throw new AppError('UNKNOWN', `no status recorded for "${parsed.id}"`)
+      // Own keys only: a story id like "constructor" or "__proto__" must not pick up an
+      // inherited Object.prototype member as its "decision".
+      const decision = Object.prototype.hasOwnProperty.call(decisions, parsed.id)
+        ? decisions[parsed.id]
+        : defaultDecision(status)
+      if (!allowedDecisions(status).includes(decision)) {
+        throw new AppError(
+          'INVALID_INPUT',
+          `"${String(decision)}" is not allowed for a ${status} story ("${parsed.id}")`
+        )
+      }
+      return { parsed, status, decision, localId: pending.localIds.get(parsed.id) }
+    })
+    this.pendingImport = null
+    const root = await this.getLibraryRoot()
+    const { language } = await this.readSettings()
+    return applyImport(
+      {
+        fs: this.fs,
+        root,
+        localIds: await this.listStoryIds(root),
+        trashStory: (id) => this.moveStoryToTrash(root, id),
+        language,
+        now: new Date()
+      },
+      plan
+    )
+  }
+
+  /** Drop the pending import. Idempotent: an unknown or consumed id is a no-op. */
+  async discardLibraryImport(importId: string): Promise<void> {
+    if (this.pendingImport?.importId === importId) this.pendingImport = null
+  }
+
+  /**
+   * A local story's files keyed like ParsedStory.files, for the Identical check. Only
+   * the story's own top-level `versions/` is left out (history differs per device);
+   * filesEqual ignores it too.
+   */
+  private async readStoryFiles(root: string, id: string): Promise<Map<string, Uint8Array>> {
+    const entries = await this.walkFiles(layout.storyDir(root, id), (rel) => rel === 'versions')
+    return new Map(entries.map((e) => [e.path, e.data]))
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────────

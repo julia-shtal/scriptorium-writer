@@ -74,7 +74,8 @@ async function renameWithRetry(
   rename: (oldPath: string, newPath: string) => Promise<void>,
   sleep: (ms: number) => Promise<void>,
   tmp: string,
-  target: string
+  target: string,
+  transientCodes: ReadonlySet<string> = TRANSIENT_RENAME_CODES
 ): Promise<void> {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -82,10 +83,36 @@ async function renameWithRetry(
       return
     } catch (err) {
       const code = (err as NodeJS.ErrnoException | null)?.code
-      const transient = code !== undefined && TRANSIENT_RENAME_CODES.has(code)
+      const transient = code !== undefined && transientCodes.has(code)
       if (!transient || attempt >= MAX_RENAME_ATTEMPTS) throw err
       // Back off a little before retrying: 10ms, 20ms, 40ms … capped at 100ms.
       await sleep(Math.min(10 * 2 ** (attempt - 1), 100))
     }
   }
+}
+
+/**
+ * For a DIRECTORY target, EEXIST is final, not transient: it means the target folder is
+ * occupied (the FsPort contract refuses to rename onto an existing directory), and no
+ * amount of waiting frees it.
+ */
+const TRANSIENT_DIR_RENAME_CODES: ReadonlySet<string> = new Set(
+  [...TRANSIENT_RENAME_CODES].filter((c) => c !== 'EEXIST')
+)
+
+/**
+ * Move a directory with the same transient-lock retry as {@link atomicWriteFile}
+ * (M31 import publish and its rollback). Windows Defender, the Search indexer or a
+ * sync client often still hold a handle on files written milliseconds ago, so a
+ * directory rename right after staging can fail with EPERM/EACCES/EBUSY once and
+ * succeed a moment later.
+ */
+export async function renameDirWithRetry(
+  fs: FsPort,
+  from: string,
+  to: string,
+  deps: AtomicWriteDeps = {}
+): Promise<void> {
+  const rename = deps.rename ?? fs.rename.bind(fs)
+  await renameWithRetry(rename, deps.sleep ?? defaultSleep, from, to, TRANSIENT_DIR_RENAME_CODES)
 }

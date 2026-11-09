@@ -7,10 +7,12 @@
  */
 import type { ImportFileResult } from '@shared/types'
 import { convertDocxToHtml } from '@data/docx-import'
+import { AppError } from '@shared/errors'
+import { IMPORT_LIMITS } from '@data/library-import'
 
 export async function pickImportFile(): Promise<ImportFileResult> {
   const file = await promptForFile('.md,.docx')
-  // No cancel event fires for <input type=file>; treat "no file" as canceled.
+  // A dismissed picker (or an empty selection) yields no file; treat it as canceled.
   if (!file) return { canceled: true }
 
   if (file.name.toLowerCase().endsWith('.md')) {
@@ -18,6 +20,24 @@ export async function pickImportFile(): Promise<ImportFileResult> {
   }
   const { html, warnings } = await convertDocxToHtml(await file.arrayBuffer())
   return { canceled: false, kind: 'docx', html, warnings }
+}
+
+/**
+ * Pick a library `.zip` (M31). Same `<input type=file>` route as chapter import, so it works
+ * in Chrome on Android and in the Capacitor WebView. Size is checked before reading.
+ */
+export async function pickLibraryArchive(): Promise<
+  { name: string; bytes: Uint8Array } | undefined
+> {
+  const file = await promptForFile('.zip,application/zip')
+  if (!file) return undefined
+  if (file.size > IMPORT_LIMITS.maxArchiveBytes) {
+    throw new AppError(
+      'IMPORT_TOO_LARGE',
+      `archive is ${file.size} bytes (limit ${IMPORT_LIMITS.maxArchiveBytes})`
+    )
+  }
+  return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
 }
 
 /** Resolve with the chosen File, or undefined if the input yields none. */
@@ -32,6 +52,14 @@ function promptForFile(accept: string): Promise<File | undefined> {
       const file = input.files?.[0]
       input.remove()
       resolve(file)
+    })
+    // M31: Chromium 113+ (desktop, Android Chrome, the Capacitor WebView) fires `cancel`
+    // when the picker is dismissed. Without it the promise never settled, and Settings'
+    // «Import library…» button stayed on «Reading archive…» until the view was left.
+    // Older engines simply never fire it, which is the previous behaviour.
+    input.addEventListener('cancel', () => {
+      input.remove()
+      resolve(undefined)
     })
     input.click()
   })

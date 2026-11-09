@@ -8,7 +8,9 @@
  *
  * Division of labour:
  *  - READS (`readFile`, `readFileBytes`, `readdir`, `stat`) and dir ops (`mkdir`,
- *    `rm`, `rename`) run on the MAIN thread — no write contention there.
+ *    `rm`, `rename`) run on the MAIN thread — no write contention there. The one
+ *    exception: the directory-rename FALLBACK copies files, and those writes go via
+ *    the worker like any other `writeFile`.
  *  - WRITES (`writeFile`) are delegated to {@link ./opfs-worker.ts}, because the
  *    reliable OPFS write path (`createSyncAccessHandle`) exists only in a worker.
  *    Strings are UTF-8 encoded and the buffer is transferred to the worker.
@@ -36,9 +38,12 @@ import type { WriteRequest, WriteResponse } from './opfs-worker'
 
 /** Error carrying the `code === 'ENOENT'` shape the data layer checks. */
 function enoent(path: string): Error & { code: string } {
-  return Object.assign(new Error(`ENOENT: no such file or directory, '${path}'`), {
-    code: 'ENOENT'
-  })
+  return errno('ENOENT', `no such file or directory, '${path}'`)
+}
+
+/** Node-style error: message prefixed with, and `code` set to, the errno name. */
+function errno(code: string, message: string): Error & { code: string } {
+  return Object.assign(new Error(`${code}: ${message}`), { code })
 }
 
 /** True for the OPFS "entry does not exist" DOMException. */
@@ -225,14 +230,29 @@ export class OpfsFsPort implements FsPort {
   }
 
   async rename(from: string, to: string): Promise<void> {
-    let fileHandle: FileSystemFileHandle
+    let fileHandle: FileSystemFileHandle | null = null
+    let dirHandle: FileSystemDirectoryHandle | null = null
+    // Only SOURCE resolution sits inside the ENOENT-translating try: a NotFoundError
+    // raised later (by the move itself) is not "the source is missing" and must not
+    // be reported as such.
     try {
       const src = await this.resolveParent(from, false)
-      fileHandle = await src.parent.getFileHandle(src.name, { create: false })
+      try {
+        fileHandle = await src.parent.getFileHandle(src.name, { create: false })
+      } catch (err) {
+        if (!isTypeMismatchError(err)) throw err
+        // The entry is a directory (M31: story -> .trash, staged import -> stories/).
+        dirHandle = await src.parent.getDirectoryHandle(src.name, { create: false })
+      }
     } catch (err) {
       if (isNotFoundError(err)) throw enoent(from)
       throw err
     }
+    if (dirHandle) {
+      await this.moveDirectory(dirHandle, from, to)
+      return
+    }
+    if (!fileHandle) throw enoent(from)
 
     // Ensure the destination parent chain exists before moving into it.
     const dst = await this.resolveParent(to, true)
@@ -259,6 +279,71 @@ export class OpfsFsPort implements FsPort {
       } else {
         throw err
       }
+    }
+  }
+
+  /**
+   * Move a directory. Chrome's OPFS has `FileSystemDirectoryHandle.move()`, a real move;
+   * use it when present. Otherwise fall back to copy-then-remove.
+   *
+   * Callers today: deleteStory (story -> .trash), deleteChapter (versions dir ->
+   * .trash), M31 staged import -> stories/.
+   *
+   * WARNING: the fallback is NON-ATOMIC. The source is removed only after the whole copy
+   * succeeded, so a crash DURING the copy leaves the complete source plus a PARTIAL
+   * target; a full duplicate arises only if `rm` fails after a complete copy. Never
+   * neither. Callers publishing into a visible location (M31 staged import ->
+   * stories/) must account for a possible partial target. Duplicates and partials are
+   * recoverable by hand; a lost story is not.
+   */
+  private async moveDirectory(
+    handle: FileSystemDirectoryHandle,
+    from: string,
+    to: string
+  ): Promise<void> {
+    // Preconditions guard BOTH paths (native move and fallback).
+    const fromKey = segments(from).join('/')
+    const toKey = segments(to).join('/')
+    // No-op, matches Node (else the fallback would copy onto itself, then rm it).
+    if (toKey === fromKey) return
+    if (toKey.startsWith(`${fromKey}/`)) {
+      // Else copyTree would recurse into its own output forever.
+      throw errno('EINVAL', `cannot move '${from}' into itself '${to}'`)
+    }
+    try {
+      await this.stat(to)
+      // Never merge into an existing target — reliability first.
+      throw errno('EEXIST', `directory target exists, '${to}'`)
+    } catch (err) {
+      if ((err as { code?: string })?.code !== 'ENOENT') throw err
+    }
+    const dst = await this.resolveParent(to, true)
+    if (typeof handle.move === 'function') {
+      try {
+        await handle.move(dst.parent, dst.name)
+        return
+      } catch (err) {
+        // Only "this engine can't move directories" falls through; real errors surface.
+        // TypeError: move() exists but the engine rejects the arguments/handle kind;
+        // NotSupportedError: the engine implements move() only for files.
+        const unsupported =
+          err instanceof TypeError ||
+          (err instanceof DOMException && err.name === 'NotSupportedError')
+        if (!unsupported) throw err
+      }
+    }
+    await this.copyTree(from, to)
+    await this.rm(from, { recursive: true })
+  }
+
+  /** Recursive copy through the port's own primitives (writes go via the worker). */
+  private async copyTree(from: string, to: string): Promise<void> {
+    await this.mkdir(to, { recursive: true })
+    for (const name of await this.readdir(from)) {
+      const src = `${from}/${name}`
+      const dst = `${to}/${name}`
+      if ((await this.stat(src)).isDirectory) await this.copyTree(src, dst)
+      else await this.writeFile(dst, await this.readFileBytes(src))
     }
   }
 

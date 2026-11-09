@@ -2,13 +2,27 @@
 
 Released versions, newest first. Dates are the release tag dates.
 
-## Unreleased
+## 1.7.0 — unreleased
 
-- A web build that runs in the browser and installs as a PWA — see [web-pwa.md](web-pwa.md).
-- An Android tablet build packaged with Capacitor — see [android.md](android.md).
+- Settings → "Import library…" (Windows, web, Android) restores or merges a library `.zip`
+  from any platform, with a per-story preview (new, identical, conflict, invalid) and a
+  choice for conflicts: keep both, replace (the old copy goes to `.trash/`), or skip.
+  Archives from 1.6.0 import too.
+- Library exports now carry a `manifest.json` header with the format and app versions.
+- Fixed: deleting a story in the web app (PWA) failed because OPFS had no directory
+  rename.
 
-Neither has been released; both are described here so the source tree makes sense, not
-because they ship.
+See [architecture.md](architecture.md#library-import).
+
+## 1.6.0 — 2026-09-05
+
+- The web build is released: it runs in the browser, installs as a PWA, and works offline.
+  The library lives in the browser's private storage, so the app reminds you to save a
+  `.zip` backup when the last one is over a week old — see [web-pwa.md](web-pwa.md).
+- An Android tablet build, in beta, as a sideloaded APK on the release page. The library
+  lives in `Documents/Scriptorium-Writer`, so it survives a reinstall and can be copied
+  over USB — see [android.md](android.md).
+- The Windows desktop app is unchanged.
 
 ## 1.5.0 — 2026-08-02
 

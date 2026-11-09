@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fsp from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { atomicWriteFile } from './atomic-write'
+import { atomicWriteFile, renameDirWithRetry } from './atomic-write'
 import { NodeFsPort } from '../platform/node/fs-port'
 
 const fs = new NodeFsPort()
@@ -111,5 +111,39 @@ describe('atomicWriteFile', () => {
     ).rejects.toMatchObject({ code: 'ENOSPC' })
     expect(attempts).toBe(1)
     expect(await listTemps()).toEqual([])
+  })
+})
+
+describe('renameDirWithRetry (M31 import publish)', () => {
+  const noSleep = (): Promise<void> => Promise.resolve()
+  const codeError = (code: string): NodeJS.ErrnoException =>
+    Object.assign(new Error(`injected ${code}`), { code })
+
+  it('retries a transient lock (EPERM) and then moves the directory', async () => {
+    const from = join(dir, 'staged')
+    const to = join(dir, 'published')
+    await fsp.mkdir(from)
+    await fsp.writeFile(join(from, 'story.json'), '{}')
+    let attempts = 0
+    const flaky = async (a: string, b: string): Promise<void> => {
+      attempts += 1
+      if (attempts === 1) throw codeError('EPERM')
+      await fs.rename(a, b)
+    }
+    await renameDirWithRetry(fs, from, to, { rename: flaky, sleep: noSleep })
+    expect(attempts).toBe(2)
+    expect(await fsp.readFile(join(to, 'story.json'), 'utf8')).toBe('{}')
+  })
+
+  it('treats EEXIST as final for a directory: the target is occupied, waiting cannot free it', async () => {
+    let attempts = 0
+    const occupied = async (): Promise<void> => {
+      attempts += 1
+      throw codeError('EEXIST')
+    }
+    await expect(
+      renameDirWithRetry(fs, join(dir, 'a'), join(dir, 'b'), { rename: occupied, sleep: noSleep })
+    ).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(attempts).toBe(1)
   })
 })

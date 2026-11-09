@@ -1,10 +1,12 @@
-import { join } from 'path'
-import { readFile } from 'node:fs/promises'
+import { join, basename } from 'path'
+import { readFile, stat } from 'node:fs/promises'
 import { app, shell, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateDownloadedInfo, ExportFileResult, ExportFormat } from '@shared/types'
 import { FileService } from '@data/file-service'
+import { IMPORT_LIMITS } from '@data/library-import'
+import { AppError } from '@shared/errors'
 import { registerIpcHandlers } from './ipc'
 import { requestFlushBeforeQuit } from './quit-flush'
 import { initAutoUpdate } from './auto-update'
@@ -182,6 +184,7 @@ app.whenReady().then(async () => {
     fs: fsPort,
     userDataPath: app.getPath('userData'),
     defaultLibraryPath: join(app.getPath('documents'), 'Scriptorium-Writer'),
+    platform: process.platform,
     // First-run only: default the UI language from the OS locale (English → 'en',
     // otherwise 'ru'). getLocale() is reliable here (post-ready); it returns '' before
     // ready, which startsWith('en') treats as false → 'ru' (safe fallback).
@@ -212,6 +215,29 @@ app.whenReady().then(async () => {
         if (result.canceled || !result.filePath) return { canceled: true }
         await fileService.exportLibraryArchive(result.filePath)
         return { canceled: false, path: result.filePath }
+      },
+      previewLibraryImport: async () => {
+        const win = BrowserWindow.getAllWindows()[0]
+        const options = {
+          title: 'Импортировать библиотеку',
+          properties: ['openFile' as const],
+          filters: [{ name: 'Zip archive', extensions: ['zip'] }]
+        }
+        const result = win
+          ? await dialog.showOpenDialog(win, options)
+          : await dialog.showOpenDialog(options)
+        if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+        const path = result.filePaths[0]
+        // Size check BEFORE reading: never pull a 5 GB file into memory just to refuse it.
+        const { size } = await stat(path)
+        if (size > IMPORT_LIMITS.maxArchiveBytes) {
+          throw new AppError(
+            'IMPORT_TOO_LARGE',
+            `archive is ${size} bytes (limit ${IMPORT_LIMITS.maxArchiveBytes})`
+          )
+        }
+        const buffer = await readFile(path)
+        return fileService.previewLibraryImport(new Uint8Array(buffer), basename(path))
       },
       readImportFile: async () => {
         const win = BrowserWindow.getAllWindows()[0]

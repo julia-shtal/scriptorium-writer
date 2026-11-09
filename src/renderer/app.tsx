@@ -27,7 +27,10 @@ export default function App(): JSX.Element {
   const openChapter = useEditorStore((s) => s.openChapter)
   const activeView = useUiStore((s) => s.activeView)
   const [error, setError] = useState<string | null>(null)
-  const [recoveries, setRecoveries] = useState<ChapterRecovery[]>([])
+  // M31: recoveries live in uiStore so a library import (Settings) can raise the same
+  // dialog after its re-scan. Boot still fills it exactly once, as before.
+  const recoveries = useUiStore((s) => s.recoveries)
+  const setRecoveries = useUiStore((s) => s.setRecoveries)
   const [booting, setBooting] = useState(true)
 
   // MC3: on Android the OS can withhold access to the library (MANAGE_EXTERNAL_STORAGE).
@@ -64,7 +67,8 @@ export default function App(): JSX.Element {
     bootedRef.current = true
     void (async () => {
       try {
-        setRecoveries(await bootApp())
+        // Through getState(), not the hook value: the once-only effect keeps its deps.
+        useUiStore.getState().setRecoveries(await bootApp())
       } catch (err) {
         setError(err instanceof Error ? err.message : tRef.current.errors.openLibraryFailed)
       } finally {
@@ -74,7 +78,11 @@ export default function App(): JSX.Element {
   }, [storageGranted])
 
   const handleResolved = async (r: ChapterRecovery): Promise<void> => {
-    setRecoveries((rs) => rs.filter((x) => x.chapterId !== r.chapterId))
+    // Match the story too: a Keep-both import copies chapter ids into a second story, so a
+    // chapter id alone no longer names one recovery.
+    setRecoveries(
+      useUiStore.getState().recoveries.filter((x) => x.storyId !== r.storyId || x.chapterId !== r.chapterId)
+    )
     try {
       setError(null)
       await openChapter(r.storyId, r.chapterId)

@@ -9,6 +9,7 @@
  * filenames are stripped.
  */
 
+import { IMPORT_TMP_NAME } from './library-manifest'
 import { joinPath as join, randomHex } from './path-utils'
 
 /**
@@ -91,5 +92,7 @@ export const layout = {
     join(root, 'stories', storyId, 'notes'),
   notesFile: (root: string, storyId: string): string =>
     join(root, 'stories', storyId, 'notes', 'notes.json'),
-  trashDir: (root: string): string => join(root, '.trash')
+  trashDir: (root: string): string => join(root, '.trash'),
+  /** Import staging (M31). At the root, not in stories/, so a crashed run never looks like a story. */
+  importTmpDir: (root: string): string => join(root, IMPORT_TMP_NAME)
 } as const

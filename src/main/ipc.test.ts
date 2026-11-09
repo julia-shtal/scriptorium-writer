@@ -24,6 +24,7 @@ describe('registerIpcHandlers', () => {
       revealInFolder: vi.fn(),
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
+      previewLibraryImport: vi.fn(),
       readImportFile: vi.fn(),
       exportChapter: vi.fn(),
       exportStory: vi.fn()
@@ -41,6 +42,7 @@ describe('registerIpcHandlers', () => {
       revealInFolder: vi.fn(),
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
+      previewLibraryImport: vi.fn(),
       readImportFile: vi.fn(),
       exportChapter: vi.fn(),
       exportStory: vi.fn()
@@ -59,6 +61,7 @@ describe('registerIpcHandlers', () => {
       revealInFolder: vi.fn(),
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
+      previewLibraryImport: vi.fn(),
       readImportFile: vi.fn(),
       exportChapter: vi.fn(),
       exportStory: vi.fn()
@@ -83,6 +86,7 @@ describe('registerIpcHandlers', () => {
       revealInFolder: vi.fn(),
       setSpellLanguages: vi.fn(),
       exportLibrary: vi.fn(),
+      previewLibraryImport: vi.fn(),
       readImportFile: vi.fn(),
       exportChapter: vi.fn(),
       exportStory: vi.fn()
@@ -98,6 +102,7 @@ describe('registerIpcHandlers', () => {
       revealInFolder: vi.fn(),
       setSpellLanguages,
       exportLibrary: vi.fn(),
+      previewLibraryImport: vi.fn(),
       readImportFile: vi.fn(),
       exportChapter: vi.fn(),
       exportStory: vi.fn()

@@ -19,6 +19,9 @@ export type AppErrorCode =
   | 'EXPORT_FAILED' // library archive export failed (disk full / permission / unwritable path)
   | 'STORAGE_FULL' // OPFS/browser storage quota exhausted during a write (QuotaExceededError)
   | 'UNSUPPORTED' // operation has no implementation on this platform (e.g. no OS file explorer in a browser)
+  | 'IMPORT_INVALID_ARCHIVE' // not a zip, a malformed manifest, or an unsafe entry path — whole archive refused
+  | 'IMPORT_UNSUPPORTED_VERSION' // archive formatVersion newer than this app reads — update the app first
+  | 'IMPORT_TOO_LARGE' // archive / uncompressed size / entry count over IMPORT_LIMITS
   | 'UNKNOWN' // anything not otherwise classified
 
 export interface SerializedAppError {
