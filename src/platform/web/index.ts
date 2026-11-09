@@ -19,14 +19,21 @@
  */
 
 import { zip } from 'fflate'
-import type { Api, ImportFileResult, ExportFileResult, ExportLibraryResult } from '@shared/types'
+import type {
+  Api,
+  ImportFileResult,
+  ExportFileResult,
+  ExportLibraryResult,
+  LibraryImportPreview
+} from '@shared/types'
 import type { Platform } from '@renderer/platform'
 import { AppError } from '@shared/errors'
 import { FileService } from '@data/file-service'
 import type { FsPort } from '@data/fs-port'
+import { manifestJson, MANIFEST_ENTRY } from '@data/library-manifest'
 import { buildChapterExportBytes, buildStoryExportBytes } from '@data/export-format'
 import { OpfsFsPort } from './opfs-fs-port'
-import { pickImportFile } from './import-file'
+import { pickImportFile, pickLibraryArchive } from './import-file'
 import { triggerDownload, MIME } from './download'
 
 /** Strip characters illegal in filenames; mirrors the desktop saveExport sanitizer.
@@ -90,6 +97,8 @@ export async function zipLibrary(service: FileService): Promise<Uint8Array> {
   const entries = await service.readLibraryEntries()
   const tree: Record<string, Uint8Array> = {}
   for (const e of entries) tree[e.path] = e.data
+  // M31: the same manifest shape the desktop archiver appends.
+  tree[MANIFEST_ENTRY] = new TextEncoder().encode(manifestJson(service.libraryManifest()))
   return new Promise<Uint8Array>((resolve, reject) => {
     // Async (non-blocking) zip; level 6 matches the desktop archiver setting.
     zip(tree, { level: 6 }, (err, data) => (err ? reject(err) : resolve(data)))
@@ -168,6 +177,16 @@ export function makeApiFromService(service: FileService): Api {
       return { canceled: false, path: filename }
     },
 
+    // library import (M31) — Capacitor inherits these unchanged: the picker is an
+    // <input type=file>, which the Android WebView supports, and nothing here downloads.
+    previewLibraryImport: async (): Promise<LibraryImportPreview> => {
+      const picked = await pickLibraryArchive()
+      if (!picked) return { canceled: true }
+      return service.previewLibraryImport(picked.bytes, picked.name)
+    },
+    applyLibraryImport: (importId, decisions) => service.applyLibraryImport(importId, decisions),
+    discardLibraryImport: (importId) => service.discardLibraryImport(importId),
+
     // import / export
     readImportFile: (): Promise<ImportFileResult> => pickImportFile(),
     exportChapter: async (storyId, chapterId, format): Promise<ExportFileResult> => {
@@ -230,6 +249,8 @@ export async function createPlatformFromFsPort(
   paths: {
     userDataPath: string
     defaultLibraryPath: string
+    /** Recorded in export manifests (M31): 'web' or 'android'. */
+    platform?: string
     /** Forwarded straight to {@link FileServiceOptions.isLibraryPathUsable} (MC3). Capacitor
      *  passes `isNativeLibraryPathUsable` so a Windows `libraryPath` that travelled in with a
      *  synced settings.json is ignored rather than opened; web passes nothing, keeping today's
@@ -252,7 +273,8 @@ export async function createWebPlatform(): Promise<Platform> {
   const storagePersisted = await requestPersistentStorage()
   const { api } = await createPlatformFromFsPort(new OpfsFsPort(), {
     userDataPath: '/userdata',
-    defaultLibraryPath: '/library'
+    defaultLibraryPath: '/library',
+    platform: 'web'
   })
   // No app-managed spellchecker on web — the device's native checker decides (MP5).
   return {

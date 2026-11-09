@@ -52,6 +52,14 @@ the Node cases run under Vitest's node project, the OPFS cases in real Chromium 
 (see [android.md](android.md)). A port that passes the contract can be swapped in without
 touching the atomic write path, snapshot pruning, or the recovery scan.
 
+The contract includes **renaming a directory with its contents** (`rename` moves a file or
+a directory; a directory target must not already exist). Library import publishes a story
+by renaming a staged folder into place, so it depends on this. Adding the case also fixed
+a real bug: deleting a story (and a chapter's `versions/` folder) failed on OPFS, which has
+no plain directory rename, so the PWA could not delete stories. `OpfsFsPort` now uses the
+browser's native directory move where it exists and otherwise falls back to
+copy-then-remove — see [Known limitations](#library-import-known-limitations).
+
 ## Where data lives
 
 - **Library** (your stories) — a plain, syncable folder. Default:
@@ -90,6 +98,7 @@ Scriptorium-Writer/               ← library root (libraryPath)
       notes/
         notes.json
   .trash/                         ← soft-deleted stories/chapters land here
+  .import-tmp/                    ← library-import staging; transient, wiped at startup
 ```
 
 `NN-slug` filenames are for human legibility only; the app always resolves chapters by
@@ -100,6 +109,81 @@ reordering renumbers the `NN-` prefixes). The one thing that never changes is th
 `versions/<chapterId>/` folder — that id is the chapter's identity, so it keeps the slug
 of whatever the chapter was called when it was created. Alignment lives in the JSON canon
 (Markdown can't carry it), which is why the canon is JSON, not Markdown.
+
+## Library import
+
+Settings → "Import library…" (Windows, PWA, Android) restores or merges a `.zip` made by
+**Export library** on any platform. Export and import share one archive format.
+
+### The archive header: `manifest.json`
+
+Every export contains `manifest.json` at the archive root. It is generated at zip time and
+never stored in the library folder; a stray root `manifest.json` (from a hand-unzipped
+archive) and `.import-tmp/` are excluded from exports. Fields:
+
+| Field | Meaning |
+|-------|---------|
+| `format` | `"scriptorium-library"` |
+| `formatVersion` | `1`. Bumped when the layout changes in a way an older importer must refuse. |
+| `appVersion` | The exporting app's version. |
+| `exportedAt` | ISO timestamp. |
+| `platform` | The exporting platform. |
+| `schema` | The story, chapter and notes `schemaVersion`s in the archive. |
+
+An archive **without** a manifest is treated as a legacy (1.6.0 or earlier) export and
+imports normally. An archive with a newer `formatVersion` is refused whole, with a message
+to update the app first. A story or chapter saved with a newer `schemaVersion` marks only
+that story Invalid.
+
+### Pipeline: preview, decide, staged apply
+
+1. **Preview** (`src/data/library-import.ts`, pure — no writes). Unzips with `unzipSync`
+   (fflate's async API spawns `blob:` workers, which the PWA CSP blocks), validates, and
+   returns per-story file sets. `FileService` classifies each story against the local
+   library: **New** (id not present), **Identical** (byte-equal to the local copy, ignoring
+   `versions/`), **Conflict** (same id, different content), or **Invalid** (with a reason).
+   Story ids are compared case-insensitively. Nothing is written. Missing chapter files are
+   a per-story warning, not a failure.
+2. **Decide** (`src/shared/library-import-rules.ts`, shared by the dialog and the data
+   layer so they cannot disagree). Allowed decisions, first is the default: New →
+   Import / Skip; Identical → Skip; Conflict → Keep both / Replace / Skip; Invalid → Skip.
+   **Keep both** gives the incoming story a new id and a title suffixed
+   « (импорт DD.MM.YYYY)» / " (imported YYYY-MM-DD)". **Replace** moves the current copy to
+   `.trash/` — it is never deleted.
+3. **Apply** (`src/data/library-import-apply.ts`). Per story: stage every file under
+   `<library>/.import-tmp/<run>/<id>/` with `atomicWriteFile`; verify the staged copy
+   (sizes and the `story.json` id); for Replace, move the local story to `.trash/`; publish
+   by renaming the staged directory to `stories/<id>/`. If publishing fails after a Replace,
+   the trashed copy is renamed back. A story that fails is reported and does not roll back
+   the others; the result is shown as a failure, not a success, when any story failed.
+
+The renderer side (`src/renderer/import/library-import-flow.ts`, `ImportLibraryDialog`)
+first saves the open chapter through the same path as quit-flush and refuses to import if
+that save fails. A replaced story that is open is closed before the apply and reopened
+after. Afterwards the library is re-scanned, so a chapter whose file was missing in the
+archive is offered for restore from version history in the recovery dialog.
+
+What is **not** imported: `.trash/` in the archive, unknown root entries (counted and
+reported), and settings (they are per-machine and not in the archive).
+
+### Safety limits
+
+The whole archive is refused — before anything is staged — for: more than 200 MB compressed,
+1 GB unpacked, or 50 000 entries; unsafe entry paths; unsupported compression; sizes that
+disagree with the headers; names that collide when case is ignored; a malformed manifest.
+`.import-tmp/` lives at the library root, is wiped by `ensureLibrary` at startup, and is
+never listed or exported.
+
+### Library import: known limitations
+
+- **OPFS directory move can be non-atomic.** Where the browser has no native directory
+  move, `OpfsFsPort.rename` copies then removes. A crash in the middle can leave a partial
+  copy at the target. The source is removed only after the copy completes. (The test
+  Chromium lacks native move, so the suite exercises the fallback.)
+- **A crafted archive can cost CPU time during preview.** Memory stays bounded by the
+  limits above; time is not.
+- **Two PWA tabs.** A second tab that boots during an import wipes `.import-tmp/`. The
+  affected story fails and is reported; no data is lost.
 
 ## Project layout
 

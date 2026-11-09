@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '@renderer/store/settingsStore'
 import { useT } from '@renderer/i18n/useT'
 import { format } from '@renderer/i18n/strings'
@@ -6,6 +6,8 @@ import { isAppError } from '@shared/errors'
 import { api, getPlatform } from '@renderer/platform'
 import { runLibraryBackup } from '@renderer/backup/run-library-backup'
 import { formatBytes } from '@renderer/backup/format-bytes'
+import type { LibraryImportPreview } from '@shared/types'
+import { ImportLibraryDialog } from './ImportLibraryDialog'
 
 const FONTS = ['PT Serif', 'Lora', 'Georgia']
 const LANGS: { code: string; label: string }[] = [
@@ -19,6 +21,20 @@ export function SettingsView(): JSX.Element {
   const [exportState, setExportState] = useState<
     { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; path: string } | { kind: 'error'; msg: string }
   >({ kind: 'idle' })
+  // M31: the preview is read-only; nothing touches the library until the dialog confirms.
+  const [importPreview, setImportPreview] = useState<Extract<LibraryImportPreview, { canceled: false }> | null>(null)
+  const [importState, setImportState] = useState<{ kind: 'idle' } | { kind: 'busy' } | { kind: 'error'; msg: string }>(
+    { kind: 'idle' }
+  )
+  // The picker and parse can outlast the view (the writer navigates away mid-read). A
+  // preview that lands after unmount has no dialog to release it, so it is discarded here.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   const isWeb = getPlatform().capabilities?.evictableStorage === true
   const exportsToDeviceFolder = getPlatform().capabilities?.exportsToDeviceFolder === true
   // MC3: how the library location is presented is a per-platform answer, not something to
@@ -58,6 +74,31 @@ export function SettingsView(): JSX.Element {
             ? t.errors.exportLibraryFailedDisk
             : t.errors.exportLibraryFailed
       setExportState({ kind: 'error', msg })
+    }
+  }
+
+  const importLibrary = async (): Promise<void> => {
+    setImportState({ kind: 'busy' })
+    try {
+      const preview = await api().previewLibraryImport()
+      if (!mountedRef.current) {
+        if (!preview.canceled) void api().discardLibraryImport(preview.importId).catch(() => {})
+        return
+      }
+      setImportState({ kind: 'idle' })
+      if (!preview.canceled) setImportPreview(preview)
+    } catch (err) {
+      // The archive was refused before anything was written; say why in the writer's terms.
+      const code = isAppError(err) ? err.code : null
+      const msg =
+        code === 'IMPORT_UNSUPPORTED_VERSION'
+          ? t.errors.importLibraryUnsupportedVersion
+          : code === 'IMPORT_TOO_LARGE'
+            ? t.errors.importLibraryTooLarge
+            : code === 'IMPORT_INVALID_ARCHIVE'
+              ? t.errors.importLibraryInvalid
+              : t.errors.importLibraryFailed
+      setImportState({ kind: 'error', msg })
     }
   }
 
@@ -167,6 +208,15 @@ export function SettingsView(): JSX.Element {
           >
             {exportState.kind === 'busy' ? t.settings.exporting : t.settings.exportLibrary}
           </button>
+          {/* M31: on every platform, beside Export. Moving a library between devices is
+              export on one and import on the other; Android has no other route. */}
+          <button
+            className="linkish"
+            disabled={importState.kind === 'busy' || importPreview !== null}
+            onClick={() => void importLibrary()}
+          >
+            {importState.kind === 'busy' ? t.settings.importingLibrary : t.settings.importLibrary}
+          </button>
         </div>
         {exportState.kind === 'done' && (
           <div className="settings-note">
@@ -180,7 +230,11 @@ export function SettingsView(): JSX.Element {
         {exportState.kind === 'error' && (
           <div className="settings-note settings-note--error">{exportState.msg}</div>
         )}
+        {importState.kind === 'error' && (
+          <div className="settings-note settings-note--error">{importState.msg}</div>
+        )}
       </div>
+      {importPreview && <ImportLibraryDialog preview={importPreview} onClose={() => setImportPreview(null)} />}
     </div>
   )
 }

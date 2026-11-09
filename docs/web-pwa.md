@@ -110,7 +110,15 @@ space is in use; the library view nudges you to save a `.zip` backup when the la
 over a week old (dismissible, and it stays away for a week). Use **Export library**
 (Settings) or the nudge button to save a copy — to a folder you choose where the browser
 supports `showSaveFilePicker`, otherwise to Downloads (the path Chrome for Android uses).
-The last successful export is recorded as `lastLibraryBackupAt` in settings. All of this is
+The last successful export is recorded as `lastLibraryBackupAt` in settings.
+
+That `.zip` can be restored in the app: Settings → **Import library…** picks the archive
+(from this browser, another one, the desktop app, or the Android app), previews it story
+by story, and writes nothing until you confirm. Conflicting stories default to **Keep both**;
+**Replace** moves the current copy to `.trash/`. See
+[architecture.md](architecture.md#library-import) for how it works.
+
+All of the backup nudge and storage readout is
 **web-only**: it is gated on the `evictableStorage` capability flag, which is true only in
 a browser tab. Desktop and the Android app both store the library as ordinary files, so
 neither shows the nudge and neither shows the Storage/quota readout — a

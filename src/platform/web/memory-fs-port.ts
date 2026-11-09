@@ -23,6 +23,11 @@ function enoent(path: string): Error & { code: string } {
   })
 }
 
+/** Error carrying `code === 'EINVAL'` (invalid rename request). */
+function invalid(msg: string, path: string): Error & { code: string } {
+  return Object.assign(new Error(`EINVAL: ${msg}, '${path}'`), { code: 'EINVAL' })
+}
+
 /** Normalise to forward slashes and strip any trailing slash (but keep root). */
 function normalize(path: string): string {
   const p = path.replace(/\\/g, '/').replace(/\/+$/, '')
@@ -98,9 +103,44 @@ export class MemoryFsPort implements FsPort {
     const src = normalize(from)
     const dst = normalize(to)
     const bytes = this.files.get(src)
-    if (bytes === undefined) throw enoent(from)
-    this.files.set(dst, bytes)
-    this.files.delete(src)
+    if (bytes !== undefined) {
+      this.files.set(dst, bytes)
+      this.files.delete(src)
+      return
+    }
+    if (src === '/') throw invalid('cannot rename the root', from)
+    // Directory move (M31): re-key every file and directory under `src`.
+    const prefix = `${src}/`
+    const hasChildren =
+      [...this.files.keys()].some((k) => k.startsWith(prefix)) ||
+      [...this.dirs].some((k) => k.startsWith(prefix))
+    if (!this.dirs.has(src) && !hasChildren) throw enoent(from)
+    if (dst === '/') throw invalid('cannot rename onto the root', to)
+    if (dst === src) return // no-op, matches Node
+    if (dst.startsWith(prefix)) throw invalid(`cannot move '${from}' into itself`, to)
+    // Never merge into an existing target (same rule as OpfsFsPort).
+    if (
+      this.files.has(dst) ||
+      this.dirs.has(dst) ||
+      [...this.files.keys()].some((k) => k.startsWith(`${dst}/`))
+    ) {
+      throw Object.assign(new Error(`EEXIST: directory target exists, '${to}'`), {
+        code: 'EEXIST'
+      })
+    }
+    for (const [key, value] of [...this.files]) {
+      if (!key.startsWith(prefix)) continue
+      this.files.delete(key)
+      this.files.set(dst + key.slice(src.length), value)
+    }
+    for (const key of [...this.dirs]) {
+      if (key !== src && !key.startsWith(prefix)) continue
+      this.dirs.delete(key)
+      this.dirs.add(dst + key.slice(src.length))
+    }
+    // Create dst's ancestor chain, as OpfsFsPort does for the destination parent, so
+    // readdir/stat on the new parent work after the move.
+    for (const dir of ancestors(dst)) this.dirs.add(dir)
   }
 
   async rm(path: string, opts?: { force?: boolean; recursive?: boolean }): Promise<void> {

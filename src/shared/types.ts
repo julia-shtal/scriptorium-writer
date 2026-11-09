@@ -199,6 +199,75 @@ export type ExportFormat = 'docx' | 'md'
 export type ExportFileResult = { canceled: true } | { canceled: false; path: string }
 
 /**
+ * Header written as `manifest.json` at the root of every library export from M31 on.
+ * Generated at zip time only — never written into the library folder. Archives without
+ * one are legacy (≤ v1.6.0) and imported as `formatVersion: 1`.
+ */
+export interface LibraryManifest {
+  format: 'scriptorium-library'
+  formatVersion: number
+  appVersion: string
+  exportedAt: ISODate
+  /** `process.platform` on desktop ('win32', …), 'web', or 'android'. */
+  platform: string
+  schema: { story: number; chapter: number; notes: number }
+}
+
+export type ImportStoryStatus = 'new' | 'identical' | 'conflict' | 'invalid'
+export type ImportDecision = 'import' | 'skip' | 'keepBoth' | 'replace'
+
+/** Why a story in an archive cannot be imported. Rendered via i18n, never shown raw. */
+export type ImportInvalidReason =
+  | 'missingStoryJson'
+  | 'badStoryJson' // unparseable, or not a story shape
+  | 'idMismatch' // story.json id ≠ its folder name
+  | 'storySchemaTooNew'
+  | 'badChapter' // a chapters/*.json is unparseable or not a chapter
+  | 'chapterSchemaTooNew'
+  | 'badNotes'
+  | 'notesSchemaTooNew'
+
+/** Non-blocking problem: the story imports, and post-import recovery offers to fix it. */
+export type ImportStoryWarning = { kind: 'missingChapter'; chapterId: string }
+
+export interface ImportStorySide {
+  title: string
+  chapterCount: number
+  wordCount: number
+  /** '' when unknown (an unreadable local story.json). */
+  updatedAt: ISODate
+}
+
+export interface ImportStoryPreview {
+  id: string
+  status: ImportStoryStatus
+  incoming: ImportStorySide
+  /** Present when a story with this id already exists locally. */
+  local?: ImportStorySide
+  warnings: ImportStoryWarning[]
+  invalidReason?: ImportInvalidReason
+}
+
+export type LibraryImportPreview =
+  | { canceled: true }
+  | {
+      canceled: false
+      importId: string
+      fileName: string
+      /** null for a legacy (≤ v1.6.0) archive with no manifest. */
+      manifest: LibraryManifest | null
+      stories: ImportStoryPreview[]
+      /** Entries outside stories/<id>/** — `.trash/`, stray files. Never imported. */
+      ignoredEntries: number
+    }
+
+export interface LibraryImportResult {
+  imported: { id: string; finalId: string; decision: ImportDecision }[]
+  skipped: string[]
+  failed: { id: string; reason: string }[]
+}
+
+/**
  * The typed surface exposed on `window.api` via the preload contextBridge. Every
  * method here is backed 1:1 by an `ipcMain.handle` registration delegating to the
  * main-process `FileService`. Signatures are the single source of truth for both
@@ -246,6 +315,17 @@ export interface Api {
   revealInFolder(path: string): Promise<void> // open a folder in the OS file explorer
   /** Export the whole library to a user-chosen .zip (M13). Main shows the save dialog. */
   exportLibrary(): Promise<ExportLibraryResult>
+
+  // library import (M31)
+  /** Pick a .zip, parse + validate + classify it. Writes nothing. */
+  previewLibraryImport(): Promise<LibraryImportPreview>
+  /** Apply per-story decisions to the pending import (missing -> status default). */
+  applyLibraryImport(
+    importId: string,
+    decisions: Record<string, ImportDecision>
+  ): Promise<LibraryImportResult>
+  /** Drop the pending import. Idempotent. */
+  discardLibraryImport(importId: string): Promise<void>
 
   // import / export (M14)
   /** Show an open dialog (.md/.docx), read the file, return normalized content. */

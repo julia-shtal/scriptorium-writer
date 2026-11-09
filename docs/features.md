@@ -131,6 +131,17 @@ folder into one `.zip` (via `archiver`), including `.trash/`, reproducing the on
 file and renames over the destination only once complete, so a failure never touches the
 source or leaves a truncated archive.
 
+Every archive also carries a generated `manifest.json` at its root (format, app and schema
+versions) so an import can recognise it; the manifest is never stored in the library folder.
+
+## Library import
+
+Settings → "Import library…" reads a library `.zip` from any platform (archives without a
+manifest, from 1.6.0, work too). A preview classifies each story as New, Identical,
+Conflict or Invalid before anything is written; conflicts default to Keep both, or can
+Replace (the current copy moves to `.trash/`) or Skip. The archive's `.trash/` and the
+settings are never imported. Details and limits: [architecture.md](architecture.md#library-import).
+
 ## Markdown backup (.md shadow)
 
 Every successful chapter save also writes a

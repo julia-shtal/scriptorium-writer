@@ -25,6 +25,13 @@ export interface FsPort {
   writeFile(path: string, data: string | Uint8Array): Promise<void>
   /** Directory entry names (not full paths). Rejects `ENOENT` when absent. */
   readdir(path: string): Promise<string[]>
+  /**
+   * Move a file OR a directory (with everything under it). A FILE target that already
+   * exists is overwritten — {@link atomicWriteFile} depends on that. A DIRECTORY target
+   * must not exist (adapters may reject with `EEXIST`): renaming onto an existing
+   * directory is unspecified (Node fails on Windows), and the data layer never asks for
+   * it (M31 publishes only into free ids). A directory must not be moved into itself.
+   */
   rename(from: string, to: string): Promise<void>
   rm(path: string, opts?: { force?: boolean; recursive?: boolean }): Promise<void>
   stat(path: string): Promise<{ size: number; mtimeMs: number; isDirectory: boolean }>

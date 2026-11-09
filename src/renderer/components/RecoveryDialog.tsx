@@ -15,6 +15,9 @@ interface Props {
  * missing/corrupt, offer a one-click restore from its newest snapshot. The corrupt
  * canon is never touched here — restore goes through restoreVersion (M1).
  */
+/** A chapter id alone is not unique: a Keep-both library import (M31) copies chapter ids. */
+const keyOf = (r: ChapterRecovery): string => `${r.storyId}/${r.chapterId}`
+
 export function RecoveryDialog({ recoveries, onResolved, onClose }: Props): JSX.Element {
   const t = useT()
   const [busy, setBusy] = useState<string | null>(null)
@@ -22,13 +25,13 @@ export function RecoveryDialog({ recoveries, onResolved, onClose }: Props): JSX.
 
   const restore = async (r: ChapterRecovery): Promise<void> => {
     if (!r.newestVersionId) return
-    setBusy(r.chapterId)
+    setBusy(keyOf(r))
     setFailed(null)
     try {
       await api().restoreVersion(r.storyId, r.chapterId, r.newestVersionId)
       onResolved(r)
     } catch {
-      setFailed(r.chapterId)
+      setFailed(keyOf(r))
     } finally {
       setBusy(null)
     }
@@ -43,20 +46,20 @@ export function RecoveryDialog({ recoveries, onResolved, onClose }: Props): JSX.
         <p>{t.recoveryDialog.intro}</p>
         <ul className="recovery-list">
           {recoveries.map((r) => (
-            <li key={`${r.storyId}/${r.chapterId}`}>
+            <li key={keyOf(r)}>
               <span>
                 {r.chapterTitle ?? r.chapterId} —{' '}
                 {r.reason === 'missing'
                   ? t.recoveryDialog.reasonMissing
                   : t.recoveryDialog.reasonCorrupt}
-                {failed === r.chapterId && (
+                {failed === keyOf(r) && (
                   <span className="recovery-failed">{t.recoveryDialog.restoreFailed}</span>
                 )}
               </span>
               {r.newestVersionId ? (
                 <button
                   className="linkish"
-                  disabled={busy === r.chapterId}
+                  disabled={busy === keyOf(r)}
                   onClick={() => void restore(r)}
                 >
                   {t.recoveryDialog.restore}

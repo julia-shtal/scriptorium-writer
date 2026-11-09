@@ -473,6 +473,115 @@ body {
   color: var(--danger);
 }
 
+/* --- Library import dialog (M31) --- */
+/* The story list can be long, so the dialog caps itself at the viewport and only the list
+   scrolls; header and buttons stay reachable on a phone. dvh, not vh, so the Android
+   soft keyboard and browser chrome are accounted for. Nothing has a fixed width: rows
+   wrap at phone width (the PWA and the APK run there). */
+.modal.import-library {
+  max-width: 560px;
+  max-height: calc(100vh - 32px); /* fallback for engines without dvh */
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+/* The dialog takes initial focus (tabIndex -1) only so Tab starts inside it. */
+.modal.import-library:focus {
+  outline: none;
+}
+.import-library-head {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.import-library-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.import-library-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+}
+.import-library-title {
+  flex: 1 1 10em;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.import-library-badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.import-library-badge--new {
+  color: var(--accent);
+}
+.import-library-badge--identical {
+  color: var(--muted);
+}
+.import-library-badge--conflict {
+  color: var(--ink-heading);
+  background: var(--sidebar-bg);
+}
+.import-library-badge--invalid {
+  color: var(--danger);
+}
+.import-library-select {
+  max-width: 100%;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--page-bg);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 4px 6px;
+}
+.import-library-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.import-library-side {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* Warnings inside a row take a full line; the row gap already spaces them. */
+.import-library-row .import-warn {
+  flex-basis: 100%;
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+.import-library-foot {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.import-library-failed {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
 /* --- Export popover (M14) --- */
 /* A small menu anchored to its trigger (⋯ in the editor head, or a caller-supplied
    icon in the chapters list). Warm surface, same shadow/radius feel as .modal. */
@@ -1205,6 +1314,10 @@ fieldset.settings-field {
 }
 .settings-path {
   display: flex;
+  /* M31 put a second long button (Import) beside Export; on a phone they wrap below the
+     location instead of overflowing. The location keeps `flex: 1` (basis 0), so on wider
+     screens nothing wraps and the row looks as before. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   font-family: var(--font-sans);

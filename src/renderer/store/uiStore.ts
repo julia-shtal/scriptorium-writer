@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { FindOptions } from '@renderer/editor/find/computeMatches'
+import type { ChapterRecovery } from '@shared/types'
 
 /** Views from SPEC §10. Only 'editor' is rendered in M2; the rest arrive in M6. */
 export type ViewId =
@@ -31,6 +32,11 @@ interface UiState {
   findQuery: string
   findReplacement: string
   findOptions: FindOptions
+  /**
+   * Chapters the last scan flagged (boot, or after a library import — M31). Drives
+   * RecoveryDialog. In the store, not app.tsx state, so an import can raise it too.
+   */
+  recoveries: ChapterRecovery[]
   setActiveView: (view: ViewId) => void
   toggleFocus: () => void
   toggleSidebar: () => void
@@ -40,6 +46,7 @@ interface UiState {
   setFindQuery: (q: string) => void
   setFindReplacement: (r: string) => void
   setFindOptions: (o: Partial<FindOptions>) => void
+  setRecoveries: (r: ChapterRecovery[]) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -52,6 +59,7 @@ export const useUiStore = create<UiState>((set) => ({
   findQuery: '',
   findReplacement: '',
   findOptions: { caseSensitive: false, wholeWord: false },
+  recoveries: [],
   setActiveView: (activeView) => set({ activeView }),
   toggleFocus: () => set((s) => ({ focusMode: !s.focusMode })),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -60,5 +68,6 @@ export const useUiStore = create<UiState>((set) => ({
   setFindOpen: (findOpen) => set({ findOpen }),
   setFindQuery: (findQuery) => set({ findQuery }),
   setFindReplacement: (findReplacement) => set({ findReplacement }),
-  setFindOptions: (o) => set((s) => ({ findOptions: { ...s.findOptions, ...o } }))
+  setFindOptions: (o) => set((s) => ({ findOptions: { ...s.findOptions, ...o } })),
+  setRecoveries: (recoveries) => set({ recoveries })
 }))

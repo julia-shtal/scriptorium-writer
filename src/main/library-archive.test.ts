@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import AdmZip from 'adm-zip'
 import { zipDirectory } from './library-archive'
 
+const MANIFEST = '{"format":"scriptorium-library"}'
+
 let workDir: string
 let srcDir: string
 let destPath: string
@@ -29,7 +31,7 @@ afterEach(async () => {
 
 describe('zipDirectory', () => {
   it('reproduces the on-disk layout byte-for-byte, including .trash/', async () => {
-    await zipDirectory(srcDir, destPath)
+    await zipDirectory(srcDir, destPath, MANIFEST)
     expect(existsSync(destPath)).toBe(true)
 
     const zip = new AdmZip(destPath)
@@ -50,7 +52,23 @@ describe('zipDirectory', () => {
   })
 
   it('leaves no .part temp file behind on success', async () => {
-    await zipDirectory(srcDir, destPath)
+    await zipDirectory(srcDir, destPath, MANIFEST)
     expect(existsSync(destPath + '.part')).toBe(false)
+  })
+
+  it('appends manifest.json and leaves out stray manifests and .import-tmp (M31)', async () => {
+    await fsp.writeFile(join(srcDir, 'manifest.json'), '{"stale":true}')
+    await fsp.writeFile(join(srcDir, 'stories', 's1', 'manifest.json'), '{"nested":true}')
+    await fsp.mkdir(join(srcDir, '.import-tmp', 'r'), { recursive: true })
+    await fsp.writeFile(join(srcDir, '.import-tmp', 'r', 'x.json'), '{}')
+    await zipDirectory(srcDir, destPath, '{"fresh":true}')
+
+    const zip = new AdmZip(destPath)
+    const names = zip.getEntries().map((e) => e.entryName.replace(/\\/g, '/'))
+    expect(names.filter((n) => n === 'manifest.json')).toHaveLength(1)
+    expect(zip.readAsText('manifest.json')).toBe('{"fresh":true}')
+    expect(names.some((n) => n.startsWith('.import-tmp'))).toBe(false)
+    expect(names).toContain('stories/s1/chapters/01-intro.json')
+    expect(names).toContain('stories/s1/manifest.json') // exclusion is root-only
   })
 })

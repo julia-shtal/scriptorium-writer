@@ -4,7 +4,8 @@
  * The TypeScript DOM lib bundled with this toolchain predates several stable OPFS
  * APIs this port relies on in Chrome (the target platform):
  *  - `FileSystemDirectoryHandle` async iteration (`keys()` / `entries()` / `values()`),
- *  - `FileSystemFileHandle.move()`,
+ *  - `FileSystemFileHandle.move()` (and the optional `FileSystemDirectoryHandle.move()`,
+ *    absent in some engines),
  *  - `FileSystemFileHandle.createSyncAccessHandle()` + `FileSystemSyncAccessHandle`.
  *
  * We also declare a minimal `DedicatedWorkerGlobalScope` (the WebWorker lib is not
@@ -28,6 +29,8 @@ interface FileSystemDirectoryHandle {
   entries(): AsyncIterableIterator<[string, FileSystemHandle]>
   values(): AsyncIterableIterator<FileSystemHandle>
   [Symbol.asyncIterator](): AsyncIterableIterator<[string, FileSystemHandle]>
+  /** Chrome's OPFS directory move. Optional: older engines lack it (M31 falls back). */
+  move?(parent: FileSystemDirectoryHandle, name: string): Promise<void>
 }
 
 interface FileSystemFileHandle {

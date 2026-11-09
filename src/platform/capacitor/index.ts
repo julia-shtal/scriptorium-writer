@@ -44,6 +44,7 @@ export async function createCapacitorPlatform(): Promise<Platform> {
   const { api, service } = await createPlatformFromFsPort(fs, {
     userDataPath: roots.userdata,
     defaultLibraryPath: roots.library,
+    platform: 'android',
     // A settings.json that travelled in from the desktop carries a Windows libraryPath; ignore
     // it and use the resolved Documents root instead of failing to launch (MC3 §6).
     isLibraryPathUsable: isNativeLibraryPathUsable

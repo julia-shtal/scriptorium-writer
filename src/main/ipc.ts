@@ -28,6 +28,8 @@ export interface IpcServices {
   setSpellLanguages(langs: string[]): void
   /** Show a save dialog and export the library to the chosen `.zip` (M13). */
   exportLibrary(): Promise<import('@shared/types').ExportLibraryResult>
+  /** Show an open dialog for a .zip and preview it (M31). Apply/discard go straight to FileService. */
+  previewLibraryImport(): Promise<import('@shared/types').LibraryImportPreview>
   /** Show an open dialog and return normalized import content (M14). */
   readImportFile(): Promise<import('@shared/types').ImportFileResult>
   /** Export one chapter to a user-chosen .docx or .md (M14). */
@@ -67,6 +69,9 @@ export const IPC_CHANNELS = [
   'scanLibrary',
   'revealInFolder',
   'exportLibrary',
+  'previewLibraryImport',
+  'applyLibraryImport',
+  'discardLibraryImport',
   'readImportFile',
   'exportChapter',
   'exportStory'
@@ -87,6 +92,7 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     revealInFolder,
     setSpellLanguages,
     exportLibrary,
+    previewLibraryImport,
     readImportFile,
     exportChapter,
     exportStory
@@ -126,6 +132,10 @@ export function registerIpcHandlers(registrar: IpcRegistrar, services: IpcServic
     scanLibrary: () => fs.scanLibrary(),
     revealInFolder: ([path]) => revealInFolder(path as string),
     exportLibrary: () => exportLibrary(),
+    previewLibraryImport: () => previewLibraryImport(),
+    applyLibraryImport: ([importId, decisions]) =>
+      fs.applyLibraryImport(importId as string, decisions as Parameters<Api['applyLibraryImport']>[1]),
+    discardLibraryImport: ([importId]) => fs.discardLibraryImport(importId as string),
     readImportFile: () => readImportFile(),
     exportChapter: ([storyId, chapterId, format]) =>
       exportChapter(storyId as string, chapterId as string, format as ExportFormat),

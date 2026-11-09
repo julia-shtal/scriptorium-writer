@@ -39,7 +39,9 @@ export const ru = {
   plurals: {
     words: { one: 'слово', few: 'слова', many: 'слов' },
     chapters: { one: 'глава', few: 'главы', many: 'глав' },
-    fixes: { one: 'исправление', few: 'исправления', many: 'исправлений' }
+    fixes: { one: 'исправление', few: 'исправления', many: 'исправлений' },
+    // Accusative, for «переместить в корзину 2 работы» (ImportLibraryDialog).
+    storiesAcc: { one: 'работу', few: 'работы', many: 'работ' }
   },
   // Settings view (SettingsView.tsx)
   settings: {
@@ -69,6 +71,9 @@ export const ru = {
     libraryInDocuments: 'Документы / Scriptorium-Writer',
     exportLibrary: 'Экспортировать библиотеку',
     exporting: 'Экспорт…',
+    // M31: library import (SettingsView → ImportLibraryDialog).
+    importLibrary: 'Импортировать библиотеку…',
+    importingLibrary: 'Чтение архива…',
     librarySaved: 'Библиотека сохранена:',
     storageHeading: 'Хранилище',
     storagePersisted: 'Данные хранятся постоянно на этом устройстве.',
@@ -272,6 +277,54 @@ export const ru = {
     committing: 'Импорт…',
     commit: 'Импортировать'
   },
+  // Library import dialog (ImportLibraryDialog.tsx, M31). Story titles and ids in the
+  // rows are author content, not routed here. `{chapters}` / `{words}` arrive already
+  // composed as "count + plural noun"; `{stories}` is the plural noun alone.
+  importLibrary: {
+    title: 'Импорт библиотеки',
+    fromFile: 'Файл: {name}',
+    legacyArchive: 'Архив из старой версии приложения (без описания формата).',
+    summary: 'Новых: {new} · Конфликтов: {conflict} · Без изменений: {identical} · Повреждённых: {invalid}',
+    ignored: 'Пропущено служебных файлов: {count} (корзина и прочее не импортируются).',
+    statusNew: 'Новая',
+    statusIdentical: 'Без изменений',
+    statusConflict: 'Конфликт',
+    statusInvalid: 'Повреждена',
+    decisionImport: 'Импортировать',
+    decisionSkip: 'Пропустить',
+    decisionKeepBoth: 'Оставить обе',
+    decisionReplace: 'Заменить',
+    decisionLabel: 'Действие',
+    incoming: 'В архиве',
+    local: 'В библиотеке',
+    sideMeta: '{chapters} · {words} · изменено {date}',
+    unknownDate: 'неизвестно',
+    replaceWarning: 'Текущая версия будет перемещена в корзину.',
+    replaceLocalNewer: 'Ваша копия новее, чем в архиве.',
+    missingChapter:
+      'Глава «{id}» указана, но её файла нет — после импорта её можно будет восстановить из истории версий.',
+    invalidMissingStoryJson: 'Нет файла story.json.',
+    invalidBadStoryJson: 'Файл story.json повреждён.',
+    invalidIdMismatch: 'Идентификатор в story.json не совпадает с папкой.',
+    invalidStorySchemaTooNew: 'Работа сохранена более новой версией приложения.',
+    invalidBadChapter: 'Одна из глав повреждена.',
+    invalidChapterSchemaTooNew: 'Глава сохранена более новой версией приложения.',
+    invalidBadNotes: 'Заметки повреждены.',
+    invalidNotesSchemaTooNew: 'Заметки сохранены более новой версией приложения.',
+    empty: 'В архиве нет ни одной работы.',
+    cancel: 'Отмена',
+    confirm: 'Импортировать',
+    confirmWithReplace: 'Импортировать и переместить в корзину {count} {stories}',
+    applying: 'Импорт…',
+    resultTitle: 'Импорт завершён',
+    resultTitlePartial: 'Импорт завершён с ошибками',
+    resultCounts: 'Импортировано: {imported} · Пропущено: {skipped} · Ошибок: {failed}',
+    // One line per failed story; `{reason}` below it is the data layer's technical
+    // message, shown as-is in smaller muted text.
+    resultFailedItem: 'Не удалось импортировать «{title}»',
+    resultFailedDetail: 'Подробности: {reason}',
+    close: 'Закрыть'
+  },
   // Startup crash-recovery prompt (RecoveryDialog.tsx). Chrome only — chapter titles
   // are author content and fall back to chapterId, not routed here.
   recoveryDialog: {
@@ -366,6 +419,15 @@ export const ru = {
     // ImportDialog commit failure (whole-file import could not complete).
     importFailed:
       'Не удалось импортировать файл целиком. Возможно, он повреждён или в неподдерживаемом формате; часть глав могла быть создана.',
+    // M31 library import (SettingsView preview, ImportLibraryDialog apply), by AppError code.
+    importLibraryInvalid: 'Это не архив библиотеки Scriptorium или он повреждён.',
+    importLibraryUnsupportedVersion:
+      'Архив создан более новой версией приложения. Сначала обновите приложение.',
+    importLibraryTooLarge: 'Архив слишком большой для импорта.',
+    importLibraryFailed: 'Не удалось импортировать библиотеку.',
+    // The open chapter could not be saved, so nothing was imported.
+    importLibraryUnsaved:
+      'Не удалось сохранить открытую главу, поэтому импорт отменён. Сохраните главу и попробуйте снова.',
     // useExport per-format failures. `{ext}` is the target file extension (.docx/.md).
     exportChapterFailed: 'Не удалось экспортировать главу в {ext}.',
     exportStoryFailed: 'Не удалось экспортировать работу в {ext}.',
@@ -411,7 +473,8 @@ export const en: Dictionary = {
   plurals: {
     words: { one: 'word', few: 'words', many: 'words' },
     chapters: { one: 'chapter', few: 'chapters', many: 'chapters' },
-    fixes: { one: 'fix', few: 'fixes', many: 'fixes' }
+    fixes: { one: 'fix', few: 'fixes', many: 'fixes' },
+    storiesAcc: { one: 'story', few: 'stories', many: 'stories' }
   },
   settings: {
     title: 'Settings',
@@ -433,6 +496,8 @@ export const en: Dictionary = {
     libraryInDocuments: 'Documents / Scriptorium-Writer',
     exportLibrary: 'Export library',
     exporting: 'Exporting…',
+    importLibrary: 'Import library…',
+    importingLibrary: 'Reading archive…',
     librarySaved: 'Library saved:',
     storageHeading: 'Storage',
     storagePersisted: 'Your data is stored persistently on this device.',
@@ -591,6 +656,49 @@ export const en: Dictionary = {
     committing: 'Importing…',
     commit: 'Import'
   },
+  importLibrary: {
+    title: 'Import library',
+    fromFile: 'File: {name}',
+    legacyArchive: 'Archive from an older app version (no format header).',
+    summary: 'New: {new} · Conflicts: {conflict} · Identical: {identical} · Invalid: {invalid}',
+    ignored: 'Skipped service files: {count} (trash and the like are not imported).',
+    statusNew: 'New',
+    statusIdentical: 'Identical',
+    statusConflict: 'Conflict',
+    statusInvalid: 'Invalid',
+    decisionImport: 'Import',
+    decisionSkip: 'Skip',
+    decisionKeepBoth: 'Keep both',
+    decisionReplace: 'Replace',
+    decisionLabel: 'Action',
+    incoming: 'In archive',
+    local: 'In library',
+    sideMeta: '{chapters} · {words} · changed {date}',
+    unknownDate: 'unknown',
+    replaceWarning: 'The current version will be moved to the trash.',
+    replaceLocalNewer: 'Your copy is newer than the archived one.',
+    missingChapter:
+      'Chapter “{id}” is listed but its file is missing — after import you can restore it from version history.',
+    invalidMissingStoryJson: 'story.json is missing.',
+    invalidBadStoryJson: 'story.json is damaged.',
+    invalidIdMismatch: 'The id in story.json does not match its folder.',
+    invalidStorySchemaTooNew: 'Saved by a newer app version.',
+    invalidBadChapter: 'One of the chapters is damaged.',
+    invalidChapterSchemaTooNew: 'A chapter was saved by a newer app version.',
+    invalidBadNotes: 'The notes are damaged.',
+    invalidNotesSchemaTooNew: 'The notes were saved by a newer app version.',
+    empty: 'The archive contains no stories.',
+    cancel: 'Cancel',
+    confirm: 'Import',
+    confirmWithReplace: 'Import and move {count} {stories} to trash',
+    applying: 'Importing…',
+    resultTitle: 'Import finished',
+    resultTitlePartial: 'Import finished with errors',
+    resultCounts: 'Imported: {imported} · Skipped: {skipped} · Failed: {failed}',
+    resultFailedItem: 'Could not import “{title}”',
+    resultFailedDetail: 'Details: {reason}',
+    close: 'Close'
+  },
   recoveryDialog: {
     title: 'Recovery',
     intro: 'Some chapters could not be read. You can restore them from the latest snapshot.',
@@ -657,6 +765,12 @@ export const en: Dictionary = {
       'Exporting is not available in this app yet. Save a copy of your library from the desktop app or in a browser instead.',
     importFailed:
       'Could not import the whole file. It may be corrupted or in an unsupported format; some chapters may have been created.',
+    importLibraryInvalid: 'This is not a Scriptorium library archive, or it is damaged.',
+    importLibraryUnsupportedVersion: 'The archive was made by a newer app version. Update the app first.',
+    importLibraryTooLarge: 'The archive is too large to import.',
+    importLibraryFailed: 'Could not import the library.',
+    importLibraryUnsaved:
+      'The open chapter could not be saved, so the import was canceled. Save the chapter and try again.',
     exportChapterFailed: 'Could not export the chapter to {ext}.',
     exportStoryFailed: 'Could not export the work to {ext}.',
     openLibraryFailed: 'Could not open the library',
