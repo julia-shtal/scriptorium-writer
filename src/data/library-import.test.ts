@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { zipSync } from 'fflate'
-import { filesEqual, isSafeEntryPath, parseLibraryArchive, IMPORT_LIMITS } from './library-import'
+import { filesEqual, isSafeEntryPath, parseLibraryArchive, storyLastModified, IMPORT_LIMITS } from './library-import'
 import { isAppError } from '@shared/errors'
 
 const enc = (s: string): Uint8Array => new TextEncoder().encode(s)
@@ -43,6 +43,25 @@ describe('parseLibraryArchive', () => {
     })
     expect(parsed.stories[0]!.invalidReason).toBeUndefined()
     expect(parsed.stories[0]!.files.has('chapters/01-one.md')).toBe(true)
+  })
+
+  it('reports the newest chapter edit as the story updatedAt (saveChapter never touches story.json)', () => {
+    const files = validStory('a')
+    files['stories/a/chapters/01-one.json'] = json(chapter('c1', { updatedAt: '2026-09-01T00:00:00.000Z' }))
+    const parsed = parseLibraryArchive(zipSync(files))
+    expect(parsed.stories[0]!.incoming.updatedAt).toBe('2026-09-01T00:00:00.000Z')
+  })
+
+  it('ignores the dates of chapters outside chapterOrder', () => {
+    const files = validStory('a')
+    files['stories/a/chapters/02-stray.json'] = json(chapter('stray', { updatedAt: '2030-01-01T00:00:00.000Z' }))
+    const parsed = parseLibraryArchive(zipSync(files))
+    expect(parsed.stories[0]!.incoming.updatedAt).toBe('2026-02-01T00:00:00.000Z')
+  })
+
+  it('storyLastModified is empty when story.json is unreadable', () => {
+    expect(storyLastModified(new Map([['story.json', enc('{nope')]]))).toBe('')
+    expect(storyLastModified(new Map())).toBe('')
   })
 
   it('reads a manifest archive', () => {

@@ -51,7 +51,7 @@ import {
 import { AppError } from '@shared/errors'
 import { atomicWriteFile } from './atomic-write'
 import { buildLibraryManifest, isExcludedFromExport, manifestJson } from './library-manifest'
-import { filesEqual, parseLibraryArchive, type ParsedArchive } from './library-import'
+import { filesEqual, parseLibraryArchive, storyLastModified, type ParsedArchive } from './library-import'
 import { applyImport, type PlannedStory } from './library-import-apply'
 import { allowedDecisions, defaultDecision } from '@shared/library-import-rules'
 import { serializeChapterToMarkdown } from './markdown'
@@ -768,9 +768,13 @@ export class FileService {
       if (localId !== undefined) matched.set(p.id, localId)
       const summary = localId !== undefined ? summaries.get(localId) : undefined
       let status: ImportStoryStatus
+      let localFiles: Map<string, Uint8Array> | undefined
       if (p.invalidReason) status = 'invalid'
       else if (localId === undefined) status = 'new'
-      else status = filesEqual(p.files, await this.readStoryFiles(root, localId)) ? 'identical' : 'conflict'
+      else {
+        localFiles = await this.readStoryFiles(root, localId)
+        status = filesEqual(p.files, localFiles) ? 'identical' : 'conflict'
+      }
       statuses.set(p.id, status)
       stories.push({
         id: p.id,
@@ -783,7 +787,9 @@ export class FileService {
                 title: summary.title,
                 chapterCount: summary.chapterCount,
                 wordCount: summary.wordCount,
-                updatedAt: summary.updatedAt
+                // Same definition as the incoming side (newest chapter edit counts, not just
+                // story.json); only colliding non-invalid stories were read, else the summary's.
+                updatedAt: (localFiles ? storyLastModified(localFiles) : '') || summary.updatedAt
               }
             : // The folder exists but story.json is unreadable (listStories skipped it).
               { title: localId, chapterCount: 0, wordCount: 0, updatedAt: '' },

@@ -85,6 +85,43 @@ export function filesEqual(a: Map<string, Uint8Array>, b: Map<string, Uint8Array
   })
 }
 
+/**
+ * A story's "last modified" for import comparison: the newest of story.json's updatedAt and
+ * the updatedAt of every readable chapter in its chapterOrder. saveChapter stamps only the
+ * chapter, so story.json alone says "unchanged" after the most common edit (typing). One
+ * pure helper for BOTH the archive and the local side, so the two can never drift.
+ * ISO-8601 strings compare lexically. Returns '' when nothing readable carries a date.
+ */
+export function storyLastModified(files: Map<string, Uint8Array>): string {
+  let latest = ''
+  const consider = (v: unknown): void => {
+    if (typeof v === 'string' && v > latest) latest = v
+  }
+  let order: Set<string> | null = null
+  try {
+    const story = parseJson(files.get('story.json') ?? new Uint8Array())
+    if (isRecord(story)) {
+      consider(story.updatedAt)
+      if (Array.isArray(story.chapterOrder)) {
+        order = new Set(story.chapterOrder.filter((c): c is string => typeof c === 'string'))
+      }
+    }
+  } catch {
+    return ''
+  }
+  if (!order) return latest
+  for (const [rel, bytes] of files) {
+    if (!/^chapters\/[^/]+\.json$/.test(rel)) continue
+    try {
+      const ch = parseJson(bytes)
+      if (isRecord(ch) && typeof ch.id === 'string' && order.has(ch.id)) consider(ch.updatedAt)
+    } catch {
+      // An unreadable chapter contributes no date; validateStory reports it separately.
+    }
+  }
+  return latest
+}
+
 export function parseLibraryArchive(bytes: Uint8Array, limits: ImportLimits = IMPORT_LIMITS): ParsedArchive {
   if (bytes.byteLength > limits.maxArchiveBytes) {
     throw new AppError('IMPORT_TOO_LARGE', `archive is ${bytes.byteLength} bytes (limit ${limits.maxArchiveBytes})`)
@@ -279,6 +316,6 @@ function validateStory(id: string, files: Map<string, Uint8Array>): ParsedStory 
   const wordCount = order.reduce((sum, c) => sum + (wordsById.get(c) ?? 0), 0)
   return {
     id, files, warnings,
-    incoming: { title: s.title, chapterCount: order.length, wordCount, updatedAt: s.updatedAt }
+    incoming: { title: s.title, chapterCount: order.length, wordCount, updatedAt: storyLastModified(files) || s.updatedAt }
   }
 }

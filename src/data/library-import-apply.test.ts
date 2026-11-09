@@ -372,3 +372,21 @@ describe('importedTitle', () => {
     expect(importedTitle('Frost', 'en', d)).toBe('Frost (imported 2026-11-09)')
   })
 })
+
+describe('previewLibraryImport last-modified', () => {
+  it('sees a chapter saved after export as newer on the local side', async () => {
+    const { svc } = await makeService()
+    const s = await svc.createStory({ title: 'A' })
+    const ch = await svc.createChapter(s.id, 'One')
+    await svc.saveChapter(s.id, { id: ch.id, title: 'One', doc: doc('before') })
+    const exported: Record<string, Uint8Array> = {}
+    for (const e of await svc.readLibraryEntries()) exported[e.path] = e.data
+    // saveChapter stamps only the chapter, not story.json — the case the story date missed.
+    await new Promise((r) => setTimeout(r, 5))
+    await svc.saveChapter(s.id, { id: ch.id, title: 'One', doc: doc('edited later') })
+    const preview = await svc.previewLibraryImport(zipSync(exported), 'x.zip')
+    const entry = preview.stories.find((p) => p.id === s.id)!
+    expect(entry.status).toBe('conflict')
+    expect(entry.local!.updatedAt > entry.incoming.updatedAt).toBe(true)
+  })
+})

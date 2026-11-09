@@ -35,6 +35,20 @@ export function SettingsView(): JSX.Element {
       mountedRef.current = false
     }
   }, [])
+  // Focus return after the dialog closes. useFocusTrap restores to whatever was focused when
+  // the dialog mounted, but the button is disabled while the archive is read and Chrome drops
+  // focus to <body> when a focused button becomes disabled — so the trap captures <body>.
+  // Put focus back on the button ourselves once the dialog is gone.
+  const importButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogWasOpenRef = useRef(false)
+  useEffect(() => {
+    if (importPreview) {
+      dialogWasOpenRef.current = true
+    } else if (dialogWasOpenRef.current) {
+      dialogWasOpenRef.current = false
+      importButtonRef.current?.focus()
+    }
+  }, [importPreview])
   const isWeb = getPlatform().capabilities?.evictableStorage === true
   const exportsToDeviceFolder = getPlatform().capabilities?.exportsToDeviceFolder === true
   // MC3: how the library location is presented is a per-platform answer, not something to
@@ -211,8 +225,11 @@ export function SettingsView(): JSX.Element {
           {/* M31: on every platform, beside Export. Moving a library between devices is
               export on one and import on the other; Android has no other route. */}
           <button
+            ref={importButtonRef}
             className="linkish"
-            disabled={importState.kind === 'busy' || importPreview !== null}
+            // Not disabled while the dialog is open: it is modal (focus-trapped, backdrop
+            // covers the page), so the button is unreachable anyway.
+            disabled={importState.kind === 'busy'}
             onClick={() => void importLibrary()}
           >
             {importState.kind === 'busy' ? t.settings.importingLibrary : t.settings.importLibrary}
