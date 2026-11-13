@@ -17,10 +17,11 @@
 // ANDROID_HOME / ANDROID_SDK_ROOT. Nothing here reads or writes key material: the SHA-256
 // fingerprint of a certificate is public, and is the whole point of check 3.
 // Usage: `npm run verify:apk`, or `node scripts/verify-apk.mjs <path-to.apk>`.
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildToolVersions as listBuildToolVersions, findBuildTool, sdkRoot } from './android-sdk.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -75,7 +76,7 @@ if (!existsSync(apk) || !statSync(apk).isFile()) {
 // ---------------------------------------------------------------- the SDK tools
 // Both variable names are checked because both are in circulation: ANDROID_HOME is what
 // Android Studio writes, ANDROID_SDK_ROOT is what a lot of CI and CLI docs still use.
-const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT
+const sdk = sdkRoot()
 if (!sdk) {
   fail(
     'neither ANDROID_HOME nor ANDROID_SDK_ROOT is set, so the Android SDK cannot be found.',
@@ -103,36 +104,10 @@ if (!existsSync(buildToolsRoot)) {
   )
 }
 
-// Build-tools directories are named by version ("36.0.0", "35.0.1", "34.0.0-rc3"), so a plain
-// lexicographic sort puts "9.0.0" above "34.0.0". Compare the numeric components instead and
-// take the highest — the newest apksigner reads every older APK, so newest is always right.
-function compareVersions(a, b) {
-  const parts = (s) => s.split(/[.\-]/).map((x) => (/^\d+$/.test(x) ? Number(x) : -1))
-  const pa = parts(a)
-  const pb = parts(b)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pb[i] ?? -1) - (pa[i] ?? -1)
-    if (d !== 0) return d
-  }
-  return 0
-}
-const buildToolVersions = readdirSync(buildToolsRoot, { withFileTypes: true })
-  .filter((e) => e.isDirectory())
-  .map((e) => e.name)
-  .sort(compareVersions)
-
-// apksigner ships as a .bat wrapper on Windows and an extensionless shell script elsewhere;
-// aapt2 is a real executable, hence the .exe.
-const exeNames = (base, win) => (process.platform === 'win32' ? [`${base}${win}`, base] : [base])
-function findTool(base, win) {
-  for (const version of buildToolVersions) {
-    for (const name of exeNames(base, win)) {
-      const candidate = join(buildToolsRoot, version, name)
-      if (existsSync(candidate)) return { path: candidate, version }
-    }
-  }
-  return null
-}
+// Newest-first version order and the per-platform file names live in android-sdk.mjs, shared
+// with the release preflight so both agree on which apksigner is "the" apksigner.
+const buildToolVersions = listBuildToolVersions(buildToolsRoot)
+const findTool = (base, win) => findBuildTool(buildToolsRoot, buildToolVersions, base, win)
 
 const apksigner = findTool('apksigner', '.bat')
 if (!apksigner) {

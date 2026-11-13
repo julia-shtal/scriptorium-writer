@@ -167,7 +167,9 @@ rule, through the same preview + single-transaction path.
 
 Packaged builds check GitHub Releases in the background via
 `electron-updater`'s GitHub provider (no separate update server); `electron-builder.yml`
-carries the `publish` block, and `npm run build:win` emits a `latest.yml` manifest. The
+carries the `publish` block, and `npm run build:win` emits a `latest.yml` manifest. Every
+release carries that manifest with the installer it names, checked against it before upload
+([releasing.md](releasing.md)), because a release without it breaks the update check. The
 check never blocks launch (skipped in dev, fire-and-forget in packaged builds). A
 downloaded update shows a dismissible footer notice; "Restart now" routes through the same
 quit-guard flush as a normal quit, so no unsaved chapter is lost.

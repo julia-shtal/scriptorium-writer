@@ -20,7 +20,8 @@ The same React renderer also builds as a plain browser app — a second Vite tar
 - `npm run verify:web` — checks a built `dist-web/`: that the entry HTML was renamed to
   `index.html` (Capacitor requires that name), that the manifest is complete, English, and
   points only at icons that exist, that the service worker precaches the shell but not the
-  unreachable `archiver` chunk, and that the bundle is still inside its size budgets. It
+  unreachable `archiver` chunk, that `version.json` matches `package.json`, and that the
+  bundle is still inside its size budgets. It
   prints the measured sizes and the margin left against each budget.
 - `npm run preview:web` — serves the built `dist-web/` so a production bundle can actually be
   looked at before release. Note that `vite preview` serves plain HTTP, so **the service worker
@@ -38,10 +39,16 @@ Pages from the **`gh-pages`** branch of this repository. That branch holds a bui
 not source: it is the contents of `dist-web/` and nothing else.
 
 - **Nothing is built on GitHub.** There is no Actions workflow and no Pages build step. A
-  deployment is `npm run build:web` on the author's machine, then copying `dist-web/` onto
-  `gh-pages`. The bundle that was verified with `npm run verify:web` and looked at with
-  `npm run preview:web` is byte-for-byte the bundle that gets served — a build that only
-  ever happens in one place cannot disagree with itself.
+  deployment is part of every release, run on the author's machine by `npm run release`: it
+  builds `dist-web/` once, verifies it, freezes that copy, and commits exactly the frozen
+  bundle onto `gh-pages` — the same bytes the Android APK is packed from. The bundle that was
+  verified is byte-for-byte the bundle that gets served — a build that only ever happens in
+  one place cannot disagree with itself. The procedure is in [releasing.md](releasing.md).
+- **`version.json`** at the bundle root holds the version from `package.json`. The release
+  polls the deployed copy to see when Pages is serving the new version. It is deliberately
+  left out of the service-worker precache, so a request for it always reaches the network
+  rather than an installed client's cached copy; `npm run verify:web` fails if it is missing,
+  stale, or precached.
 - **`base` is `'./'`** (`vite.web.config.ts`), so every asset URL in the bundle is relative.
   That is what lets a project page at the `/scriptorium-writer/` subpath work with no
   configuration, and it is the same property that makes the Capacitor WebView's

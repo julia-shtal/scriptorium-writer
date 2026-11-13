@@ -12,5 +12,7 @@ what the app is; these pages hold the detail.
   permission, export, build loop, signing, and what is still unverified.
 - [Web build and PWA](web-pwa.md) — the browser target, OPFS storage, offline and update
   behaviour, touch adaptations, and backups against storage eviction.
+- [Releasing](releasing.md) — publishing a version: the release machine's setup, what
+  `npm run release` does and in what order, and what to do when it stops halfway.
 - [Feature reference](features.md) — per-feature notes on how each capability works.
 - [Changelog](CHANGELOG.md) — released versions, newest first.

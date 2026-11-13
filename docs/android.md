@@ -424,18 +424,16 @@ until an install is refused.
   `build.gradle` — so a well-meaning "let me just bump it here" edit fails in `npm test`
   rather than at the next release.
 
-**Cutting a release build.**
+**Release builds.** A release is cut with `npm run release`, which bumps the version, builds
+the APK from the same verified web bundle that goes to Pages, checks it with `verify:apk`,
+and publishes it together with the Windows installer and the PWA — see
+[releasing.md](releasing.md). To build a signed release APK by hand, for example to try it
+on a device, `npm run build:android` runs `build:web`, `cap sync` and
+`gradlew.bat -p android :app:assembleRelease`; the APK lands at
+`android/app/build/outputs/apk/release/app-release.apk` (~4.6 MB), and `npm run verify:apk`
+checks it. `:app:bundleRelease` builds an `.aab`, which no release ships.
 
-1. Bump `version` in `package.json`.
-2. `npm run build:web`.
-3. `npx cap sync android` — or `npm run sync:android`, which does steps 2 and 3 together.
-4. Build the signed release in Android Studio, or
-   `./android/gradlew.bat -p android :app:assembleRelease`, which lands at
-   `android/app/build/outputs/apk/release/app-release.apk` (~4.6 MB). `:app:bundleRelease`
-   for an `.aab`.
-5. Install on the device and verify.
-
-**Do not skip step 3, even when only native config changed.**
+**Do not skip the `cap sync`, even when only native config changed.**
 `android/app/src/main/assets/capacitor.config.json` is *generated* and gitignored — it is
 what the app actually reads at runtime. Every edit to
 `capacitor.config.ts`, including `backgroundColor` and the `SystemBars` style above,
@@ -450,6 +448,9 @@ broken change.
 Release signing is configured in
 `android/app/build.gradle` from `android/keystore.properties`;
 `android/keystore.properties.example` is the committed template and documents each key.
+When that file is absent, the same four values are read from the `SCRIPTORIUM_*`
+environment variables instead — the seam a CI runner would use; see
+[One-time setup](releasing.md#one-time-setup) for both.
 
 - **`*.jks`, `*.keystore` and `keystore.properties` are gitignored at the repository
   root**, which uncomments what Capacitor's own `android/.gitignore` ships commented out.
@@ -482,7 +483,8 @@ Release signing is configured in
   it is not a thing that can be done quietly: every existing install would have to be
   uninstalled first. A changed fingerprint is a reason to stop, not to update.
 - **`npm run verify:apk` is the author-side half of that same check.**
-  `scripts/verify-apk.mjs`, run by hand on the built APK before it is uploaded, asserts that
+  `scripts/verify-apk.mjs`, which the release runs on every APK before anything is published
+  (and which `npm run verify:apk` runs by hand on `app-release.apk`), asserts that
   the APK is signed at all; that it carries a v2 or v3 signature, since a v1-only APK on
   `minSdk 30` means the signing config did not apply the way it was meant to; and that
   `versionCode`/`versionName` read back out of the artifact (via `aapt2`, skipped with a note
@@ -493,11 +495,13 @@ Release signing is configured in
   once, after the first release build, from the digest the script prints; until then the
   comparison is skipped with a note and the rest still runs. The script needs `ANDROID_HOME`
   (or `ANDROID_SDK_ROOT`) set, and reads only public certificate material — never the keystore.
-- **Gradle applies the signing config only when `keystore.properties` exists**, and warns
-  in the build log when it doesn't. A keystore-less fresh clone therefore still configures
+- **Gradle applies the signing config only when `keystore.properties` exists or all four
+  signing variables are set**, and warns in the build log when neither is the case. A
+  keystore-less fresh clone therefore still configures
   — Gradle sync and debug builds work — instead of failing outright, while an unsigned
   release APK, which looks identical to a signed one until a device refuses to install it, is
-  never a silent outcome. A half-filled `keystore.properties` fails immediately rather than
+  never a silent outcome. A half-filled `keystore.properties`, or a partial set of the
+  variables, fails immediately rather than
   surfacing much later as an opaque "keystore was tampered with". A warning in a build log is
   easy to scroll past, which is the other reason `npm run verify:apk` exists: it turns "was
   this signed?" into an answer before upload rather than after.

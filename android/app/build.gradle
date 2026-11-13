@@ -45,14 +45,28 @@ def (versionMajor, versionMinor, versionPatch) = versionParts
 // for every installed user, since Android identifies an app by (applicationId, signing key).
 // See android/keystore.properties.example for the expected keys.
 //
-// The file is optional on purpose. A fresh clone has no keystore, and Gradle sync / debug
-// builds must still work there — so its absence downgrades release builds to unsigned
-// rather than failing configuration. It is logged as a warning because an accidentally
-// unsigned release APK looks identical to a signed one until Play or a device rejects it.
+// When that file is absent, the same four values are read from environment variables
+// (M32) — the seam a CI runner would use, with the secrets injected for one build and never
+// written to disk. The file wins when both exist, so a local release can't be silently
+// re-pointed at another key by a stray variable. The variables are all-or-none, with the
+// same reasoning as the missing-key check below; scripts/release/preflight.mjs applies the
+// identical rule, so the release script and Gradle agree on whether the APK will be signed.
+//
+// Both sources are optional on purpose. A fresh clone has no keystore, and Gradle sync /
+// debug builds must still work there — so their absence downgrades release builds to
+// unsigned rather than failing configuration. It is logged as a warning because an
+// accidentally unsigned release APK looks identical to a signed one until Play or a device
+// rejects it.
 def keystorePropertiesFile = rootProject.file('keystore.properties')
 def keystoreProperties = new Properties()
-def hasReleaseKeystore = keystorePropertiesFile.exists()
-if (hasReleaseKeystore) {
+def keystoreEnvVars = [
+    storeFile    : 'SCRIPTORIUM_KEYSTORE_FILE',
+    storePassword: 'SCRIPTORIUM_KEYSTORE_PASSWORD',
+    keyAlias     : 'SCRIPTORIUM_KEY_ALIAS',
+    keyPassword  : 'SCRIPTORIUM_KEY_PASSWORD'
+]
+def hasReleaseKeystore = false
+if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
     def missing = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].findAll {
         !keystoreProperties.getProperty(it)
@@ -64,6 +78,23 @@ if (hasReleaseKeystore) {
             "${keystorePropertiesFile} is missing required key(s): ${missing.join(', ')}. " +
             "See android/keystore.properties.example."
         )
+    }
+    hasReleaseKeystore = true
+} else {
+    // An empty variable counts as unset (Groovy truth), matching the release preflight.
+    def setVars = keystoreEnvVars.values().findAll { System.getenv(it) }
+    if (setVars) {
+        def missingVars = keystoreEnvVars.values().findAll { !System.getenv(it) }
+        if (missingVars) {
+            throw new GradleException(
+                "${keystorePropertiesFile} is absent and the signing environment variables are " +
+                "only partly set — missing: ${missingVars.join(', ')}. Set all four " +
+                "(${keystoreEnvVars.values().join(', ')}) or none."
+            )
+        }
+        // Loaded into the same Properties object, so signingConfigs below has one code path.
+        keystoreEnvVars.each { key, envVar -> keystoreProperties.setProperty(key, System.getenv(envVar)) }
+        hasReleaseKeystore = true
     }
 }
 
@@ -85,14 +116,16 @@ android {
     }
     signingConfigs {
         release {
-            // Only populated when the properties file is present; an empty signingConfig is
-            // harmless as long as nothing references it (see buildTypes.release below).
+            // Only populated when the properties file or the env vars are present; an empty
+            // signingConfig is harmless as long as nothing references it (see
+            // buildTypes.release below).
             if (hasReleaseKeystore) {
                 // storeFile is resolved against android/ (the Gradle root project) rather than
                 // against this module, so the properties file can say `scriptorium-release.jks`
                 // and mean the keystore sitting next to it. Gradle's file() passes absolute
                 // paths through unchanged, so pointing at a keystore kept outside the repo
-                // also works.
+                // also works. SCRIPTORIUM_KEYSTORE_FILE resolves the same way; give it an
+                // absolute path.
                 storeFile rootProject.file(keystoreProperties.getProperty('storeFile'))
                 storePassword keystoreProperties.getProperty('storePassword')
                 keyAlias keystoreProperties.getProperty('keyAlias')
@@ -106,9 +139,10 @@ android {
                 signingConfig signingConfigs.release
             } else {
                 logger.warn(
-                    "MC4: ${keystorePropertiesFile} not found — release builds will be UNSIGNED " +
-                    "and cannot be installed on a device or uploaded to Play. Copy " +
-                    "android/keystore.properties.example and point it at your keystore."
+                    "MC4: ${keystorePropertiesFile} not found and SCRIPTORIUM_KEYSTORE_FILE etc. " +
+                    "not set — release builds will be UNSIGNED and cannot be installed on a " +
+                    "device or uploaded to Play. Copy android/keystore.properties.example and " +
+                    "point it at your keystore."
                 )
             }
             minifyEnabled false
