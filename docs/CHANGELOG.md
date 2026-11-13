@@ -1,6 +1,6 @@
 # Changelog
 
-Released versions, newest first. Dates are the release tag dates.
+Released versions, newest first. Dates are the release dates.
 
 ## 1.7.0 — unreleased
 

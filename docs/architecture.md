@@ -199,7 +199,7 @@ electron-builder.yml      # Windows NSIS packaging + GitHub publish (auto-update
 capacitor.config.ts       # Android container config: appId, scheme, SystemBars, colours
 android/                  # Capacitor's Gradle project — hand-editable, tracked on purpose
 resources/                # bundled at package time: dictionaries/ (.bdic), icons/
-scripts/                  # gen-icon.mjs — desktop .ico, PWA PNGs, Android mipmaps
+scripts/                  # gen-icon, verify-web-build, verify-apk, android-sdk, release.mjs + release/ (see releasing.md)
 src/
   main/                   # Electron wiring: IPC, spellcheck, docx/zip, auto-update, library-archive
   data/                   # Platform-neutral data layer: FileService, atomic-write, snapshots, markdown, paths (injected FsPort — no Node imports)

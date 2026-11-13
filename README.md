@@ -160,6 +160,7 @@ npm run dev      # opens the book-themed editor on a seeded demo chapter
 | `npm run sync:android:dev` | `build:web:dev` + `npx cap sync android` — the on-device debug loop. |
 | `npm run open:android` | `npx cap open android`. Does not build or sync first. |
 | `npm run run:android` | Build the web bundle, then `npx cap run android` (syncs and deploys). |
+| `npm run release -- <major\|minor\|patch\|X.Y.Z>` | Build, verify and publish Windows, the PWA and Android together — see [docs/releasing.md](docs/releasing.md). |
 
 ## Architecture
 
@@ -214,6 +215,8 @@ are in [docs/architecture.md](docs/architecture.md).
   verification status.
 - [docs/web-pwa.md](docs/web-pwa.md) — the browser build, OPFS, offline and update
   behaviour, backups.
+- [docs/releasing.md](docs/releasing.md) — cutting a release: setup, the `npm run release`
+  stages, resume and abort.
 - [docs/features.md](docs/features.md) — per-feature notes on how each capability works.
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — released versions, newest first.
 

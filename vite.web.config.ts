@@ -14,6 +14,7 @@
 //
 // This mirrors the `renderer` section of electron.vite.config.ts but is plain Vite, not
 // electron-vite: no externalizeDepsPlugin (the browser bundle must include its deps).
+import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -92,6 +93,24 @@ function injectWebCsp(): Plugin {
   }
 }
 
+// version.json ({"version":"X.Y.Z"} from package.json) at the bundle root, for the release
+// script's post-publish smoke check (M32): it polls the deployed Pages site until this file
+// reads the version just released, which is how "the PWA is live" becomes something a script
+// can see. It is deliberately NOT precached — the workbox globPatterns below have no `json` —
+// so a fetch always reaches the network rather than an installed client's stale copy; keep
+// it that way. scripts/verify-web-build.mjs checks it is present, matches package.json and is
+// absent from sw.js.
+function emitVersionJson(): Plugin {
+  return {
+    name: 'scriptorium-writer:version-json',
+    apply: 'build',
+    generateBundle() {
+      const { version } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: `${JSON.stringify({ version })}\n` })
+    }
+  }
+}
+
 export default defineConfig({
   root: 'src/renderer',
   base: './', // relative asset URLs — works from a subpath, and from Capacitor's https://localhost WebView origin (MC1)
@@ -122,6 +141,7 @@ export default defineConfig({
     serveWebIndex(),
     injectWebCsp(),
     renameIndexHtml(),
+    emitVersionJson(),
     mkcert(), // dev HTTPS so the tablet can register a service worker + persist OPFS
     VitePWA({
       registerType: 'prompt', // never reload mid-sentence; the user chooses when
@@ -132,6 +152,7 @@ export default defineConfig({
         // Precache the whole shell. The app makes ZERO network requests after load
         // (all storage is OPFS), so there is intentionally NO runtimeCaching — do not
         // add a network-first strategy for requests that never happen.
+        // No `json` on purpose: version.json (emitVersionJson above) must stay out of the precache.
         globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
         // library-archive is `archiver`, reached only by the dynamic import at
         // file-service.ts:654. The web Platform answers exportLibrary with UNSUPPORTED

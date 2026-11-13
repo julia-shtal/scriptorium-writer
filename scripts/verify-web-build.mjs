@@ -141,7 +141,36 @@ for (const f of files) {
   }
 }
 
-// --- 8. size budgets -----------------------------------------------------------------------
+// --- 8. version.json -----------------------------------------------------------------------
+// Emitted by `emitVersionJson` in vite.web.config.ts (M32). The release's post-publish smoke
+// check polls the deployed copy until it reads the version just released, so a missing or stale
+// file would make a good deploy look broken, or a stale deploy look good. It must not be
+// precached, or an installed client would answer from its own cache.
+const PACKAGE_VERSION = JSON.parse(readFileSync(join(HERE, '..', 'package.json'), 'utf8')).version
+let builtVersion = null
+if (!has('version.json')) {
+  fail('version.json is missing — the version-json plugin in vite.web.config.ts did not run.')
+} else {
+  let parsed
+  try {
+    parsed = JSON.parse(readFileSync(join(DIST, 'version.json'), 'utf8'))
+  } catch (err) {
+    fail(`version.json is not valid JSON: ${err.message}`)
+  }
+  if (parsed !== undefined) {
+    builtVersion = parsed?.version ?? null
+    if (typeof builtVersion !== 'string') {
+      fail('version.json has no "version" string.')
+    } else if (builtVersion !== PACKAGE_VERSION) {
+      fail(`version.json says "${builtVersion}", but package.json is ${PACKAGE_VERSION} — a stale bundle?`)
+    }
+  }
+  if (precached.includes('version.json')) {
+    fail('sw.js precaches version.json — the release smoke check would read a cached copy; keep json out of globPatterns.')
+  }
+}
+
+// --- 9. size budgets -----------------------------------------------------------------------
 const totalBytes = files.reduce((sum, f) => sum + f.bytes, 0)
 const largest = files.reduce((max, f) => (f.bytes > max.bytes ? f : max), { path: '(none)', bytes: 0 })
 if (totalBytes > MAX_TOTAL_BYTES) {
@@ -174,3 +203,4 @@ console.log(
 )
 console.log(`  precached        ${precached.length} entries (${kb(precached.reduce((s, u) => s + (files.find((f) => f.path === u)?.bytes ?? 0), 0))})`)
 console.log(`  manifest         lang=${manifest?.lang}, ${manifest?.icons?.length ?? 0} icons, no Cyrillic`)
+console.log(`  version.json     ${builtVersion} (matches package.json, not precached)`)

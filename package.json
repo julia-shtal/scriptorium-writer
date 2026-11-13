@@ -22,6 +22,7 @@
     "sync:android:dev": "npm run build:web:dev && npx cap sync android",
     "build:android": "npm run sync:android && android\\gradlew.bat -p android :app:assembleRelease",
     "verify:apk": "node scripts/verify-apk.mjs android/app/build/outputs/apk/release/app-release.apk",
+    "release": "node scripts/release.mjs",
     "open:android": "npx cap open android",
     "run:android": "npm run build:web && npx cap run android",
     "start": "electron-vite preview",
