@@ -2,7 +2,7 @@
 
 Released versions, newest first. Dates are the release dates.
 
-## 1.7.0 — unreleased
+## 1.7.0 — 2026-11-19
 
 - Settings → "Import library…" (Windows, web, Android) restores or merges a library `.zip`
   from any platform, with a per-story preview (new, identical, conflict, invalid) and a
