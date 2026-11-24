@@ -23,7 +23,7 @@ const LIGHT = {
   F: FRAME, P: PARCHMENT, p: PAGE, I: ICON_INK,
   A: ACCENT, g: GOLD, e: EMBER, m: FRAME,
 }
-// Candlelit variant for GitHub dark mode: same object, dimmer room. These stay literal and
+// Dim-room variant for GitHub dark mode: same picture, lower light. These stay literal and
 // local — they are art direction for the README only, and nothing else in the app uses them.
 // This dresses the banner, where every element sits on a dimmed parchment field.
 const DARK = {
@@ -131,55 +131,210 @@ function paths(g, pal) {
   return [...byColor].map(([hex, d]) => `<path fill="${hex}" d="${d}"/>`).join('')
 }
 
-// ---------------------------------------------------------------- candle
-// 15 wide. The flame is animated, so it lives outside the body grid.
-const FLAME = [
-  ['.......e.......', '......epe......', '......gpg......', '.....egpge.....',
-    '.....egpge.....', '.....egpge.....', '.....egege.....'],
-  ['........e......', '.......epe.....', '......gpg......', '.....egpge.....',
-    '.....egpge.....', '.....egpge.....', '.....egege.....'],
-  ['.......e.......', '.......p.......', '......epe......', '......gpg......',
-    '.....egpge.....', '.....egpge.....', '.....egege.....'],
-  ['......e........', '.....epe.......', '......gpg......', '.....egpge.....',
-    '.....egpge.....', '.....egpge.....', '.....egege.....'],
-]
-const FLAME_H = 7
+// ---------------------------------------------------------------- open book
+// Seen in three-quarter view, receding to the upper left. The spread is a plane: u runs
+// across it (-1 left fore-edge, 0 spine, 1 right fore-edge) and v into depth (0 front,
+// 1 back), and `lift` raises the leaves out of the gutter. Each surface is swept densely and
+// rounded onto the grid, back to front, so a later pass wins where two of them meet.
+const BOOK_X = 27 // spine at the front edge
+const BOOK_Y = 30
+const lift = (u) => 2.4 * Math.sqrt(Math.abs(u))
+const flat = (u, v) => [BOOK_X + u * 14 - v * 6, BOOK_Y - u * 2 - v * 10]
+const onLeaf = (u, v) => { const [x, y] = flat(u, v); return [x, y - lift(u)] }
+const snap = ([x, y]) => [Math.round(x), Math.round(y)]
+const sweep = (fn, n = 240) => { for (let i = 0; i <= n; i++) fn(i / n) }
 
-// Beeswax taper: accent on the lit edge, frame on the shadow edge, so the
-// silhouette separates from parchment without a hard black outline.
-const CANDLE_BODY = [
-  '.......I.......', // wick
-  '.......I.......',
-  '...ApppIpppF...', // melted pool, wick embedded
-  '..ApppppppppF..',
-  '..AppggggAAAF..',
-  '..AppggggAAAF..',
-  '..AppggggAAApF.', // drip, right
-  '..AppggggAAApF.',
-  '..AppggggAAApF.',
-  '..AppggggAAAgF.',
-  '..AppggggAAAF..',
-  '.ApppggggAAAF..', // drip, left
-  '.ApppggggAAAF..',
-  '.ApppggggAAAF..',
-  '..AppggggAAAF..',
-  '..AppggggAAAF..',
-  '..AppggggAAAF..',
-  '..AppggggAAAF..',
-  '.AppppggggAAAF.', // wax pooling out
-  'AppppppggggAAAF',
-  '.AAAAAAAAAAAAA.', // cast shadow
-]
+// Text lines sit at these depths, back to front. '#' is ink, '.' a word gap; a line runs
+// one pixel per screen column, and columns past the end of its pattern stay blank.
+const LINE_V = [0.78, 0.6, 0.42, 0.24]
+const OLD_TEXT = ['###.####.##', '#.#####.###', '####.##.###', '####.###.##']
+const NEW_TEXT = ['####.###.##', '##.####.###', '#####.#.###', '###.####']
+
+// [x, y, inked] per screen column, following the curve of the leaf.
+function lineOn(u0, u1, v, pattern) {
+  const px = []
+  sweep((a) => {
+    const [x, y] = snap(onLeaf(u0 + (u1 - u0) * a, v))
+    if (!px.length || px.at(-1)[0] !== x) px.push([x, y])
+  }, 400)
+  return px.map(([x, y], k) => [x, y, (pattern[k] ?? '.') === '#'])
+}
+// The right-hand page, which the quill writes.
+const LINES = LINE_V.map((v, i) => lineOn(0.14, 0.86, v, NEW_TEXT[i]))
+
+function drawBook(g) {
+  // leather boards, three pixels under the page plane
+  sweep((a) => sweep((b) => {
+    const [x, y] = snap(flat(-1.07 + a * 2.14, -0.04 + b * 1.08))
+    set(g, x, y + 3, 'F')
+  }, 120), 240)
+  // front face of the text block: stacked leaves, page and accent in turn
+  sweep((a) => {
+    const u = -1 + 2 * a
+    const [x, ys] = snap(onLeaf(u, 0))
+    const [, yf] = snap(flat(u, 0))
+    for (let y = ys + 1; y <= yf + 2; y++) set(g, x, y, (y - ys) % 2 ? 'p' : 'A')
+  })
+  // left face of the text block, the one turned towards us
+  sweep((a) => {
+    const [x, ys] = snap(onLeaf(-1, a))
+    set(g, x - 1, ys + 1, 'A'); set(g, x - 1, ys + 2, 'A')
+  })
+  // page surface, back to front, then its outline and the gutter
+  sweep((b) => sweep((a) => set(g, ...snap(onLeaf(-1 + 2 * a, 1 - b)), 'p'), 300), 160)
+  sweep((a) => {
+    const u = -1 + 2 * a
+    set(g, ...snap(onLeaf(u, 0)), 'A'); set(g, ...snap(onLeaf(u, 1)), 'A')
+  }, 300)
+  sweep((a) => {
+    set(g, ...snap(onLeaf(-1, a)), 'A'); set(g, ...snap(onLeaf(1, a)), 'A'); set(g, ...snap(onLeaf(0, a)), 'A')
+  }, 100)
+  // the left-hand page is already written, in faded gold
+  LINE_V.forEach((v, i) => lineOn(-0.84, -0.14, v, OLD_TEXT[i]).forEach(([x, y, ink]) => {
+    if (ink) set(g, x, y, 'g')
+  }))
+}
+
+// ---------------------------------------------------------------- quill
+// 9x13, leaning up and to the right from the nib at local (0, QUILL_H - 1). Not the 16x16
+// quill sprite: this one is drawn at the banner's scale and moves as one piece.
+// 13 rows is the ceiling: the hop between the top two lines lifts the nib to y 16, and the
+// quill's top must stay on the parchment (y >= 4), clear of the gilt line.
+const QUILL_W = 9
+const QUILL_H = 13
+
+function quillRows() {
+  const m = Array.from({ length: QUILL_H }, () => new Array(QUILL_W).fill('.'))
+  const shaftX = (y) => Math.round(((QUILL_H - 1 - y) * 5) / (QUILL_H - 1))
+  // vane width either side of the shaft, top row down
+  const vane = [[0, 1], [1, 1], [1, 2], [2, 2], [2, 3], [2, 3], [2, 2], [1, 2], [1, 1], [0, 1]]
+  vane.forEach(([l, r], y) => {
+    const s = shaftX(y)
+    for (let x = s - l; x <= s + r; x++) if (x >= 0 && x < QUILL_W) m[y][x] = 'p'
+  })
+  // outline every vane pixel that touches empty space
+  const empty = (x, y) => x < 0 || y < 0 || x >= QUILL_W || y >= QUILL_H || m[y][x] === '.'
+  const edge = []
+  for (let y = 0; y < QUILL_H; y++) {
+    for (let x = 0; x < QUILL_W; x++) {
+      if (m[y][x] === 'p' && (empty(x - 1, y) || empty(x + 1, y) || empty(x, y - 1) || empty(x, y + 1))) edge.push([x, y])
+    }
+  }
+  edge.forEach(([x, y]) => { m[y][x] = 'I' })
+  for (let y = 1; y < vane.length - 1; y++) m[y][shaftX(y)] = 'g'      // shaft through the vane
+  for (let y = vane.length; y < QUILL_H - 1; y++) m[y][shaftX(y)] = 'A' // bare barrel
+  m[QUILL_H - 1][0] = 'I'                                              // nib
+  return m.map((r) => r.join(''))
+}
+const QUILL = quillRows()
 
 // ---------------------------------------------------------------- banner
-const W = 152
 const H = 40
 const TITLE = 'SCRIPTORIUM WRITER'
-const CANDLE_X = 10
-const CANDLE_Y = 6
-const WORD_X = 32
+const WORD_X = 56
 const WORD_Y = 14
 const CARET_X = WORD_X + titleW(TITLE) + 3
+const W = CARET_X + 2 + 5 // caret, then parchment and border
+
+// ---------------------------------------------------------------- page turn
+// The written leaf turns over to the left. s runs from the spine (0) to the fore-edge (1)
+// and v into depth, as on the page; theta rotates the leaf about the spine (0 lying right,
+// PI lying left), and the fore-edge lags behind the rest of it, so the leaf curls as it goes.
+function leafPt(s, v, th) {
+  const t = th - 0.45 * Math.sin(th) * s * s
+  const [x, y] = flat(s * Math.cos(t), v)
+  return snap([x, y - lift(s) - s * Math.sin(t) * 12])
+}
+const TURN_ANGLES = [10, 26, 46, 68, 90, 110, 142, 160, 174] // degrees, one frame each
+const TURN_HOLD = [2, 1, 1, 1, 1, 1, 1, 1, 2] // steps each frame is held
+
+// Whole-picture frames of the leaf alone, laid over the base. The front carries the page
+// just written; the back carries the left-hand page's faded text, which it lands as.
+function turnFrame(deg) {
+  const th = (deg * Math.PI) / 180
+  const g = grid(W, H)
+  for (let b = 0; b <= 120; b++) for (let a = 0; a <= 160; a++) set(g, ...leafPt(a / 160, 1 - b / 120, th), 'p')
+  sweep((a) => { set(g, ...leafPt(a, 0, th), 'A'); set(g, ...leafPt(a, 1, th), 'A') }, 200)
+  sweep((a) => { set(g, ...leafPt(1, a, th), 'A'); set(g, ...leafPt(0, a, th), 'A') }, 100)
+  // past the vertical the leaf is nearly edge-on in this view: no text until it opens out
+  if (deg >= 90 && deg < 150) return g
+  const front = deg < 90
+  LINE_V.forEach((v, i) => [...(front ? NEW_TEXT : OLD_TEXT)[i]].forEach((ch, k) => {
+    if (ch !== '#') return
+    const s = front ? 0.14 + (k + 0.5) / 14 : 0.84 - (k + 0.5) / 14
+    set(g, ...leafPt(s, v, th), front ? 'I' : 'g')
+  }))
+  return g
+}
+
+// ---------------------------------------------------------------- timeline
+// One step of the loop: where the nib is, how many pixels of each line are written, and
+// which turn frame (if any) is showing.
+const STEP = 0.085 // seconds
+const PARK = [44, 19] // nib position while the leaf turns: clear of it and of the wordmark
+
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t))
+// Eased glide from a to b (exclusive of a), about 1.6 px per step and never fewer than three.
+function glide(a, b) {
+  const n = Math.max(3, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6))
+  const out = []
+  for (let k = 1; k <= n; k++) {
+    const e = ease(k / n)
+    out.push([Math.round(a[0] + (b[0] - a[0]) * e), Math.round(a[1] + (b[1] - a[1]) * e)])
+  }
+  return out
+}
+
+// Writes every line in order, lifting the nib over word gaps and gliding between lines;
+// lifts off the finished page and turns it, gliding the quill home over the blank page
+// beneath. The loop is seamless: it starts and ends with the quill hovering over that blank
+// page and the previous one lying, turned, on the left.
+function timeline() {
+  const steps = []
+  const written = LINES.map(() => 0)
+  const push = (q, f = null) => steps.push({ q: [...q], w: [...written], f })
+  const first = LINES[0][0]
+  const hover = [first[0], first[1] - 2]
+  let q = hover
+  push(q); push(q)
+  for (const p of glide(q, [first[0], first[1] - 1])) push(p)
+  LINES.forEach((line, i) => {
+    line.forEach(([x, y, ink], k) => {
+      written[i] = k + 1
+      push(q = [x, ink ? y : y - 1])
+    })
+    const next = LINES[i + 1]
+    if (next) {
+      const [bx, by] = next[0]
+      const hop = [Math.round((q[0] + bx) / 2), Math.min(q[1], by) - 2]
+      for (const p of glide(q, hop)) push(q = p)
+      for (const p of glide(q, [bx, by - 1])) push(q = p)
+    }
+  })
+  // lift off the finished page and drift clear of the leaf
+  for (const p of glide(q, [q[0] + 1, q[1] - 2])) push(q = p)
+  for (const p of glide(q, PARK)) push(q = p)
+  push(q); push(q)
+  // the written page leaves with the leaf; a blank one lies underneath
+  written.fill(0)
+  const home = glide(PARK, hover)
+  let hi = 0
+  TURN_ANGLES.forEach((deg, fi) => {
+    for (let k = 0; k < TURN_HOLD[fi]; k++) {
+      if (deg > 100 && hi < home.length) q = home[hi++] // the quill starts home as the leaf passes the spine
+      push(q, fi)
+    }
+  })
+  while (hi < home.length) push(q = home[hi++])
+  return steps
+}
+
+function wordmark(g, x, y) {
+  const tw = titleW(TITLE)
+  write(g, x, y, TITLE, FONT, 'I', 5, 4)
+  fill(g, x, y + 9, tw, 1, 'A')            // title-page rules
+  fill(g, x + 10, y + 11, tw - 20, 1, 'A')
+}
 
 function baseGrid() {
   const g = grid(W, H)
@@ -191,22 +346,56 @@ function baseGrid() {
   fill(g, 3, H - 4, W - 6, 1, 'A')
   fill(g, W - 4, 3, 1, H - 6, 'A')
 
-  stamp(g, CANDLE_X, CANDLE_Y + FLAME_H, CANDLE_BODY)
-
-  const tw = titleW(TITLE)
-  write(g, WORD_X, WORD_Y, TITLE, FONT, 'I', 5, 4)
-  fill(g, WORD_X, WORD_Y + 9, tw, 1, 'A')            // title-page rules
-  fill(g, WORD_X + 10, WORD_Y + 11, tw - 20, 1, 'A')
+  drawBook(g)
+  wordmark(g, WORD_X, WORD_Y)
   return g
 }
 
-function flameGroup(i, pal) {
-  const g = grid(W, H)
-  stamp(g, CANDLE_X, CANDLE_Y, FLAME[i])
-  const values = FLAME.map((_, k) => (k === i ? 1 : 0)).join(';')
-  return `<g opacity="${i === 0 ? 1 : 0}">${paths(g, pal)}` +
-    `<animate attributeName="opacity" values="${values}" keyTimes="0;0.22;0.44;0.72"` +
-    ` dur="1.05s" calcMode="discrete" repeatCount="indefinite"/></g>`
+// Each line is drawn whole and revealed left to right by a clip whose width steps along
+// with the nib. Discrete steps keep every frame on the pixel grid.
+function lineGroups(steps, pal, anim) {
+  const clips = []
+  const groups = LINES.map((line, i) => {
+    const x0 = Math.min(...line.map(([x]) => x))
+    const ys = line.map(([, y]) => y)
+    const y0 = Math.min(...ys)
+    const widths = steps.map((s) => (s.w[i] === 0 ? 0 : line[s.w[i] - 1][0] - x0 + 1))
+    clips.push(`<clipPath id="line${i}"><rect x="${x0}" y="${y0}" width="0" height="${Math.max(...ys) - y0 + 1}">` +
+      `<animate attributeName="width" values="${widths.join(';')}" ${anim}/></rect></clipPath>`)
+    const g = grid(W, H)
+    line.forEach(([x, y, ink]) => { if (ink) set(g, x, y, 'I') })
+    return `<g clip-path="url(#line${i})">${paths(g, pal)}</g>`
+  })
+  return { clips, groups }
+}
+
+// Each turn frame is a whole picture, shown only on its own steps: opacity switches at
+// discrete keyTimes, one per change rather than one per step.
+function turnGroups(steps, pal, anim) {
+  return TURN_ANGLES.map((deg, fi) => {
+    const on = steps.map((s) => (s.f === fi ? 1 : 0))
+    const keyTimes = []
+    const values = []
+    on.forEach((v, k) => {
+      if (k === 0 || v !== on[k - 1]) { keyTimes.push((k / steps.length).toFixed(4)); values.push(v) }
+    })
+    return `<g opacity="${on[0]}">${paths(turnFrame(deg), pal)}<animate attributeName="opacity"` +
+      ` values="${values.join(';')}" keyTimes="${keyTimes.join(';')}" ${anim}/></g>`
+  })
+}
+
+// The quill is drawn once at the origin and translated so its nib follows the timeline.
+// The group starts at the first step, so a renderer without SMIL still shows it in place.
+function quillGroup(steps, pal, anim) {
+  // Fail the build rather than draw the quill over the gilt line or into the wordmark.
+  for (const { q: [x, y] } of steps) {
+    if (y - (QUILL_H - 1) < 4 || x + QUILL_W - 1 >= WORD_X) throw new Error(`quill nib at ${x},${y} leaves the open parchment`)
+  }
+  const g = grid(QUILL_W, QUILL_H)
+  stamp(g, 0, 0, QUILL)
+  const at = steps.map(({ q: [x, y] }) => `${x} ${y - (QUILL_H - 1)}`)
+  return `<g transform="translate(${at[0]})">${paths(g, pal)}` +
+    `<animateTransform attributeName="transform" type="translate" values="${at.join(';')}" ${anim}/></g>`
 }
 
 function caretGroup(pal) {
@@ -218,11 +407,17 @@ function caretGroup(pal) {
 }
 
 function banner(pal, scale = 6) {
+  const steps = timeline()
+  const anim = `dur="${(steps.length * STEP).toFixed(2)}s" calcMode="discrete" repeatCount="indefinite"`
+  const { clips, groups } = lineGroups(steps, pal, anim)
   // One top-level piece per line: keeps the animated groups countable from a shell and
   // makes a regenerated banner diff readably. No pretty-printing inside the groups.
   const body = [
+    `<defs>${clips.join('')}</defs>`,
     paths(baseGrid(), pal),
-    ...FLAME.map((_, i) => flameGroup(i, pal)),
+    ...groups,
+    ...turnGroups(steps, pal, anim),
+    quillGroup(steps, pal, anim),
     caretGroup(pal)
   ].join('\n')
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}"` +
@@ -329,12 +524,37 @@ function sprite(name, pal, scale = 3) {
 }
 
 // ---------------------------------------------------------------- social preview
-// GitHub wants a raster at exactly 1280x640, and the banner's 3.8:1 grid cannot be
-// stretched into 2:1 — so this is a second composition on a 160x80 board at 8x, with the
-// candle and the wordmark kept at the banner's relative offsets and centred as one group.
+// GitHub wants a raster at exactly 1280x640, and the banner's 4.3:1 grid cannot be
+// stretched into 2:1 — so this is a second composition on a 160x80 board at 8x. Side by
+// side, the book and the wordmark come to ~155 px against the board's 154 px interior, so
+// here the book stands above the wordmark and each is centred on its own.
 const SW = 160
 const SH = 80
 const SOCIAL_SCALE = 8
+const SOCIAL_GAP = 5 // rows between the book's boards and the wordmark
+
+// Bounding box of the cells that hold something.
+function bounds(g) {
+  const b = { x0: g.w, y0: g.h, x1: -1, y1: -1 }
+  g.px.forEach((row, y) => row.forEach((c, x) => {
+    if (c === null) return
+    b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y)
+    b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y)
+  }))
+  return b
+}
+
+// The banner's last written frame, as a still: page full, quill resting with its nib on the
+// end of the last line. A social preview cannot animate.
+function restingBook() {
+  const g = grid(W, H)
+  drawBook(g)
+  LINES.forEach((line) => line.forEach(([x, y, ink]) => { if (ink) set(g, x, y, 'I') }))
+  const book = bounds(g)
+  const [nx, ny] = LINES.at(-1).findLast(([, , ink]) => ink)
+  stamp(g, nx, ny - (QUILL_H - 1), QUILL)
+  return { g, book, all: bounds(g) }
+}
 
 function socialGrid() {
   const g = grid(SW, SH)
@@ -346,19 +566,15 @@ function socialGrid() {
   fill(g, 3, SH - 4, SW - 6, 1, 'A')
   fill(g, SW - 4, 3, 1, SH - 6, 'A')
 
-  const tw = titleW(TITLE)
-  const dx = WORD_X - CANDLE_X // candle-to-wordmark offsets, straight from the banner
-  const dy = WORD_Y - CANDLE_Y
-  const groupW = dx + tw
-  const groupH = Math.max(FLAME_H + CANDLE_BODY.length, dy + 12)
-  const gx = Math.round((SW - groupW) / 2)
-  const gy = Math.round((SH - groupH) / 2)
-
-  stamp(g, gx, gy, FLAME[0]) // frame 0 only: a social preview cannot animate
-  stamp(g, gx, gy + FLAME_H, CANDLE_BODY)
-  write(g, gx + dx, gy + dy, TITLE, FONT, 'I', 5, 4)
-  fill(g, gx + dx, gy + dy + 9, tw, 1, 'A')            // title-page rules
-  fill(g, gx + dx + 10, gy + dy + 11, tw - 20, 1, 'A')
+  // Centre the stack vertically counting the quill, which rises above the book; centre
+  // the book horizontally on its own, so the quill reads as leaning out of it.
+  const { g: art, book, all } = restingBook()
+  const artH = all.y1 - all.y0 + 1
+  const top = Math.round((SH - (artH + SOCIAL_GAP + 12)) / 2)
+  const dx = Math.round((SW - (book.x1 - book.x0 + 1)) / 2) - book.x0
+  const dy = top - all.y0
+  art.px.forEach((row, y) => row.forEach((c, x) => { if (c !== null) set(g, x + dx, y + dy, c) }))
+  wordmark(g, Math.round((SW - titleW(TITLE)) / 2), top + artH + SOCIAL_GAP)
   return g
 }
 

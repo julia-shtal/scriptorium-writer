@@ -73,9 +73,12 @@ describe('the committed README art is what the generator produces', () => {
   it('keeps banner-light.svg small enough to be an inline README image', () => {
     // Catches a regression in the emitter: `paths()` packs the pixel grid into one <path>
     // per colour. Going back to one <rect> per run — the obvious, naive shape — roughly
-    // triples this to ~17 KB for the same picture, in a file GitHub serves on every page
-    // view. 8000 is comfortably above the ~5.4 KB it is today and far below that.
-    expect(readFileSync(join(COMMITTED, 'banner-light.svg')).byteLength).toBeLessThan(8000)
+    // triples the static art, in a file GitHub serves on every page view. The banner is
+    // ~19.8 KB today, and the growth since the ~5.4 KB candle is the page turn's nine
+    // whole-picture frames plus the writing quill's timeline: a translate and a clip width
+    // per step, ~100 steps per loop. 24000 leaves room for that to grow a little and still
+    // trips on a per-run <rect> emitter.
+    expect(readFileSync(join(COMMITTED, 'banner-light.svg')).byteLength).toBeLessThan(24000)
   })
 
   it('declares 1280x640 in the social preview PNG header', () => {
